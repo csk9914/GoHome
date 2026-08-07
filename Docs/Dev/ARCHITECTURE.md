@@ -1,6 +1,6 @@
 # GoHome 기술 아키텍처 (개발용)
 
-> 이 문서는 개발자용 문서군(`Docs/Dev/`)이며, `Docs/Design/`(md/git)나 Notion과는 별개 체계다. 아래 `../Design/...` 링크는 `Docs/tools/check_doc_links.js` 검증 범위 밖이므로 파일을 옮기거나 헤더를 바꾸면 수동으로 확인할 것.
+> 이 문서는 개발자용 문서군(`Docs/Dev/`)이다. 링크 검증은 아래 "Docs/Design 참조 점검 체크리스트" 절 참고.
 >
 > 이 문서의 역할은 [../Design/02_GoHome_기술분석서.md](../Design/02_GoHome_기술분석서.md)에 이미 확정된 시스템 스펙을 실제 `Source/GoHome/` 폴더·클래스 이름에 매핑하고, 그 클래스들이 서로 어떤 관계·인터페이스로 맞물리는지 확정하는 것이다. **인일/복잡도/담당자 수치는 이 문서에 옮겨 적지 않는다** — 유일한 출처는 02문서이므로 필요하면 그쪽을 열어서 확인할 것. 반대로 **클래스 관계·경계 인터페이스 시그니처(아래 "시스템별 클래스 관계", "시스템 간 인터페이스 계약" 두 절)는 이 문서가 유일한 출처**다 — 02문서에는 시그니처 수준 내용이 없다.
 >
@@ -8,7 +8,7 @@
 
 ## 목차
 
-- [Docs/Design 링크 수동 점검 체크리스트](#docsdesign-링크-수동-점검-체크리스트)
+- [Docs/Design 참조 점검 체크리스트](#docsdesign-참조-점검-체크리스트)
 - [모듈/폴더 구조](#모듈폴더-구조)
 - [시스템 → 클래스 매핑](#시스템--클래스-매핑)
 - [시스템별 클래스 관계](#시스템별-클래스-관계)
@@ -19,13 +19,12 @@
 - [2차 프로토타입 추가 시스템 배치](#2차-프로토타입-추가-시스템-배치)
 - [Replication 권한 원칙](#replication-권한-원칙)
 
-## Docs/Design 링크 수동 점검 체크리스트
+## Docs/Design 참조 점검 체크리스트
 
-이 문서(및 `ONBOARDING.md`)의 `../Design/...` 링크는 `check_doc_links.js` 검증 대상이 아니므로, `Docs/Design/01`·`02`문서의 절 번호나 헤더 제목을 바꿀 때마다 아래를 직접 확인한다:
+스크립트 동작 방식은 저장소 루트 [CLAUDE.md](../../CLAUDE.md) "검증 스크립트" 절 참고. 스크립트가 못 잡는 부분(본문 텍스트로만 언급된 절 번호)이 있으니, `Docs/Design/01`·`02`문서의 절 번호나 헤더 제목을 바꿀 때마다 아래를 추가로 확인한다:
 
-1. `grep -rn "Design/0" Docs/Dev/` 로 이 문서군에서 Design 문서를 참조하는 모든 줄을 찾는다.
-2. 각 링크의 앵커(`#...`)가 바뀐 헤더를 가리키고 있지 않은지 확인한다.
-3. 헤더 번호(예: "10. 착수 순서", "13-1. ...")가 바뀌었다면, 이 문서의 "의존성/착수 순서"·"2차 프로토타입 추가 시스템 배치" 절에서 같은 번호를 인용한 곳도 함께 갱신한다.
+1. `grep -rn "Design/0" Docs/Dev/` 로 이 문서군에서 Design 문서를 참조하는 모든 줄을 찾아, 절 번호가 **본문 텍스트로만**(링크가 아닌 형태로) 언급된 곳이 있는지 확인한다.
+2. 헤더 번호(예: "10. 착수 순서", "13-1. ...")가 바뀌었다면, 이 문서의 "의존성/착수 순서"·"2차 프로토타입 추가 시스템 배치" 절에서 같은 번호를 인용한 곳도 함께 갱신한다.
 
 ## 모듈/폴더 구조
 
@@ -41,7 +40,7 @@
 | `UI/` | 6. UI | - (각 시스템 리플리케이티드 프로퍼티 바인딩 대상) | UMG 바인딩용 C++ 베이스 클래스 |
 | `Save/` | 9. 세이브 데이터 스키마, 8. 장비 강화 | - | `SaveGame` 오브젝트 |
 
-각 폴더는 `Public/`(헤더)·`Private/`(구현)으로 나눈다.
+`Public/`·`Private/` 최상위 배치 규칙은 [CODING_CONVENTIONS.md 폴더 규칙](CODING_CONVENTIONS.md#폴더-규칙) 참고.
 
 ## 시스템 → 클래스 매핑
 
@@ -162,18 +161,20 @@
 
 각자 선수 협의 없이 동시에 착수하려면, 아래 헤더들이 **Day 1에 먼저 커밋**되어 있어야 다른 폴더가 이를 include해 컴파일 참조를 시작할 수 있다. 이 표가 그 최소 스텁 목록이다.
 
+시그니처 자체는 대부분 위 "시스템 간 인터페이스 계약" 표에 이미 있으므로, 아래 표는 파일 경로와 착수 이유만 다루고 시그니처가 겹치는 항목은 참고 표시로 대신한다.
+
 | 헤더 경로 | 소유 폴더 | 담아야 할 최소 선언 | 다른 폴더가 착수 전 필요한 이유 |
 |---|---|---|---|
-| `Interaction/Public/IWeightProvider.h` | Interaction | `float GetTotalWeight() const` 순수 가상 함수만 | Player(산소), 13-3 수류 구간, 8번 장비 강화가 이 타입으로 참조 시작 |
-| `Interaction/Public/IInteractable.h` | Interaction | `CanInteract`/`OnInteract` 순수 가상 함수만 | Item이 이 인터페이스를 구현하며 착수 |
-| `Interaction/Public/FInventorySlot.h` | Interaction | 슬롯 구조체 필드(아이템 참조, 수량 등) | UI가 슬롯 바인딩 레이아웃을 먼저 잡을 수 있음 |
-| `Player/Public/IDamageable.h` | Player | `ApplyDamage` 순수 가상 함수만 | AI가 공격 로직을 이 인터페이스 대상으로 작성 시작 |
-| `AI/Public/ENoiseType.h` + `GenerateNoise` 시그니처 | AI | `ENoiseType`(Small/Medium/Large/Alarm) enum, `GenerateNoise(FVector, float, ENoiseType, AActor*)` 선언 | Player(이동 사운드)·Item(소음 유발형)이 발생원 호출 코드를 먼저 작성 |
-| `Core/Public/EExpeditionState.h` | Core | `EExpeditionState` enum, `FOnExpeditionStateChanged` 델리게이트 선언 | UI·Save·Interaction이 상태 구독 코드를 먼저 작성 |
-| `Core/Public/EFailReason.h` | Core | `EFailReason` enum(`AllPlayersDead`, `TimeExpired`, `DockThreatened` 등) | Player(HealthComponent)와 UI가 실패 처리 코드를 먼저 작성 |
-| `Core/Public/UDockingDoorComponent.h` | Core | `bool IsOpen() const` + `FOnDoorStateChanged` 델리게이트 선언만 (구현 없음) | AI(도킹 문 위협 판정), 13-1 게이트가 이 타입으로 참조 시작 |
-| `Core/Public/AGoHomeGameState.h` | Core | `AddDeliveredValue(int32)`, `Fail(EFailReason)`, `FOnExpeditionStateChanged OnStateChanged` 선언만 (구현 없음) | Interaction(정산 값 전달), UI, Save가 이 타입으로 참조 시작 |
-| `Player/Public/UHealthComponent.h` | Player | `DECLARE_MULTICAST_DELEGATE(FOnDeath)` + `FOnDeath OnDeath` 선언만 (구현 없음) | Core(GameState)가 생존자 수 추적을 위해 이 델리게이트를 구독하며 착수 |
+| `Public/Interaction/IWeightProvider.h` | Interaction | (위 인터페이스 계약 표 `IWeightProvider` 참고) 순수 가상 함수만 | Player(산소), 13-3 수류 구간, 8번 장비 강화가 이 타입으로 참조 시작 |
+| `Public/Interaction/IInteractable.h` | Interaction | (위 인터페이스 계약 표 `IInteractable` 참고) 순수 가상 함수만 | Item이 이 인터페이스를 구현하며 착수 |
+| `Public/Interaction/FInventorySlot.h` | Interaction | 슬롯 구조체 필드(아이템 참조, 수량 등) | UI가 슬롯 바인딩 레이아웃을 먼저 잡을 수 있음 |
+| `Public/Player/IDamageable.h` | Player | (위 인터페이스 계약 표 `IDamageable` 참고) 순수 가상 함수만 | AI가 공격 로직을 이 인터페이스 대상으로 작성 시작 |
+| `Public/AI/ENoiseType.h` | AI | `ENoiseType`(Small/Medium/Large/Alarm) enum (`GenerateNoise` 시그니처는 위 인터페이스 계약 표 참고) | Player(이동 사운드)·Item(소음 유발형)이 발생원 호출 코드를 먼저 작성 |
+| `Public/Core/EExpeditionState.h` | Core | `EExpeditionState` enum (델리게이트 시그니처는 위 인터페이스 계약 표 참고) | UI·Save·Interaction이 상태 구독 코드를 먼저 작성 |
+| `Public/Core/EFailReason.h` | Core | `EFailReason` enum(`AllPlayersDead`, `TimeExpired`, `DockThreatened` 등) | Player(HealthComponent)와 UI가 실패 처리 코드를 먼저 작성 |
+| `Public/Core/UDockingDoorComponent.h` | Core | (위 인터페이스 계약 표 "도킹 문 상태" 참고) 선언만 (구현 없음) | AI(도킹 문 위협 판정), 13-1 게이트가 이 타입으로 참조 시작 |
+| `Public/Core/AGoHomeGameState.h` | Core | `AddDeliveredValue(int32)`, `Fail(EFailReason)`, `FOnExpeditionStateChanged OnStateChanged` 선언만 (구현 없음) | Interaction(정산 값 전달), UI, Save가 이 타입으로 참조 시작 |
+| `Public/Player/UHealthComponent.h` | Player | (위 인터페이스 계약 표 `OnDeath` 참고) 선언만 (구현 없음) | Core(GameState)가 생존자 수 추적을 위해 이 델리게이트를 구독하며 착수 |
 
 **열거형 값 (확정)**:
 - `EExpeditionState`: `Lobby`, `ZoneSelect`, `Departure`, `Exploration`, `Return`, `Settlement`, `Failed`
@@ -184,59 +185,35 @@
 
 ## 클래스 다이어그램
 
+필드·메서드 목록은 위 "시스템별 클래스 관계"·"시스템 간 인터페이스 계약" 절에 이미 있으므로, 여기서는 텍스트로 보기 어려운 교차 폴더 의존 관계만 화살표로 표시한다.
+
 ```mermaid
 classDiagram
     %% Core
-    class AGoHomeGameState {
-        +EExpeditionState State
-        +AddDeliveredValue(int32 Value)
-        +Fail(EFailReason Reason)
-        +FOnExpeditionStateChanged OnStateChanged
-    }
-    class UDockingDoorComponent {
-        +bool IsOpen()
-        +FOnDoorStateChanged OnDoorStateChanged
-    }
-    class AGoHomeGameMode {
-        +Logout(AController*)
-    }
+    class AGoHomeGameState
+    class UDockingDoorComponent
+    class AGoHomeGameMode
 
     %% Player
     class AGoHomeCharacter
-    class UOxygenComponent {
-        +float Oxygen
-    }
-    class UHealthComponent {
-        +float HP
-        +FOnDeath OnDeath
-    }
+    class UOxygenComponent
+    class UHealthComponent
     class IDamageable {
         <<interface>>
-        +ApplyDamage(float, AActor*, FName)
     }
 
     %% Interaction
-    class UInventoryComponent {
-        +FInventorySlot Slots[4]
-    }
+    class UInventoryComponent
     class IWeightProvider {
         <<interface>>
-        +GetTotalWeight() float
     }
     class IInteractable {
         <<interface>>
-        +CanInteract(APlayerController*) bool
-        +OnInteract(APlayerController*)
     }
 
     %% Item
-    class AItemActorBase {
-        +bool bIsBeingClaimed
-    }
-    class UItemDataAsset {
-        +float Weight
-        +float Value
-    }
+    class AItemActorBase
+    class UItemDataAsset
 
     %% AI (경계만)
     class AMonsterBase {
@@ -244,9 +221,7 @@ classDiagram
     }
 
     %% Save
-    class UGoHomeSaveGame {
-        +int32 SharedCurrency
-    }
+    class UGoHomeSaveGame
     class UGoHomeSaveSubsystem {
         <<GameInstanceSubsystem, 트래블 간 유지>>
     }

@@ -1,6 +1,6 @@
 # GoHome 코딩 컨벤션 (개발용)
 
-> `Docs/Dev/` 문서군 — `Docs/Design/`·Notion과는 별개 체계. 여기 적힌 항목은 이미 [../Design/02_GoHome_기술분석서.md 전제 조건](../Design/02_GoHome_기술분석서.md#전제-조건)에서 팀 결정된 것을 실행 규칙으로 구체화한 것뿐이며, 새 결정을 만들지 않는다.
+> `Docs/Dev/` 문서군. 여기 적힌 항목은 [../Design/02_GoHome_기술분석서.md 전제 조건](../Design/02_GoHome_기술분석서.md#전제-조건)에서 이미 팀 결정된 것을 실행 규칙으로 구체화한 것이다.
 >
 > 참고: [Unreal Engine 스타일 가이드 (Allar, 한글 번역)](https://github.com/ymkim50/ue4-style-guide/blob/master/README_Kor.md) — 아래 "에셋 명명 규칙"·"블루프린트 변수 규칙"은 이 문서를 GoHome 프로젝트 범위에 맞게 축약한 것이다.
 
@@ -9,6 +9,7 @@
 Epic 공식 C++ 코딩 표준(Epic Coding Standard)을 그대로 따른다.
 
 - 클래스 접두사: `U`(UObject 파생), `A`(Actor 파생), `F`(구조체/일반 클래스), `I`(인터페이스), `E`(Enum), `T`(템플릿)
+- **파일명에는 접두사를 붙이지 않는다** (`IDamageable.h`가 아니라 `Damageable.h`). "Add C++ Class" 마법사가 Name 필드 값 앞에 타입별 접두사를 자동으로 붙이므로, Name 필드에는 항상 접두사 없는 베이스 이름만 입력할 것(예: `Damageable`, `WeightProvider`, `Interactable`) — 이미 접두사가 붙은 이름을 입력하면 `IIDamageable`처럼 중복 접두사가 붙는다.
 - 헤더(`Public/`)와 구현(`Private/`)을 반드시 분리
 - 멤버 변수는 `PascalCase`, `bool`은 `b` + 형용사(`Is` 생략, `bSubmerged`) — Epic 원문 예시(`bPendingDestruction`, `bHasFadedIn`)도 `Is`를 붙이지 않는 쪽이라 이를 따름. 블루프린트 변수도 동일 규칙([블루프린트 변수 규칙](#블루프린트-변수-규칙) 참고)
 - 함수는 `PascalCase`, 매개변수/지역 변수는 `PascalCase` (Epic 표준 그대로, camelCase 아님)
@@ -38,14 +39,14 @@ AI 컨트롤러(`AIC_`), 파티클 시스템(`PS_`) 등 위 표에 없는 타입
 
 ### Source (C++)
 
-기능별 분리, [ARCHITECTURE.md](ARCHITECTURE.md)의 폴더 구조를 그대로 따른다: `Core` / `Player` / `Interaction` / `AI` / `Item` / `UI` / `Save`, 각각 `Public`/`Private` 하위 분리.
+기능별 분리, [ARCHITECTURE.md](ARCHITECTURE.md)의 폴더 구조를 그대로 따른다: `Public`/`Private`을 `Source/GoHome/` 최상위에 두고, 그 아래 각 기능 폴더(`Core` / `Player` / `Interaction` / `AI` / `Item` / `UI` / `Save`)를 중첩한다(예: `Public/Core/`, `Private/Core/`).
 
 - 새 시스템이 기존 7개 폴더 중 어디에도 안 맞으면, 새 폴더를 만들기 전에 [ARCHITECTURE.md](ARCHITECTURE.md)에 먼저 매핑을 기록한다 (폴더 구조의 단일 출처는 그 문서).
 - 폴더를 넘나드는 의존은 인터페이스(`IInteractable`, `IWeightProvider`류)로만 한다 — 컴포넌트가 다른 폴더의 구체 클래스를 직접 include하지 않는다.
 
 ### Content (에셋)
 
-`Content/GoHome/` 아래를 Source와 동일한 7개 기능 폴더로 맞춘다: `Core` / `Player` / `Interaction` / `AI` / `Item` / `UI` / `Save` — 코드-에셋 대응이 바로 보이도록 함. 그 외:
+`Content/GoHome/` 아래를 위 Source와 동일한 7개 기능 폴더로 맞춘다 — 코드-에셋 대응이 바로 보이도록 함. 그 외:
 
 - `Maps/`: 모든 레벨을 여기 모은다 (기획서 맵별로 하위 폴더 분리 가능)
 - `MaterialLibrary/`: 여러 기능 폴더에서 공유하는 마스터 머티리얼/유틸리티만
@@ -65,9 +66,9 @@ AI 컨트롤러(`AIC_`), 파티클 시스템(`PS_`) 등 위 표에 없는 타입
 
 ### AI(BP_Monster) 작업 방식
 
-AI 담당이 BP 워크플로를 기본으로 삼기 때문에, AI는 다른 시스템보다 BP 비중이 크다 — C++를 못 써서가 아니라 워크플로 선택이며, 필요하면 AI 담당도 C++ 쪽을 직접 고칠 수 있다.
+AI는 워크플로 선택으로 다른 시스템보다 BP 비중이 크지만, 필요하면 AI 담당도 C++ 쪽을 직접 고칠 수 있다.
 
-- `AMonsterBase`(C++)가 경계 인터페이스([ARCHITECTURE.md "AI (경계만)"](ARCHITECTURE.md#ai-경계만) 참고 — `IDamageable`, `GenerateNoise`/`IMonsterNoiseListener`)를 `BlueprintNativeEvent`로 노출하고, `BP_Monster`(`AMonsterBase` 자식 BP)에서 상태 머신·Steering Behaviors를 구현한다.
+- `AMonsterBase`(C++)가 경계 인터페이스([ARCHITECTURE.md "AI (경계만)"](ARCHITECTURE.md#ai-경계만) 참고)를 `BlueprintNativeEvent`로 노출하고, `BP_Monster`(`AMonsterBase` 자식 BP)에서 상태 머신·Steering Behaviors를 구현한다.
 - 데미지 적용·소음 판정·상태 브로드캐스트처럼 서버 권위가 걸린 처리는 BP가 직접 구현하지 않고 C++ 함수 호출로 끝낸다 — 위 "C++ / Blueprint 경계" 절의 원칙이 AI에도 동일하게 적용된다.
 - 상태 머신을 Behavior Tree + Blackboard로 구성해도 무방하다(권장일 뿐, 02문서의 "Enum 상태 머신 + Steering Behaviors" 결정을 대체하는 게 아니라 병행 가능한 구현 수단).
 - 경계 인터페이스 시그니처 변경이 필요하면 C++ 담당과 사전 협의한다 — 소유권 규칙은 [ARCHITECTURE.md "소유권 규칙"](ARCHITECTURE.md#병렬-착수를-위한-헤더-스텁과-소유권) 참고.
@@ -87,8 +88,8 @@ AI 담당이 BP 워크플로를 기본으로 삼기 때문에, AI는 다른 시�
 ## Git / Git LFS
 
 - 소스 관리는 Git + Git LFS ([../Design/02_GoHome_기술분석서.md 전제 조건](../Design/02_GoHome_기술분석서.md#전제-조건)에서 미션 가이드 명시로 확정)
-- LFS 대상: `.uasset`, `.umap`, 이미지/오디오/비디오 원본 등 바이너리 애셋 전체
-- 저장소 초기화 절차(현재 미착수)는 [ONBOARDING.md](ONBOARDING.md) 참고
+- LFS 대상: `.uasset`, `.umap`, 이미지/오디오/비디오 원본 등 바이너리 애셋 전체 (`.gitattributes`에 이미 등록됨)
+- 새 팀원은 clone 직후 `git lfs install`을 한 번 실행한다 — 이후 `.gitattributes`에 등록된 확장자는 자동으로 LFS를 통해 받아진다. 새 바이너리 확장자를 추가로 트래킹해야 하면 `.gitattributes`에 `<확장자> filter=lfs diff=lfs merge=lfs -text` 패턴을 추가한다.
 
 ## 커밋 전 체크
 
