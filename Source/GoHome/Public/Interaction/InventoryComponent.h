@@ -1,4 +1,4 @@
-
+﻿//THE
 
 #pragma once
 
@@ -33,9 +33,21 @@ public:
 
 	virtual float GetTotalWeight() const override;
 
+	// 빈 슬롯을 찾아 Item을 채운다. 빈 슬롯이 없으면 false.
+	// 서버에서만 호출할 것.
+	bool TryAddItem(AItemActorBase* Item);
+
+	// Item이 들어있는 슬롯을 비운다. 찾아서 비웠으면 true.
+	// 서버에서만 호출할 것.
+	bool RemoveItem(AItemActorBase* Item);
+
+
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UFUNCTION()
 	void OnRep_Slots();
+
+private:
+	int32 FindEmptySlotIndex() const;
 };

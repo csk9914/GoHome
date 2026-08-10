@@ -109,11 +109,13 @@
 - **접속 종료 처리 (결정)**: 생존자 수 감소 경로는 `OnDeath` 하나만이 아니다. `AGoHomeGameMode`(Core, `AGameMode` 파생)의 `Logout` 오버라이드(접속 종료 시 서버가 항상 호출)도 GameState의 공통 함수 `OnPlayerRemovedFromParty(APlayerState*)`를 호출해 생존자 수를 갱신한다 — `OnDeath`와 `Logout` 두 경로가 모두 이 함수로 합류하므로, 접속 종료가 "생존"으로 잘못 집계되지 않는다. `OnPlayerRemovedFromParty` 자신도 멱등이어야 한다: GameState가 `TSet<APlayerState*> RemovedFromParty`를 갖고, 이미 포함된 PlayerState면 즉시 no-op한다 — 사망 후 같은 플레이어의 접속이 끊겨 `Logout`이 이어서 호출돼도 생존자 수가 중복 차감되지 않는다.
 
 ### Interaction
-- **클래스**: `UInventoryComponent`(4슬롯), `IInteractable`, `IWeightProvider`, 소켓 어태치 헬퍼
+- **클래스**: `UInventoryComponent`(4슬롯), `UInteractionComponent`(상호작용 대상 탐지), `IInteractable`, `IWeightProvider`, 소켓 어태치 헬퍼
 - **관계**: `UInventoryComponent`가 `IWeightProvider`를 구현(보유 아이템 무게 합산). `IInteractable`은 Item이 구현. 소켓 어태치는 Player의 스켈레탈 메시 소켓에 접근해야 하므로 두 폴더 사이의 결합 지점이다.
 - **결합도 절단**: 소켓 어태치 헬퍼는 Interaction에 두되, Character는 "오른손/왼손 소켓 이름"만 공개 프로퍼티로 노출해 Interaction이 Character 내부 구조를 몰라도 되게 한다.
 - **동시 픽업 레이스 컨디션 (결정)**: 아이템 액터 자신이 서버 전용 `bool bIsBeingClaimed` 플래그를 갖는다. `Server_RequestPickup`이 도착했을 때 이미 `true`면 즉시 거부한다 — 서버 틱은 단일 스레드로 처리되므로 같은 틱 안에서도 먼저 도착한 RPC만 통과한다. 별도 락 오브젝트나 큐는 두지 않는다. 이 판단이 유효하려면 체크와 설정이 하나의 동기 함수 호출 안에서 끊김 없이 실행되어야 한다 — 사이에 Latent 노드나 비동기 트레이스를 넣지 말 것.
 - **정산 값 전달 (결정)**: Interaction이 `GameState->AddDeliveredValue(int32)`를 직접 호출한다. GameState는 UE에서 `GetWorld()->GetGameState()`로 어차피 전역 접근 가능한 구조라 델리게이트로 감싸는 것은 실익이 없다.
+- **상호작용 대상 탐지 방식 (결정)**: 02문서에 감지 방식이 명시돼 있지 않아 이 문서에서 신설. `UInteractionComponent`가 카메라 정면 라인 트레이스(기본 `TraceDistance` 200, `TraceInterval` 0.1초 스로틀)로 `IInteractable` 구현 액터를 탐지하고, 로컬 컨트롤 폰에서만 동작한다(다른 클라이언트의 리플리케이트된 폰까지 트레이스하지 않도록 `IsLocallyControlled()`로 필터링). 대상이 바뀔 때만 `OnInteractableTargetChanged`를 브로드캐스트(HUD 프롬프트 바인딩용).
+- **`TryInteract()` 서버 권위 (임시 상태, 주의)**: 현재 `TryInteract()`는 `CanInteract` 확인 후 `OnInteract`를 로컬에서 직접 호출한다. `AItemActorBase::OnInteract`가 아직 빈 스텁이라 지금은 문제없지만, 실제 픽업 로직이 들어가면 클라이언트가 서버 승인 없이 상태를 바꾸는 셈이 되어 위 "동시 픽업 레이스 컨디션" 결정과 충돌한다 — 픽업 로직 구현 시 `Server_RequestInteract` 같은 서버 RPC 경유로 교체해야 한다(코드에 TODO로 표시돼 있음).
 
 ### AI (경계만)
 - 내부 상태 머신·조향 로직은 팀원 구현에 맡기며 이 문서에서 다루지 않는다.
@@ -147,7 +149,7 @@
 | 접점 | 정의 위치 | 시그니처(초안) | 호출·구독 측 | 근거 |
 |---|---|---|---|---|
 | `IWeightProvider` | Interaction | `float GetTotalWeight() const` | Player(산소 소모 계산), 13-3 수류 구간, 8번 장비 강화(페널티 곡선 파라미터) | 02문서 3·4·8·13-3절 |
-| `IInteractable` | Interaction | `bool CanInteract(APlayerController*) const` / `void OnInteract(APlayerController*)` | Item이 구현, 13-1 게이트의 두 트리거가 각각 구현 | 02문서 4·13-1절 |
+| `IInteractable` | Interaction | `bool CanInteract(APawn*) const` / `void OnInteract(APawn*)` | Item이 구현, 13-1 게이트의 두 트리거가 각각 구현, `UInteractionComponent`(Interaction)가 트레이스로 찾은 대상에 호출 | 02문서 4·13-1절 |
 | `IDamageable` (신설 제안) | Player | `void ApplyDamage(float Amount, AActor* Instigator, FName DamageType)` | Player(HealthComponent)가 구현, AI(몬스터 공격)와 Player 자신(`UOxygenComponent`의 질식 데미지)이 소비 | 02문서에 데미지 전달 경로가 없어 이 문서에서 신설 |
 | `GenerateNoise` | AI | `static void GenerateNoise(FVector Location, float Radius, ENoiseType Type, AActor* Source)` | Player(이동 사운드)·Item(소음 유발형)이 발생원(호출 즉시 동기 처리, 위 "AI (경계만)" 참고) | 02문서 2·4·5절 |
 | `IMonsterNoiseListener` (신설 제안) | AI | `void OnNoiseHeard(FVector Location, float Radius, ENoiseType Type, AActor* Source)` | `AMonsterBase`가 구현, `GenerateNoise`가 반경 내 각 몬스터에 호출(반응 로직은 구현체 내부, 경계 밖) | 위 "AI (경계만)" `GenerateNoise` 호출 방식 정정 참고 |
@@ -204,6 +206,7 @@ classDiagram
 
     %% Interaction
     class UInventoryComponent
+    class UInteractionComponent
     class IWeightProvider {
         <<interface>>
     }
@@ -233,12 +236,14 @@ classDiagram
     AGoHomeCharacter *-- UOxygenComponent
     AGoHomeCharacter *-- UHealthComponent
     AGoHomeCharacter *-- UInventoryComponent
+    AGoHomeCharacter *-- UInteractionComponent
     UHealthComponent ..|> IDamageable
     UOxygenComponent ..> IDamageable : ApplyDamage(질식)
     UOxygenComponent ..> IWeightProvider : GetTotalWeight()
     UInventoryComponent ..|> IWeightProvider
     AItemActorBase ..|> IInteractable
     AItemActorBase ..|> IWeightProvider
+    UInteractionComponent ..> IInteractable : CanInteract()/OnInteract()
     AItemActorBase --> UItemDataAsset : 참조
     UInventoryComponent --> AItemActorBase : 보유 슬롯
     AMonsterBase ..> IDamageable : ApplyDamage(공격)
