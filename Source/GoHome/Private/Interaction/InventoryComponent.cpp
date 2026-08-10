@@ -1,7 +1,8 @@
-
+﻿//THE
 
 #include "Interaction/InventoryComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Item/ItemActorBase.h"
 
 UInventoryComponent::UInventoryComponent()
 {
@@ -11,7 +12,16 @@ UInventoryComponent::UInventoryComponent()
 
 float UInventoryComponent::GetTotalWeight() const
 {
-	return 0.f;
+	float TotalWeight = 0.f;
+	for (const FInventorySlot& Slot : Slots)
+	{
+		if (Slot.Item)
+		{
+			TotalWeight += Slot.Item->GetTotalWeight() * Slot.Quantity;
+
+		}
+	}
+	return TotalWeight;
 }
 
 void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
