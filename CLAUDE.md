@@ -1,52 +1,34 @@
-# GoHome 문서 관리 가이드
+# GoHome Documentation Guide
 
-이 저장소는 GoHome(심해판 리썰 컴퍼니류 협동 생존 게임) UE5.7 프로젝트다. 문서/도구는 `Docs/` 폴더 하나로 모아서 관리하며, 그 아래가 **세 시스템으로 분리**된다: `Docs/Design/`(md/git, 01·02·03·05 — 변경 빈도가 낮고 상호 색인이 핵심인 게임 디자인), Notion(담당자·일정·DoD처럼 변경 빈도가 높고 체크박스/DB 형태가 자연스러운 것), `Docs/Dev/`(md/git, 코드와 함께 바뀌는 개발자용 문서 — 아키텍처/코딩 컨벤션/AI 에이전트 활용 가이드/Git 워크플로우). 검증 스크립트는 `Docs/tools/check_doc_links.js`에 있다 (상세는 아래 "검증 스크립트" 절 참고). 이 파일이 다루는 "단일 출처 원칙"은 `Docs/Design/`의 md↔Notion 경계에 대한 것이며, `Docs/Dev/`는 별도 문서군이라 그 규칙(인일/담당자/일정 등의 단일 출처)의 적용 대상은 아니다 — 다만 링크 무결성 검증만큼은 Dev도 포함된다.
+This repo is GoHome (a deep-sea Lethal Company-like co-op survival game), UE5.7. All docs/tools live under `Docs/`, split into **three systems**: `Docs/Design/` (md/git, files 01·02·03·05 — low change frequency, cross-indexing matters), Notion (high-change-frequency items like owners/schedule/DoD that fit checkboxes/DBs), `Docs/Dev/` (md/git, developer docs that change with the code — architecture/coding conventions/AI agent guide/git workflow).
 
-**md/git(`Docs/Design/`)과 Notion 사이에는 하이퍼링크를 걸지 않는다** — 기획서 문서끼리만 앵커 링크로 연결하고, Notion을 가리킬 때는 문서명/절 이름만 텍스트로 언급한다 (이유는 [AI_AGENT_GUIDE.md](Docs/Dev/AI_AGENT_GUIDE.md#왜-mdnotion-경계에-링크를-안-거는가) 참고 — 이 파일은 매 세션 상시 로드되므로 규칙 자체가 아닌 배경 설명은 온디맨드로 읽는 문서 쪽에 둔다).
+Content rules specific to `Docs/Design/` (single-source-of-truth, editing procedure, notation labels, md↔Notion linking) live in [Docs/Design/DOC_MANAGEMENT.md](Docs/Design/DOC_MANAGEMENT.md) — read that file when editing a Design doc. This file only covers what's needed in every session: the doc map and link validation.
 
-## 문서 지도
+## Document Lifecycle
 
-| 문서 | 위치 | 역할 |
+- **Now (design phase)**: `Docs/Dev/` (`ARCHITECTURE.md`/`CODING_CONVENTIONS.md`) is the primary reference for the main dev loop — `Docs/Design/` (01/02/03/05) is opened only when Dev docs don't cover the question (e.g. tracing a decision's original rationale), and edited only on the user's explicit request, never as a side effect of other work. When editing, `DOC_MANAGEMENT.md` rules apply in full.
+- **After prototype kickoff**: tag that commit and treat `Docs/Design/` as a frozen reference — this changes nothing about the rule above, since Design was already read-mostly. New Design decisions after the freeze still go through `DOC_MANAGEMENT.md`'s single-source-of-truth rules, but should be rare.
+
+## Document Map
+
+| Doc | Location | Role |
 |---|---|---|
-| `Docs/Design/01_GoHome_기획서.md` | md/git | 게임 디자인 본체 (핵심 루프, 시스템 스펙, 1차/2차 범위, 맵 계획) |
-| `Docs/Design/02_GoHome_기술분석서.md` | md/git | 시스템별 기술 구현 방식, 복잡도/인일 추정 |
-| `Docs/Design/03_GoHome_리스크_미결정사항.md` | md/git | ① 진짜 남은 미결정 항목, ② 이미 끝난 결정들의 색인. 다른 문서에 흩어진 "무엇이 결정됐는지"를 찾는 진입점 |
-| GoHome 착수 로드맵 | **Notion**(워크스페이스에서 문서명으로 검색) | 착수 전 체크리스트, DoD(완료 정의), 선행 관계, 제출 전 준비 항목 |
-| GoHome 담당자 배정 | **Notion DB**(워크스페이스에서 문서명으로 검색) | 시스템별 담당자·목표 기간·착수 조건·진행 상태 |
-| `Docs/Design/05_GoHome_참고문서_교차매핑.md` | md/git | 각 설계 결정이 어느 원본(팀원안/미션 가이드)에서 왔는지, 미션 가이드 대비 누락 검증 |
-| `Docs/Dev/ARCHITECTURE.md` | md/git (개발용) | 기획서의 시스템을 실제 UE 클래스/컴포넌트/`Source/GoHome/` 폴더에 매핑 |
-| `Docs/Dev/CODING_CONVENTIONS.md` | md/git (개발용) | C++ 코딩 표준, 폴더 규칙, C++/Blueprint 경계 |
-| `Docs/Dev/AI_AGENT_GUIDE.md` | md/git (개발용) | 팀원이 각자 AI 코딩 에이전트에게 담당 작업을 물어볼 때 따르는 절차 (질문 유형별 참조 문서 라우팅) |
-| `Docs/Dev/GIT_WORKFLOW.md` | md/git (개발용) | GitHub Desktop 사용 절차, 브랜치 전략(당일 작업 당일 머지), PR 도입 시점 |
+| `Docs/Design/01_GoHome_기획서.md` | md/git | Core game design (core loop, system specs, phase 1/2 scope, map plan) |
+| `Docs/Design/02_GoHome_기술분석서.md` | md/git | Per-system technical approach, complexity/person-day estimates |
+| `Docs/Design/03_GoHome_리스크_미결정사항.md` | md/git | ① Actually-open decisions, ② index of decisions already made |
+| GoHome 착수 로드맵 | **Notion** (search workspace by name) | Pre-kickoff checklist, DoD, dependencies, submission prep |
+| GoHome 담당자 배정 | **Notion DB** (search workspace by name) | Owner/target period/start conditions/status per system |
+| `Docs/Design/05_GoHome_참고문서_교차매핑.md` | md/git | Which source (teammate draft/mission guide) each design decision traces to; gap-check vs. mission guide |
+| `Docs/Design/DOC_MANAGEMENT.md` | md/git | Content-integrity rules for `Docs/Design/` (single source of truth, editing procedure, notation labels) |
+| `Docs/Dev/ARCHITECTURE.md` | md/git (dev) | Maps design-doc systems to UE classes/components/`Source/GoHome/` folders |
+| `Docs/Dev/CODING_CONVENTIONS.md` | md/git (dev) | C++ coding standards, folder rules, C++/Blueprint boundary |
+| `Docs/Dev/AI_AGENT_GUIDE.md` | md/git (dev) | Procedure teammates use to ask their AI coding agent about their assigned work |
+| `Docs/Dev/GIT_WORKFLOW.md` | md/git (dev) | GitHub Desktop workflow, branch strategy, when to adopt PRs |
 
-## 단일 출처 원칙 (숫자/결정을 여러 곳에 중복 적지 않는다)
-
-- **인일 추정치**: 유일한 출처는 `02문서`의 "시스템별 요약" 표(1차)와 "13. 2차 프로토타입 추가 시스템"(2차). 다른 문서는 링크만 걸고 숫자를 다시 옮겨 적지 않는다.
-- **미션 가이드 필수 요건 충족 여부**: 유일한 출처는 `03문서` "0. 미션 가이드라인 대조" 표.
-- **담당자/일정**: 유일한 출처는 **Notion "GoHome 담당자 배정" DB**. md 쪽(01/02/03/05)에는 이 값을 복사해 적지 않고, 필요하면 "담당자는 Notion 참고" 정도로만 언급한다.
-- **"무엇이 언제 결정됐는지"**: `03문서` "2. 결정 완료 색인"에 한 줄 요약 + 근거 링크로만 남긴다. 근거(수치·이유)는 원래 결정이 적힌 01/02문서에만 쓴다.
-
-새 결정/수치가 생기면 이 목록에 없는 새로운 "출처"를 만들지 말고, 위 항목 중 하나에 넣고 나머지 문서에서는 (같은 시스템 안에서만) 링크로, 다른 시스템이면 텍스트 언급으로만 참조할 것.
-
-## 문서 수정 시 확인 절차
-
-1. 수정하려는 내용의 핵심 키워드로 `Docs/Design/` 4개 문서(01,02,03,05) 전체를 grep해 관련 언급이 있는지 먼저 확인한다 (`Grep` 도구로 `Docs/Design/01_GoHome_기획서.md,Docs/Design/02_GoHome_기술분석서.md,Docs/Design/03_GoHome_리스크_미결정사항.md,Docs/Design/05_GoHome_참고문서_교차매핑.md` 전체 대상). 담당자·일정·DoD 관련 수정이면 Notion 쪽도 확인한다.
-2. 위 "단일 출처 원칙"에 따라 실제 값을 고칠 위치를 하나만 정하고, 나머지는 (같은 시스템이면) 링크, (다른 시스템이면) 텍스트 언급만 맞춰준다.
-3. 새로운 팀 결정·기획 수정이면 `03문서`의 "2. 결정 완료 색인"에 한 줄 추가한다. 아직 결정 안 된 사안이면 "1. 진짜 남은 미결정 항목" 표에 추가한다.
-4. md 헤더 제목(`#`, `##`, `###` 라인)을 바꾸거나 삭제했다면 그 헤더를 앵커로 참조하던 다른 md 문서 링크(Design 문서끼리, 그리고 Dev → Design 상대경로 링크)가 깨졌을 수 있다 — 아래 검증 스크립트를 반드시 돌린다. **Notion 쪽 변경은 이 스크립트로 검증되지 않으므로, 담당자/일정/DoD가 바뀌면 01/02/03/05의 관련 텍스트 언급(문서명만 언급한 부분)이 아직 맞는지 수동으로 확인한다.**
-5. 수정을 마친 뒤 `node Docs/tools/check_doc_links.js`를 실행해 링크 오류 0건을 확인한다.
-
-## 검증 스크립트
+## Validation Script
 
 ```
 node Docs/tools/check_doc_links.js
 ```
 
-`Docs/Design/` 문서(01,02,03,05)와 `Docs/Dev/`의 모든 `.md` 문서 전체의 모든 헤더에 대해 GitHub 앵커 생성 규칙을 그대로 재현해 앵커 목록을 만들고, 문서 간 `[텍스트](파일.md#앵커)` 링크(상대경로 기준, Dev → `../Design/...` 참조 포함)가 실제 존재하는 앵커를 가리키는지 대조한다. 헤더 텍스트를 바꾸는 모든 수정 후 습관적으로 실행할 것. 대상 저장소는 GitHub에서 열람하는 것을 전제로 한다.
-
-## 표기 관례 (Docs/Design/ 문서에 한함)
-
-- 원문 대비 변경/추가 사항은 항상 다음 세 라벨 중 하나로 표시한다: **팀 결정**(팀이 명시적으로 정한 것), **기획 수정**(원문 내용을 바꾼 것), **검증 추가**(원문·미션 가이드 재대조로 새로 발견해 채운 것).
-- 라벨에 날짜는 적지 않는다 — 언제 바뀌었는지는 git blame/log가 이미 정확히 추적하므로 프로즈에 중복 기록하지 않는다. 특정 시점에 실제로 있었던 내용을 확인하려면 `git log`/`git blame`으로 해당 라벨이 추가된 커밋을 찾는다.
-- 문서 서술 중 날짜를 꼭 적어야 하는 경우(마감일 등)는 상대적 날짜("다음 주", "이번 주 금요일") 대신 절대 날짜로 적는다.
-- 특정 시점의 문서 상태를 통째로 보존해야 하면(예: 제출본) 파일을 복제하지 말고 그 커밋에 `git tag`를 붙인다 — 파일을 복제하면 "어느 게 최신이냐"는 혼란과 이중 유지보수 부담이 생긴다.
+Reproduces GitHub's anchor-generation rule for every header in this file, `Docs/Design/*.md`, and `Docs/Dev/*.md`, then checks that every markdown cross-link with an anchor (relative path, including Dev → `../Design/...`) resolves to a real header. Run this habitually after any header-text change, in this file or Design/Dev docs alike. Assumes the repo is viewed on GitHub.

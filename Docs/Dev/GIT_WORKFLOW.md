@@ -1,4 +1,4 @@
-# GoHome GitHub Desktop 사용 가이드 & 워크플로우 (개발용)
+    # GoHome GitHub Desktop 사용 가이드 & 워크플로우 (개발용)
 
 > `Docs/Dev/` 문서군. Git 저장소 구조/네이밍 규칙 자체는 [CODING_CONVENTIONS.md "Git / Git LFS"](CODING_CONVENTIONS.md#git--git-lfs)를 따르며, 이 문서는 그 위에서 팀이 실제로 브랜치를 만들고 머지하는 **작업 절차**만 다룬다.
 
@@ -50,13 +50,13 @@ Summary는 `태그: 내용` 형식으로 적는다 (예: `기능: 인벤토리 U
 | `문서` | `Docs/` 문서 수정 |
 | `기타` | 위에 안 맞는 잡일(정리, 설정 변경 등) |
 
-- 내용은 한 줄 요약(무엇을 했는지)으로 충분하다 — "왜"가 자명하지 않을 때만 Description에 이유를 덧붙인다.
+- "왜"가 자명하지 않을 때만 Description에 이유를 덧붙인다.
 - 태그 목록에 없는 새 태그가 필요해 보이면 임의로 만들지 말고 팀과 상의해 이 표에 추가한다.
 
 ### 3-4. 원격에 올리기
 
 1. 상단 **Push origin** 클릭 (최초 push 시 버튼이 **Publish branch**로 표시됨 — 그대로 클릭).
-2. Git LFS 대상 파일(`.uasset`, `.umap` 등)이 섞여 있으면 push 시간이 길어질 수 있다 — 완료될 때까지 기다린다.
+2. Git LFS 대상 파일(`.uasset`, `.umap` 등)이 섞여 있으면 push가 오래 걸릴 수 있다 — 완료될 때까지 기다린다.
 
 ### 3-5. 당일 머지 (`develop`으로)
 
@@ -76,6 +76,6 @@ Summary는 `태그: 내용` 형식으로 적는다 (예: `기능: 인벤토리 U
 
 ## 4. 자주 발생하는 상황
 
-- **머지 전에 `develop`이 이미 앞서 있는 경우**: 3-5의 2번(Fetch/Pull)을 건너뛰지 않는다 — 오래된 `develop` 기준으로 머지하면 다른 팀원의 변경을 되돌리는 결과가 날 수 있다.
+- **머지 전에 `develop`이 이미 앞서 있는 경우**: 3-5의 2번(Fetch/Pull)을 건너뛰지 않는다(오래된 `develop` 기준 머지는 다른 팀원 변경을 되돌릴 수 있음).
 - **당일 안에 작업이 안 끝난 경우**: 끝난 만큼 커밋 → push → 가능하면 그날치만 `develop`에 머지하고, 남은 작업은 다음 날 새 이니셜 브랜치를 다시 파서 이어간다. 하루를 넘긴 브랜치를 그대로 들고 있지 않는다.
 - **Git LFS 관련 오류**: 최초 clone 후 `git lfs install`을 실행했는지 확인([CODING_CONVENTIONS.md "Git / Git LFS"](CODING_CONVENTIONS.md#git--git-lfs) 참고).

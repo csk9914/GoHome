@@ -30,7 +30,7 @@ allowed-tools: [Read, Edit, Grep, Glob, Bash, Agent, AskUserQuestion]
 |---|---|---|
 | `ARCHITECTURE.md` | UE5.7 멀티플레이어 아키텍처 전문가 | Replication 정확성(권위/RepNotify/레이스), 소유권·생명주기(구독/재구독, 델리게이트 댕글링, 레벨 트래블), 인터페이스 경계의 실질적 디커플링 여부, 동시성 엣지 케이스, "결합도 절단" 결정이 2차 확장에도 버티는지, Day-1 병렬 착수 헤더 스텁 완결성, 클래스 다이어그램-본문 정합성 |
 | `CODING_CONVENTIONS.md` | C++/UE 팀 코딩 표준 리뷰어 | 규칙이 실제로 강제/검증 가능한지(모호한 규칙 없음), 예외 케이스 누락, `ARCHITECTURE.md`의 폴더·클래스 명명과 모순되지 않는지, C++/Blueprint 경계 규정의 실행 가능성 |
-| `AI_AGENT_GUIDE.md` | AI 에이전트 협업 워크플로 리뷰어 | 라우팅표가 가리키는 문서·앵커가 실제로 존재하는지, `ARCHITECTURE.md`/`CODING_CONVENTIONS.md`의 최신 절 구성과 어긋나지 않는지, `CLAUDE.md`의 단일 출처 원칙과 모순되는 안내가 없는지 |
+| `AI_AGENT_GUIDE.md` | AI 에이전트 협업 워크플로 리뷰어 | 라우팅표가 가리키는 문서·앵커가 실제로 존재하는지, `ARCHITECTURE.md`/`CODING_CONVENTIONS.md`의 최신 절 구성과 어긋나지 않는지, [Docs/Design/DOC_MANAGEMENT.md 단일 출처 원칙](../../../Docs/Design/DOC_MANAGEMENT.md#단일-출처-원칙)과 모순되는 안내가 없는지 |
 
 ## 3. 리뷰→반영 루프
 
@@ -47,7 +47,7 @@ allowed-tools: [Read, Edit, Grep, Glob, Bash, Agent, AskUserQuestion]
    - Critical/Major는 근거를 재확인(필요하면 직접 Grep으로 관련 Design 문서·코드 대조)한 뒤 `Edit`로 직접 반영한다.
    - Minor는 오케스트레이터가 판단해 선택적으로 반영한다.
    - finding이 사실과 다르거나 이미 다른 방식으로 해결되어 있다면 반영하지 않고 그 이유를 사용자에게 남긴다.
-4. **링크 검증**: 이번 회차에서 `Docs/Design/` 문서를 가리키는 앵커·헤더 텍스트를 건드렸다면 `node Docs/tools/check_doc_links.js`를 실행해 오류 0건을 확인한다(CLAUDE.md "문서 수정 시 확인 절차" 5단계와 동일). `Docs/Dev/` 자체는 이 스크립트의 검증 대상이 아니므로, `Docs/Design/`으로 나가는 링크만 수동으로 다시 훑는다.
+4. **링크 검증**: 이번 회차에서 `Docs/Design/` 문서를 가리키는 앵커·헤더 텍스트를 건드렸다면 `node Docs/tools/check_doc_links.js`를 실행해 오류 0건을 확인한다(Docs/Design/DOC_MANAGEMENT.md의 수정 절차와 동일). `Docs/Dev/` 자체는 이 스크립트의 검증 대상이 아니므로, `Docs/Design/`으로 나가는 링크만 수동으로 다시 훑는다.
 5. **종료 조건**: 이번 회차 리뷰가 Critical/Major 없이 "준비됨"으로 판정하면 루프를 즉시 중단한다(N회를 다 채울 필요 없음). 그렇지 않으면 다음 회차로 진행하고, N회에 도달하면 무조건 종료한다.
 
 ## 4. 단일 출처 원칙 안전장치

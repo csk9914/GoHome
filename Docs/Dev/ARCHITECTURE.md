@@ -21,7 +21,7 @@
 
 ## Docs/Design 참조 점검 체크리스트
 
-스크립트 동작 방식은 저장소 루트 [CLAUDE.md](../../CLAUDE.md) "검증 스크립트" 절 참고. 스크립트가 못 잡는 부분(본문 텍스트로만 언급된 절 번호)이 있으니, `Docs/Design/01`·`02`문서의 절 번호나 헤더 제목을 바꿀 때마다 아래를 추가로 확인한다:
+스크립트 동작 방식은 저장소 루트 [CLAUDE.md 검증 스크립트](../../CLAUDE.md#validation-script) 절 참고. 스크립트가 못 잡는 부분(본문 텍스트로만 언급된 절 번호)이 있으니, `Docs/Design/01`·`02`문서의 절 번호나 헤더 제목을 바꿀 때마다 아래를 추가로 확인한다:
 
 1. `grep -rn "Design/0" Docs/Dev/` 로 이 문서군에서 Design 문서를 참조하는 모든 줄을 찾아, 절 번호가 **본문 텍스트로만**(링크가 아닌 형태로) 언급된 곳이 있는지 확인한다.
 2. 헤더 번호(예: "10. 착수 순서", "13-1. ...")가 바뀌었다면, 이 문서의 "의존성/착수 순서"·"2차 프로토타입 추가 시스템 배치" 절에서 같은 번호를 인용한 곳도 함께 갱신한다.
@@ -44,101 +44,215 @@
 
 ## 시스템 → 클래스 매핑
 
-이름은 02문서에 이미 등장한 것을 그대로 쓴다 (새 이름을 여기서 만들지 않음).
+이름은 02문서에 이미 등장한 것을 그대로 쓴다 (새 이름을 여기서 만들지 않음). 폴더 대응은 위 "모듈/폴더 구조" 표 참고. 각 블록의 `classes`는 `클래스명: 설명` 형태다.
 
 ### Core — 온라인 서브시스템 + 게임 흐름
-- `OnlineSubsystemSteam` 기반 세션 생성/참가 (리슨 서버, 호스트가 서버 겸임)
-- GameState 상태 머신: 로비 → 탐사 지역 선택 → 출발 → 탐사 → 복귀 → 정산
-- 도킹 문 개폐 컴포넌트 (서버 권위, 리플리케이트) — 2차 프로토타입 `UMultiActorGateComponent`(13-1)와 기반 공유 가능성을 염두에 두고 설계
-- `AGoHomeGameMode`: 접속 종료(`Logout`) 처리 (신설, 아래 "시스템별 클래스 관계" 참고)
-- 자세한 스펙: [../Design/02_GoHome_기술분석서.md 1. 온라인 서브시스템 + 보이스](../Design/02_GoHome_기술분석서.md#1-온라인-서브시스템--보이스)
+```yaml
+design_ref: ../Design/02_GoHome_기술분석서.md#1-온라인-서브시스템--보이스
+classes:
+  USessionSubsystem: "UGameInstanceSubsystem 파생. OnlineSubsystemSteam 기반 세션 생성/검색/참가/파괴 (리슨 서버, 호스트가 서버 겸임). 트래블(ServerTravel \"?listen\"/ClientTravel)은 호출 측(UI/GameInstance) 책임"
+  GameState 상태 머신: 로비 → 탐사 지역 선택 → 출발 → 탐사 → 복귀 → 정산
+  도킹 문 개폐 컴포넌트: 서버 권위, 리플리케이트. 2차 프로토타입 UMultiActorGateComponent(13-1)와 기반 공유 가능성을 염두에 두고 설계
+  AGoHomeGameMode: 접속 종료(Logout) 처리 (신설, 아래 "시스템별 클래스 관계" 참고)
+```
 
 ### Player — 이동/사운드/산소/HP
-- `CharacterMovementComponent` 확장 또는 부력 기반 커스텀 무브먼트 (서버 권위 + 클라 보간)
-- `UOxygenComponent`, `UHealthComponent` (액터 컴포넌트)
-- `IWeightProvider` 인터페이스 구현 지점 (무게 참조는 Interaction 쪽 정의를 따름)
-- 자세한 스펙: [../Design/02_GoHome_기술분석서.md 2. 이동 + 사운드](../Design/02_GoHome_기술분석서.md#2-이동--사운드), [3. 산소 + HP](../Design/02_GoHome_기술분석서.md#3-산소--hp)
+```yaml
+design_refs:
+  - ../Design/02_GoHome_기술분석서.md#2-이동--사운드
+  - ../Design/02_GoHome_기술분석서.md#3-산소--hp
+classes:
+  무브먼트 확장: CharacterMovementComponent 확장 또는 부력 기반 커스텀 무브먼트 (서버 권위 + 클라 보간)
+  UOxygenComponent: 액터 컴포넌트
+  UHealthComponent: 액터 컴포넌트
+notes:
+  - IWeightProvider 인터페이스 구현 지점 (무게 참조는 Interaction 쪽 정의를 따름)
+```
 
 ### Interaction — 상호작용/운반/납품
-- `IInteractable` 인터페이스, 서버 RPC 소유권 이전
-- 오른손 소켓 어태치 홀딩(손전등만 왼손 예외)
-- 4슬롯 인벤토리, 슬롯별 개별 `RepNotify`
-- `IWeightProvider` 인터페이스 정의 위치 (Player의 산소 컴포넌트, 2차의 수류 구간이 여기를 참조)
-- 자세한 스펙: [../Design/02_GoHome_기술분석서.md 4. 상호작용, 운반, 납품](../Design/02_GoHome_기술분석서.md#4-상호작용-운반-납품)
+```yaml
+design_ref: ../Design/02_GoHome_기술분석서.md#4-상호작용-운반-납품
+classes:
+  IInteractable: 인터페이스, 서버 RPC 소유권 이전
+  소켓 어태치 홀딩: 오른손 소켓 (손전등만 왼손 예외)
+  인벤토리: 4슬롯, 슬롯별 개별 RepNotify
+  IWeightProvider: 인터페이스 정의 위치 (Player의 산소 컴포넌트, 2차의 수류 구간이 여기를 참조)
+```
 
 ### AI — 몬스터
-- `BP_Monster`: Enum 상태 머신(Patrol/Investigate/Chase/Attack/Return) + Steering Behaviors(Seek/Arrive/Pursuit/Avoidance)
-- `GenerateNoise` 함수(위치/반경/타입/발생원) — AI Perception 대신 자체 구현
-- 1차 투입 종: 청각 추적자 1종
-- 자세한 스펙: [../Design/02_GoHome_기술분석서.md 5. AI 몬스터](../Design/02_GoHome_기술분석서.md#5-ai-몬스터)
+```yaml
+design_ref: ../Design/02_GoHome_기술분석서.md#5-ai-몬스터
+classes:
+  BP_Monster: Enum 상태 머신(Patrol/Investigate/Chase/Attack/Return) + Steering Behaviors(Seek/Arrive/Pursuit/Avoidance)
+  GenerateNoise: 함수(위치/반경/타입/발생원) — AI Perception 대신 자체 구현
+notes:
+  - 1차 투입 종: 청각 추적자 1종
+```
 
 ### Item — 아이템 정의
-- 액터 + 데이터 애셋(무게/가치/파손 플래그/소음 플래그) 조합으로 종 구분
-- 자세한 스펙: [../Design/02_GoHome_기술분석서.md 4. 상호작용, 운반, 납품](../Design/02_GoHome_기술분석서.md#4-상호작용-운반-납품)
+```yaml
+design_ref: ../Design/02_GoHome_기술분석서.md#4-상호작용-운반-납품
+classes:
+  아이템 액터 + 데이터 애셋: 무게/가치/파손 플래그/소음 플래그 조합으로 종 구분
+```
 
 ### UI
-- UMG, 각 시스템의 리플리케이티드 프로퍼티 바인딩 (산소/HP 게이지, 인벤토리, 납품, 탐사 지역 선택, 로딩 연출, 제한 시간 카운트다운, 장비 강화 구매)
-- 자세한 스펙: [../Design/02_GoHome_기술분석서.md 6. UI](../Design/02_GoHome_기술분석서.md#6-ui)
+```yaml
+design_ref: ../Design/02_GoHome_기술분석서.md#6-ui
+classes:
+  UMG 바인딩용 C++ 베이스 클래스: 각 시스템의 리플리케이티드 프로퍼티 바인딩 (산소/HP 게이지, 인벤토리, 납품, 탐사 지역 선택, 로딩 연출, 제한 시간 카운트다운, 장비 강화 구매)
+```
 
 ### Save — 세이브 데이터 / 장비 강화
-- 호스트 로컬 `SaveGame` 오브젝트 (파티 공유 재화, 구매 완료 업그레이드 목록, 마지막 진행 지점)
-- 장비 강화 요청은 서버가 FIFO로 처리
-- 자세한 스펙: [../Design/02_GoHome_기술분석서.md 8. 장비 강화 시스템](../Design/02_GoHome_기술분석서.md#8-장비-강화-시스템), [9. 세이브 데이터 스키마](../Design/02_GoHome_기술분석서.md#9-세이브-데이터-스키마)
+```yaml
+design_refs:
+  - ../Design/02_GoHome_기술분석서.md#8-장비-강화-시스템
+  - ../Design/02_GoHome_기술분석서.md#9-세이브-데이터-스키마
+classes:
+  SaveGame 오브젝트: 호스트 로컬, 파티 공유 재화/구매 완료 업그레이드 목록/마지막 진행 지점
+notes:
+  - 장비 강화 요청은 서버가 FIFO로 처리
+```
 
 ## 시스템별 클래스 관계
 
-각 폴더에서 실제로 생길 클래스와 그 관계를 "가상으로 코드를 짠다"는 수준으로 정리한다. 내부 구현(함수 바디, 알고리즘)은 다루지 않고, **클래스 간 소유/참조 관계·결합도를 끊어야 할 지점·구현 전에 결정해야 하는 숨은 요소**만 다룬다. 숨은 요소 중 "신설 결정"이라 표시된 항목은 02문서에 없던 내용을 이 문서에서 새로 정하는 것이다.
+각 폴더에서 실제로 생길 클래스와 그 관계를 "가상으로 코드를 짠다"는 수준으로 정리한다. 내부 구현(함수 바디, 알고리즘)은 다루지 않고, **클래스 간 소유/참조 관계·결합도를 끊어야 할 지점·구현 전에 결정해야 하는 숨은 요소**만 다룬다. `decisions`의 각 항목 중 02문서에 없던 내용을 이 문서에서 새로 정한 것은 그렇게 표시한다.
 
 ### Core
-- **클래스**: `AGoHomeGameState`(상태 필드 + 전이 함수), `UDockingDoorComponent`(액터 부착, 서버 권위 개폐 상태), `AGoHomeGameMode`(접속 종료 처리)
-- **관계**: 도킹 문 상태는 GameState가 직접 들고 있지 않고 `UDockingDoorComponent`가 별도로 소유한다 — GameState는 탐사 진행 단계(로비/탐사/정산 등)만 책임진다.
-- **결합도 절단**: AI가 도킹 문 상태를 읽을 때 GameState 전체를 참조하지 않고 `UDockingDoorComponent`의 공개 상태(`IsOpen()`, 상태 변경 델리게이트)만 구독한다 — AI가 게임 흐름 전체와 결합되지 않도록.
-- **상태 전이 트리거 (결정)**: 02문서에 없던 부분이라 이 문서에서 확정한다.
-  - 로비 → 탐사 지역 선택: `Server_ConfirmZoneSelection()` (플레이어 확인 입력)
-  - 탐사 지역 선택 → 출발: 각 `APlayerState`가 replicated `bool bReady`를 갖고, GameState가 전원 `bReady == true`가 된 시점에 자동 전이한다(별도 "시작" 버튼 없음). 각 플레이어의 `Server_SetReady()` RPC가 자신의 `bReady`를 설정한 직후, 같은 호출 안에서 GameState가 전원 상태를 검사해 전이한다(폴링 없음).
-  - 탐사 → 복귀/정산: 도킹 문이 닫힌 상태이고 생존 플레이어 전원이 잠수정 콜리전 볼륨 내부에 있을 때 GameState가 전이한다.
-  - 탐사 → 실패: 제한 시간 만료 타이머, 또는 도킹 문 위협 판정(→ AI 경계 참고)으로 기존 결정 유지.
+```yaml
+classes:
+  AGoHomeGameState: 상태 필드 + 전이 함수
+  UDockingDoorComponent: 액터 부착, 서버 권위 개폐 상태
+  AGoHomeGameMode: 접속 종료 처리
+  USessionSubsystem: UGameInstanceSubsystem, Steam 세션 생성/검색/참가/파괴
+
+relations:
+  - 도킹 문 상태는 GameState가 직접 들고 있지 않고 UDockingDoorComponent가 별도로 소유한다 — GameState는 탐사 진행 단계(로비/탐사/정산 등)만 책임진다.
+
+decoupling:
+  - AI가 도킹 문 상태를 읽을 때 GameState 전체를 참조하지 않고 UDockingDoorComponent의 공개 상태(IsOpen(), 상태 변경 델리게이트)만 구독한다 — AI가 게임 흐름 전체와 결합되지 않도록.
+
+decisions:
+  - name: 세션 생명주기
+    detail: USessionSubsystem은 UGameInstanceSubsystem(트래블 간 유지). UI는 BP 델리게이트만 구독, GameState는 세션 트리거로 쓰지 않음.
+  - name: 상태 전이 트리거 (02문서에 없어 이 문서에서 확정)
+    detail: |
+      - 로비 → 탐사 지역 선택: Server_ConfirmZoneSelection()
+      - 탐사 지역 선택 → 출발: 전원 replicated bool bReady == true 시 자동 전이 (Server_SetReady() 내에서 즉시 검사, 폴링 없음)
+      - 탐사 → 복귀/정산: 도킹 문 닫힘 + 생존자 전원 잠수정 콜리전 볼륨 내부
+      - 탐사 → 실패: 제한 시간 만료 또는 도킹 문 위협 판정(→ AI 경계 참고)
+```
 
 ### Player
-- **클래스**: `AGoHomeCharacter`, `UOxygenComponent`, `UHealthComponent`, 무브먼트 확장(`CharacterMovementComponent` 파생 또는 커스텀)
-- **관계**: `AGoHomeCharacter`가 Oxygen/Health 컴포넌트를 소유. `UOxygenComponent`는 소모 속도 계산 시 Interaction의 `IWeightProvider`를 참조하되, `UInventoryComponent`를 직접 참조하지 않고 인터페이스로만 접근한다.
-- **결합도 절단**: `UHealthComponent`는 "누가 데미지를 주는지" 몰라야 한다 → `IDamageable`(아래 인터페이스 계약 참고)로 노출해 호출자가 Character 타입을 몰라도 되게 한다.
-- **HP 0 처리 (결정)**: `UHealthComponent`가 서버 전용 `OnDeath` 델리게이트를 브로드캐스트한다. 관전 모드 전환 자체는 Character/PlayerController가 즉시 로컬 처리하지만, "전원 사망 → 실패"는 Core(GameState)가 각 **Character**의 `UHealthComponent`에 바인딩해 생존자 수를 추적하다가 0명이 되면 `Fail(EFailReason::AllPlayersDead)`를 호출한다. Character는 탐사마다 새로 스폰되므로, GameState는 매 탐사 시작 시(각 Character의 `BeginPlay`/possess 시점) 새 Character의 `OnDeath`에 재구독한다.
-- **산소 0 → 데미지 경로 (결정)**: `UOxygenComponent`는 산소가 0에 도달하면 틱마다 자신의 `Owner`가 구현한 `IDamageable::ApplyDamage(질식 데미지량, Owner, "Suffocation")`를 직접 호출한다. 별도 이벤트 계층 없이 동기 호출로 충분하다.
-- **중복 사망 방지 (결정)**: `UHealthComponent`는 `HP <= 0`이 되는 순간 내부 `bIsDead` 플래그를 세우고, 이후 도달하는 모든 `ApplyDamage` 호출은 즉시 무시한다(no-op). `OnDeath`는 캐릭터당 탐사 1회만 브로드캐스트됨이 보장되어야 GameState의 생존자 카운트가 어긋나지 않는다 — 예: AI 공격과 질식 데미지가 같은 틱/인접 틱에 겹쳐 들어오는 경우.
-- **접속 종료 처리 (결정)**: 생존자 수 감소 경로는 `OnDeath` 하나만이 아니다. `AGoHomeGameMode`(Core, `AGameMode` 파생)의 `Logout` 오버라이드(접속 종료 시 서버가 항상 호출)도 GameState의 공통 함수 `OnPlayerRemovedFromParty(APlayerState*)`를 호출해 생존자 수를 갱신한다 — `OnDeath`와 `Logout` 두 경로가 모두 이 함수로 합류하므로, 접속 종료가 "생존"으로 잘못 집계되지 않는다. `OnPlayerRemovedFromParty` 자신도 멱등이어야 한다: GameState가 `TSet<APlayerState*> RemovedFromParty`를 갖고, 이미 포함된 PlayerState면 즉시 no-op한다 — 사망 후 같은 플레이어의 접속이 끊겨 `Logout`이 이어서 호출돼도 생존자 수가 중복 차감되지 않는다.
+```yaml
+classes:
+  AGoHomeCharacter: ""
+  UOxygenComponent: ""
+  UHealthComponent: ""
+  무브먼트 확장: CharacterMovementComponent 파생 또는 커스텀
+
+relations:
+  - AGoHomeCharacter가 Oxygen/Health 컴포넌트를 소유.
+  - "UOxygenComponent는 소모 속도 계산 시 Interaction의 IWeightProvider를 참조하되, UInventoryComponent를 직접 참조하지 않고 인터페이스로만 접근한다."
+
+decoupling:
+  - "UHealthComponent는 \"누가 데미지를 주는지\" 몰라야 한다 → IDamageable(아래 인터페이스 계약 참고)로 노출해 호출자가 Character 타입을 몰라도 되게 한다."
+
+decisions:
+  - name: HP 0 처리
+    detail: UHealthComponent가 서버 전용 OnDeath 브로드캐스트. GameState가 탐사마다 각 Character의 OnDeath에 재구독해 생존자 수 추적, 0명이면 Fail(EFailReason::AllPlayersDead).
+  - name: 산소 0 → 데미지 경로
+    detail: UOxygenComponent가 산소 0시 매 틱 IDamageable::ApplyDamage(질식 데미지, Owner, "Suffocation") 동기 호출.
+  - name: 중복 사망 방지
+    detail: UHealthComponent는 bIsDead 플래그로 사망 후 ApplyDamage를 no-op 처리(OnDeath 캐릭터당 탐사 1회 보장).
+  - name: 접속 종료 처리
+    detail: AGoHomeGameMode::Logout도 GameState::OnPlayerRemovedFromParty(APlayerState*)를 호출(OnDeath와 동일 경로 합류, TSet으로 멱등 보장).
+```
 
 ### Interaction
-- **클래스**: `UInventoryComponent`(4슬롯), `IInteractable`, `IWeightProvider`, 소켓 어태치 헬퍼
-- **관계**: `UInventoryComponent`가 `IWeightProvider`를 구현(보유 아이템 무게 합산). `IInteractable`은 Item이 구현. 소켓 어태치는 Player의 스켈레탈 메시 소켓에 접근해야 하므로 두 폴더 사이의 결합 지점이다.
-- **결합도 절단**: 소켓 어태치 헬퍼는 Interaction에 두되, Character는 "오른손/왼손 소켓 이름"만 공개 프로퍼티로 노출해 Interaction이 Character 내부 구조를 몰라도 되게 한다.
-- **동시 픽업 레이스 컨디션 (결정)**: 아이템 액터 자신이 서버 전용 `bool bIsBeingClaimed` 플래그를 갖는다. `Server_RequestPickup`이 도착했을 때 이미 `true`면 즉시 거부한다 — 서버 틱은 단일 스레드로 처리되므로 같은 틱 안에서도 먼저 도착한 RPC만 통과한다. 별도 락 오브젝트나 큐는 두지 않는다. 이 판단이 유효하려면 체크와 설정이 하나의 동기 함수 호출 안에서 끊김 없이 실행되어야 한다 — 사이에 Latent 노드나 비동기 트레이스를 넣지 말 것.
-- **정산 값 전달 (결정)**: Interaction이 `GameState->AddDeliveredValue(int32)`를 직접 호출한다. GameState는 UE에서 `GetWorld()->GetGameState()`로 어차피 전역 접근 가능한 구조라 델리게이트로 감싸는 것은 실익이 없다.
+```yaml
+classes:
+  UInventoryComponent: 4슬롯
+  IInteractable: ""
+  IWeightProvider: ""
+  소켓 어태치 헬퍼: ""
+
+relations:
+  - UInventoryComponent가 IWeightProvider를 구현(보유 아이템 무게 합산).
+  - IInteractable은 Item이 구현.
+  - 소켓 어태치는 Player의 스켈레탈 메시 소켓에 접근해야 하므로 두 폴더 사이의 결합 지점이다.
+
+decoupling:
+  - "소켓 어태치 헬퍼는 Interaction에 두되, Character는 \"오른손/왼손 소켓 이름\"만 공개 프로퍼티로 노출해 Interaction이 Character 내부 구조를 몰라도 되게 한다."
+
+decisions:
+  - name: 동시 픽업 레이스 컨디션
+    detail: 아이템 액터의 서버 전용 bIsBeingClaimed 플래그로 Server_RequestPickup 중복 요청 거부(체크+설정은 한 동기 함수 안에서 처리, Latent/비동기 트레이스 금지).
+  - name: 정산 값 전달
+    detail: Interaction이 GameState->AddDeliveredValue(int32)를 직접 호출(델리게이트로 감싸지 않음).
+```
 
 ### AI (경계만)
-- 내부 상태 머신·조향 로직은 팀원 구현에 맡기며 이 문서에서 다루지 않는다.
-- **경계 인터페이스**:
-  1. 공격 시 대상의 `IDamageable::ApplyDamage`를 호출 — 몬스터는 대상이 Player인지 몰라도 된다.
-  2. 소음 감지는 발생원이 호출하는 `GenerateNoise`가 대신 처리 — AI는 발생원이 Player인지 Item인지 몰라도 된다.
-  3. 도킹 문 위협 판정은 `UDockingDoorComponent`의 공개 상태만 읽는다.
-- **`GenerateNoise` 호출 방식 (정정)**: 이전 판에서 "구독 방식 미정"이라 적었으나, 02문서 5절을 다시 보면 이미 결정돼 있었다 — `GenerateNoise`는 이벤트/델리게이트가 아니라 **호출 즉시 서버가 반경 내 몬스터를 순회하는 동기 함수**다. 단, "Investigate로 전이한다"는 반응 자체는 이 문서에서 경계에 고정하지 않는다 — 1차 청각 추적자 1종은 항상 Investigate로 반응하지만, 이후 몬스터 종이 늘어나면 종마다 반응이 다를 수 있으므로(무시/도주/임계값 이상만 반응 등), `GenerateNoise`는 반경 내 각 몬스터의 `IMonsterNoiseListener::OnNoiseHeard(FVector Location, float Radius, ENoiseType Type, AActor* Source)`를 동기 호출까지만 책임지고, "무엇으로 전이할지"는 각 몬스터의 내부 구현(경계 밖)이 정한다. AI 내부 상태 머신이 바뀌어도 "호출 즉시 동기 처리"라는 계약과 `OnNoiseHeard` 시그니처만 유지되면 경계로 충분하다.
+```yaml
+note: 내부 상태 머신·조향 로직은 팀원 구현에 맡기며 이 문서에서 다루지 않는다.
+
+boundary_interfaces:
+  - 공격 시 대상의 IDamageable::ApplyDamage를 호출 — 몬스터는 대상이 Player인지 몰라도 된다.
+  - 소음 감지는 발생원이 호출하는 GenerateNoise가 대신 처리 — AI는 발생원이 Player인지 Item인지 몰라도 된다.
+  - 도킹 문 위협 판정은 UDockingDoorComponent의 공개 상태만 읽는다.
+
+decisions:
+  - name: GenerateNoise 호출 방식 (02문서 5절 근거)
+    detail: GenerateNoise는 동기 함수로 반경 내 각 몬스터의 IMonsterNoiseListener::OnNoiseHeard를 호출까지만 책임진다. 전이 로직은 각 몬스터의 내부 구현(경계 밖)이 정한다.
+```
 
 ### Item
-- **클래스**: `AItemActorBase` + `UItemDataAsset`(무게/가치/파손 플래그/소음 플래그)
-- **관계**: `AItemActorBase`가 `IInteractable`과 `IWeightProvider`(자기 자신의 무게 반환)를 구현. 종별 값은 데이터 애셋 참조로 결정.
-- **타이머/충돌 감지 소유 (결정)**: 파손형의 충돌 속도 감지(`OnComponentHit` 등)와 소음 유발형의 "30초 보유마다 +200" 누적 타이머는 아이템 액터 자신이 갖는다(인벤토리는 무게/개수만 알면 되고, 아이템별 상태 로직을 몰라도 되게 하기 위함).
+```yaml
+classes:
+  AItemActorBase: IInteractable + IWeightProvider(자기 자신의 무게 반환) 구현
+  UItemDataAsset: 무게/가치/파손 플래그/소음 플래그
+
+relations:
+  - AItemActorBase가 IInteractable과 IWeightProvider를 구현. 종별 값은 데이터 애셋 참조로 결정.
+
+decisions:
+  - name: 타이머/충돌 감지 소유
+    detail: 파손형의 충돌 속도 감지, 소음 유발형의 "30초 보유마다 +200" 누적 타이머는 아이템 액터 자신이 소유(인벤토리는 무게/개수만 앎).
+```
 
 ### UI
-- **클래스**: 산소/HP 게이지, 인벤토리, 납품, 탐사 지역 선택, 로딩 연출, 제한 시간 카운트다운, 장비 강화 구매 각 위젯
-- **관계**: 표시 전용 위젯(게이지·인벤토리·카운트다운 등)은 리플리케이티드 프로퍼티/델리게이트를 구독만 한다. 입력을 발생시키는 위젯(탐사 지역 선택 확정, 장비 강화 구매)은 서버 RPC(`Server_ConfirmZoneSelection` 등)만 호출하고 로컬 상태를 직접 바꾸지 않는다 — 두 경우 모두 UI가 다른 시스템의 상태를 직접 쓰지 않는다는 원칙은 유지된다.
-- **숨은 요소**: 없음(순수 바인딩 + 서버 RPC 호출).
+```yaml
+classes:
+  위젯 목록: 산소/HP 게이지, 인벤토리, 납품, 탐사 지역 선택, 로딩 연출, 제한 시간 카운트다운, 장비 강화 구매
+
+relations:
+  - >
+    표시 전용 위젯(게이지·인벤토리·카운트다운 등)은 리플리케이티드 프로퍼티/델리게이트를 구독만 한다.
+    입력을 발생시키는 위젯(탐사 지역 선택 확정, 장비 강화 구매)은 서버 RPC(Server_ConfirmZoneSelection 등)만
+    호출하고 로컬 상태를 직접 바꾸지 않는다 — 두 경우 모두 UI가 다른 시스템의 상태를 직접 쓰지 않는다는
+    원칙은 유지된다.
+
+hidden_elements: 없음(순수 바인딩 + 서버 RPC 호출)
+```
 
 ### Save
-- **클래스**: `UGoHomeSaveGame`(파티 공유 재화, 업그레이드 목록, 마지막 진행 지점), `UGoHomeSaveSubsystem`(`UGameInstanceSubsystem`, `UGoHomeSaveGame` 소유 + 저장 트리거 로직)
-- **관계**: `UGoHomeSaveSubsystem`이 GameState의 상태 변경을 구독해 로비 복귀 시점 값을 `UGoHomeSaveGame`에 반영한다. 8번 장비 강화 시스템이 Save의 업그레이드 목록을 읽고 쓴다.
-- **저장 트리거 (결정)**: `UGoHomeSaveSubsystem`이 GameState의 상태 변경 델리게이트(`FOnExpeditionStateChanged`)를 구독하고, `NewState == ELobby`(로비 복귀)일 때 자체적으로 저장을 수행한다. Core는 Save의 존재를 몰라도 된다.
-- **레벨 이동 간 구독 유지 (결정)**: 01문서 "기획 수정"에 따라 로비→탐사는 서로 다른 맵으로 이동하므로 `AGameStateBase`는 매 트래블마다 새로 스폰된다 — GameState에 직접 구독하면 트래블 시점에 구독이 끊긴다. 따라서 `UGoHomeSaveGame`과 저장 트리거 로직은 `UGoHomeSaveSubsystem`(`UGameInstanceSubsystem`, 트래블에도 유지)이 소유하고, 이 서브시스템이 매 레벨의 새 `AGoHomeGameState::BeginPlay`에서 `FOnExpeditionStateChanged`에 재구독한다.
-- **로비 맵 재진입 시 저장 누락 방지 (결정)**: 델리게이트는 "상태 변화"에만 발동하는데, 로비 맵의 GameState는 스폰 즉시 `ELobby`로 "시작"할 뿐 다른 상태에서 전이해 들어오지 않으므로 `NewState == ELobby` 브로드캐스트가 아예 발생하지 않을 수 있다. `UGoHomeSaveSubsystem`은 델리게이트 구독 직후 GameState의 **현재 상태를 동기적으로 즉시 확인**해, 이미 `ELobby`라면 그 자리에서 바로 저장을 수행한다(델리게이트 엣지 트리거에만 의존하지 않음).
+```yaml
+classes:
+  UGoHomeSaveGame: 파티 공유 재화, 업그레이드 목록, 마지막 진행 지점
+  UGoHomeSaveSubsystem: UGameInstanceSubsystem, UGoHomeSaveGame 소유 + 저장 트리거 로직
+
+relations:
+  - UGoHomeSaveSubsystem이 GameState의 상태 변경을 구독해 로비 복귀 시점 값을 UGoHomeSaveGame에 반영한다.
+  - 8번 장비 강화 시스템이 Save의 업그레이드 목록을 읽고 쓴다.
+
+decisions:
+  - name: 저장 트리거
+    detail: UGoHomeSaveSubsystem이 FOnExpeditionStateChanged를 구독, NewState == ELobby일 때 저장 수행(Core는 Save 존재를 모름).
+  - name: 레벨 이동 간 구독 유지
+    detail: UGoHomeSaveSubsystem(UGameInstanceSubsystem, 트래블 간 유지)이 소유하고, 매 레벨의 새 AGoHomeGameState::BeginPlay에서 재구독.
+  - name: 로비 맵 재진입 시 저장 누락 방지
+    detail: 구독 직후 GameState 현재 상태를 동기 확인해 이미 ELobby면 즉시 저장(델리게이트 엣지 트리거에만 의존하지 않음).
+```
 
 ## 시스템 간 인터페이스 계약
 
@@ -193,6 +307,9 @@ classDiagram
     class AGoHomeGameState
     class UDockingDoorComponent
     class AGoHomeGameMode
+    class USessionSubsystem {
+        <<GameInstanceSubsystem, 트래블 간 유지>>
+    }
 
     %% Player
     class AGoHomeCharacter
