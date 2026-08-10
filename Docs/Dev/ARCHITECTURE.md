@@ -173,6 +173,7 @@ decisions:
 ```yaml
 classes:
   UInventoryComponent: 4슬롯
+  UInteractionComponent: 상호작용 대상 탐지
   IInteractable: ""
   IWeightProvider: ""
   소켓 어태치 헬퍼: ""
@@ -190,6 +191,10 @@ decisions:
     detail: 아이템 액터의 서버 전용 bIsBeingClaimed 플래그로 Server_RequestPickup 중복 요청 거부(체크+설정은 한 동기 함수 안에서 처리, Latent/비동기 트레이스 금지).
   - name: 정산 값 전달
     detail: Interaction이 GameState->AddDeliveredValue(int32)를 직접 호출(델리게이트로 감싸지 않음).
+  - name: 상호작용 대상 탐지 방식
+    detail: 02문서에 감지 방식이 명시돼 있지 않아 이 문서에서 신설. UInteractionComponent가 카메라 정면 라인 트레이스(기본 TraceDistance 200, TraceInterval 0.1초 스로틀)로 IInteractable 구현 액터를 탐지하고, 로컬 컨트롤 폰에서만 동작한다(다른 클라이언트의 리플리케이트된 폰까지 트레이스하지 않도록 IsLocallyControlled()로 필터링). 대상이 바뀔 때만 OnInteractableTargetChanged를 브로드캐스트(HUD 프롬프트 바인딩용).
+  - name: TryInteract() 서버 권위 (임시 상태, 주의)
+    detail: 현재 TryInteract()는 CanInteract 확인 후 OnInteract를 로컬에서 직접 호출한다. AItemActorBase::OnInteract가 아직 빈 스텁이라 지금은 문제없지만, 실제 픽업 로직이 들어가면 클라이언트가 서버 승인 없이 상태를 바꾸는 셈이 되어 위 "동시 픽업 레이스 컨디션" 결정과 충돌한다 — 픽업 로직 구현 시 Server_RequestInteract 같은 서버 RPC 경유로 교체해야 한다(코드에 TODO로 표시돼 있음).
 ```
 
 ### AI (경계만)
@@ -261,7 +266,7 @@ decisions:
 | 접점 | 정의 위치 | 시그니처(초안) | 호출·구독 측 | 근거 |
 |---|---|---|---|---|
 | `IWeightProvider` | Interaction | `float GetTotalWeight() const` | Player(산소 소모 계산), 13-3 수류 구간, 8번 장비 강화(페널티 곡선 파라미터) | 02문서 3·4·8·13-3절 |
-| `IInteractable` | Interaction | `bool CanInteract(APlayerController*) const` / `void OnInteract(APlayerController*)` | Item이 구현, 13-1 게이트의 두 트리거가 각각 구현 | 02문서 4·13-1절 |
+| `IInteractable` | Interaction | `bool CanInteract(APawn*) const` / `void OnInteract(APawn*)` | Item이 구현, 13-1 게이트의 두 트리거가 각각 구현, `UInteractionComponent`(Interaction)가 트레이스로 찾은 대상에 호출 | 02문서 4·13-1절 |
 | `IDamageable` (신설 제안) | Player | `void ApplyDamage(float Amount, AActor* Instigator, FName DamageType)` | Player(HealthComponent)가 구현, AI(몬스터 공격)와 Player 자신(`UOxygenComponent`의 질식 데미지)이 소비 | 02문서에 데미지 전달 경로가 없어 이 문서에서 신설 |
 | `GenerateNoise` | AI | `static void GenerateNoise(FVector Location, float Radius, ENoiseType Type, AActor* Source)` | Player(이동 사운드)·Item(소음 유발형)이 발생원(호출 즉시 동기 처리, 위 "AI (경계만)" 참고) | 02문서 2·4·5절 |
 | `IMonsterNoiseListener` (신설 제안) | AI | `void OnNoiseHeard(FVector Location, float Radius, ENoiseType Type, AActor* Source)` | `AMonsterBase`가 구현, `GenerateNoise`가 반경 내 각 몬스터에 호출(반응 로직은 구현체 내부, 경계 밖) | 위 "AI (경계만)" `GenerateNoise` 호출 방식 정정 참고 |
@@ -321,6 +326,7 @@ classDiagram
 
     %% Interaction
     class UInventoryComponent
+    class UInteractionComponent
     class IWeightProvider {
         <<interface>>
     }
@@ -350,12 +356,14 @@ classDiagram
     AGoHomeCharacter *-- UOxygenComponent
     AGoHomeCharacter *-- UHealthComponent
     AGoHomeCharacter *-- UInventoryComponent
+    AGoHomeCharacter *-- UInteractionComponent
     UHealthComponent ..|> IDamageable
     UOxygenComponent ..> IDamageable : ApplyDamage(질식)
     UOxygenComponent ..> IWeightProvider : GetTotalWeight()
     UInventoryComponent ..|> IWeightProvider
     AItemActorBase ..|> IInteractable
     AItemActorBase ..|> IWeightProvider
+    UInteractionComponent ..> IInteractable : CanInteract()/OnInteract()
     AItemActorBase --> UItemDataAsset : 참조
     UInventoryComponent --> AItemActorBase : 보유 슬롯
     AMonsterBase ..> IDamageable : ApplyDamage(공격)

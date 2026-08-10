@@ -30,6 +30,7 @@ Epic 공식 C++ 코딩 표준(Epic Coding Standard)을 그대로 따른다.
 | Widget Blueprint | `WB_` |
 | Animation Sequence | `AS_` |
 | Behavior Tree | `BT_` |
+| Data Asset | `DA_` |
 
 AI 컨트롤러(`AIC_`), 파티클 시스템(`PS_`) 등 위 표에 없는 타입을 실제로 쓰게 되면 그때 이 표에 추가한다.
 
