@@ -25,6 +25,7 @@
 | 이 값(수치)이 어디서 온 결정인지 근거가 궁금해 | [../Design/05_GoHome_참고문서_교차매핑.md](../Design/05_GoHome_참고문서_교차매핑.md) |
 | 담당자/목표 기간/DoD가 뭐야? | Notion("GoHome 담당자 배정" DB, "GoHome 착수 로드맵") — 에이전트가 못 보므로 사람이 직접 확인해서 프롬프트에 전달 |
 | 브랜치 어떻게 만들어/머지해? PR은 언제부터 써? | [GIT_WORKFLOW.md](GIT_WORKFLOW.md) |
+| Blueprint 노드 그래프 어떻게 만들어? 코드랑 같이 BP 가이드도 줘 | [7. Blueprint 작업 보조 (NodeCaster)](#7-blueprint-작업-보조-nodecaster) — 설치 안 돼 있으면 이 행 자체를 무시하고 기존 방식(텍스트 설명)으로 안내 |
 
 표 순서는 실제 빈도를 반영한다 — 구현 중엔 첫 행(ARCHITECTURE.md)만으로 대부분 끝나야 하고, Design 02문서는 예외적으로만 연다.
 
@@ -53,3 +54,25 @@ Claude Code를 쓰는 팀원은 매번 절차를 프롬프트로 다시 설명�
 - 인일 추정치·담당자·"이미 결정됐는지 여부" 같은 [DOC_MANAGEMENT.md 단일 출처 원칙](../Design/DOC_MANAGEMENT.md#단일-출처-원칙) 항목의 숫자를 에이전트가 스스로 지어내면 안 된다 — 반드시 라우팅표가 가리키는 문서를 인용해야 하며, 인용 없이 답하면 재질문할 것.
 - 에이전트가 새 인터페이스/클래스를 제안하면 [시스템 간 인터페이스 계약](ARCHITECTURE.md#시스템-간-인터페이스-계약)에 같은 접점이 이미 정의돼 있지 않은지 먼저 확인시킨다(병렬 착수 시 헤더 충돌 방지).
 - Design md 문서를 수정하는 작업을 맡겼다면 [DOC_MANAGEMENT.md의 수정 절차](../Design/DOC_MANAGEMENT.md#문서-수정-시-확인-절차)를 따랐는지, 마지막에 `node Docs/tools/check_doc_links.js`를 실행했는지 확인한다.
+
+## 7. Blueprint 작업 보조 (NodeCaster)
+
+> **선택 사항 — 팀 전체 배포 전 단계.** NodeCaster는 아직 팀 전체에 공식 배포되지 않았고, 설치한 사람만 쓸 수 있다. 아래 절차를 따르기 전에 **먼저 `nodecaster`가 PATH에 있는지만 가볍게 확인**한다(PowerShell: `Get-Command nodecaster -ErrorAction SilentlyContinue`, bash: `command -v nodecaster` — 둘 다 Node 프로세스를 안 띄우고 결과만 바로 나온다). **못 찾으면 이 섹션 전체를 건너뛰고**, 지금까지 해온 방식대로 Blueprint 그래프를 사람이 읽을 설명(노드 목록 + 연결 관계를 텍스트/의사코드로)으로 안내한다 — 설치를 강요하거나 여기서 작업을 멈추지 않는다.
+
+설치돼 있다면: 이 프로젝트에서 언리얼 엔진 Blueprint 그래프를 제안할 때는, 사람이 에디터에서 수동으로 노드를 배치하기 전에 먼저 NodeCaster로 시각화하라.
+
+- 명령어: `nodecaster` (전역 등록되어 있음 — 안 되면 아래 "설치" 참고)
+- 절차:
+  1. 그래프 스펙을 JSON 파일로 작성한다 (스키마는 아래 참고). 프리셋에 없는 노드는:
+     - **원칙**: 소스를 직접 읽을 수 있는 것(이 프로젝트 자신의 C++ 클래스/함수)은 항상 그 소스를 직접 읽어서 채운다. `lookup`/리플렉션 덤프는 소스가 없는(엔진에 컴파일되어 있는) 라이브러리 함수 전용 보조 수단이지, 프로젝트 코드를 대체하는 게 아니다.
+     - 언리얼 기본 함수(엔진 라이브러리 함수 등 프로젝트에 소스가 없는 것)라면 먼저 `nodecaster lookup <함수명>`으로 실제 파라미터 이름/타입/기본값을 조회해서 `inputs`/`outputs`를 채운다 — 추측하지 않는다.
+     - 프로젝트 고유 C++ 함수(이 프로젝트 자신의 액터/컴포넌트 등 클래스에 선언된 `UFUNCTION`)는, 그래프가 그 클래스(또는 그 자식 BP) 자신을 대상으로 호출하는 거라면 실제 UFUNCTION 선언을 직접 읽고 채우되 `functionOwner`는 지정하지 않는다(self-context로 해석됨) — `lookup`에 그 함수가 나오더라도 무시하고 이 원칙을 따른다.
+     - **다른 오브젝트에 대고 멤버 함수를 호출**하는 경우(예: 어떤 컴포넌트 참조 변수에 대고 그 컴포넌트의 함수 호출)는 `functionOwner`를 명시하고, `inputs`에 `{"name":"Target","type":"object"}` 핀을 추가해서 대상 오브젝트에 연결한다. 프로젝트 자체 클래스(엔진 라이브러리가 아닌)도 지원된다.
+     - `CastTo` 노드의 `targetClass`(`/Script/<Module>.<ClassName>` 형식)도 자동조회 대상이 아니다 — 대상 클래스 헤더 파일과 `Source/GoHome/` 폴더 구조를 직접 읽어서 클래스명(`A`/`U` 접두어 제거)을 조합해 채운다.
+  2. `nodecaster visualize <그래프.json 경로>` 실행 — 다이어그램이 브라우저로 자동으로 열린다.
+  3. 그래프가 지원되는 노드로만 구성됐다면 미리보기 페이지에 "Copy for Unreal paste" 버튼이 있다. 사람에게 그 버튼으로 복사해서 UE 에디터에 Ctrl+V 하라고 안내한다. 지원 안 되는 노드가 섞여 있으면 사람이 그 부분만 수동으로 만들어야 한다.
+  4. 브라우저 없이 클립보드에 바로 복사만 하고 싶으면 `nodecaster copy <그래프.json 경로>`를 대신 쓸 수 있다 — 단, visualize로 먼저 사람이 검토하게 하는 게 원칙이다.
+
+**설치(팀원별 1회)**: `C:\CSK\NodeCaster` 저장소를 clone한 뒤 그 폴더에서 `npm install && npm run build && npm link` — 이후 이 프로젝트를 포함해 어느 폴더에서든 `nodecaster` 명령을 그대로 쓸 수 있다.
+
+그래프 JSON 스키마, 지원 노드 종류(프리셋), 클립보드 붙여넣기가 검증된 노드 목록은 NodeCaster 저장소(`C:\CSK\NodeCaster`)의 `README.md`를 참고하라.
