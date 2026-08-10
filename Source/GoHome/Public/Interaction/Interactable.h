@@ -1,10 +1,12 @@
-
+﻿
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
 #include "Interactable.generated.h"
+
+class APawn;
 
 // This class does not need to be modified.
 UINTERFACE(MinimalAPI)
@@ -21,6 +23,6 @@ class GOHOME_API IInteractable
 	GENERATED_BODY()
 
 public:
-	virtual bool CanInteract(APlayerController* PlayerController) const = 0;
-	virtual void OnInteract(APlayerController* PlayerController) = 0;
+	virtual bool CanInteract(APawn* InstigatorPawn) const = 0;
+	virtual void OnInteract(APawn* InstigatorPawn) = 0;
 };

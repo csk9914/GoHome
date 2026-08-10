@@ -1,4 +1,4 @@
-
+﻿
 
 #include "Item/ItemActorBase.h"
 #include "Item/ItemDataAsset.h"
@@ -10,12 +10,12 @@ AItemActorBase::AItemActorBase()
 	bReplicates = true;
 }
 
-bool AItemActorBase::CanInteract(APlayerController* PlayerController) const
+bool AItemActorBase::CanInteract(APawn* InstigatorPawn) const
 {
 	return !bIsBeingClaimed;
 }
 
-void AItemActorBase::OnInteract(APlayerController* PlayerController)
+void AItemActorBase::OnInteract(APawn* InstigatorPawn)
 {
 }
 

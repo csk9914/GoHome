@@ -1,4 +1,4 @@
-
+﻿
 
 #pragma once
 
@@ -25,8 +25,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item")
 	TObjectPtr<UItemDataAsset> ItemData;
 
-	virtual bool CanInteract(APlayerController* PlayerController) const override;
-	virtual void OnInteract(APlayerController* PlayerController) override;
+	virtual bool CanInteract(APawn* InstigatorPawn) const override;
+	virtual void OnInteract(APawn* InstigatorPawn) override;
 	virtual float GetTotalWeight() const override;
 
 protected:
