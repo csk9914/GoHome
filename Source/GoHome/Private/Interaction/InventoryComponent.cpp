@@ -34,3 +34,49 @@ void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 void UInventoryComponent::OnRep_Slots()
 {
 }
+
+
+bool UInventoryComponent::TryAddItem(AItemActorBase* Item)
+{
+	if (!Item) return false;
+
+	const int32 EmptyIndex = FindEmptySlotIndex();
+	if (EmptyIndex == INDEX_NONE)
+	{
+		return false;
+	}
+
+	Slots[EmptyIndex].Item = Item;
+	Slots[EmptyIndex].Quantity = 1;
+	return true;
+}
+
+bool UInventoryComponent::RemoveItem(AItemActorBase* Item)
+{
+	if (!Item) return false;
+
+	for (FInventorySlot& Slot : Slots)
+	{
+		if (Slot.Item == Item)
+		{
+			Slot.Item = nullptr;
+			Slot.Quantity = 0;
+			return true;
+		}
+
+	}
+	return false;
+}
+
+
+int32 UInventoryComponent::FindEmptySlotIndex() const
+{
+	for (int32 Index = 0; Index < GoHomeInventorySlotCount; ++Index)
+	{
+		if (Slots[Index].Item == nullptr)
+		{
+			return Index;
+		}
+	}
+	return INDEX_NONE;
+}
