@@ -9,6 +9,7 @@
 #include "ItemActorBase.generated.h"
 
 class UItemDataAsset;
+class UStaticMeshComponent;
 
 /**
  * 파손형 충돌 감지, 소음 유발형 누적 타이머는 아이템 자신이 갖는다
@@ -22,6 +23,9 @@ class GOHOME_API AItemActorBase : public AActor, public IInteractable, public IW
 public:
 	AItemActorBase();
 
+	UPROPERTY(VisibleAnywhere, Category = "Item")
+	TObjectPtr<UStaticMeshComponent> MeshComponent;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item")
 	TObjectPtr<UItemDataAsset> ItemData;
 
@@ -29,10 +33,28 @@ public:
 	virtual void OnInteract(APawn* InstigatorPawn) override;
 	virtual float GetTotalWeight() const override;
 
+	// 파손 반영된 현재 가치. 납품 정산 시 ItemData->Value대신 이 값을 사용해야 함.
+	UFUNCTION(BlueprintCallable, Category = "Item")
+	float GetCurrentValue() const;
+
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	virtual void NotifyHit(
+		UPrimitiveComponent* MyComp, 
+		AActor* Other, 
+		UPrimitiveComponent* OtherComp, 
+		bool bSelfMoved, 
+		FVector HitLocation, 
+		FVector HitNormal, 
+		FVector NormalImpulse, 
+		const FHitResult& Hit) override;
 
 	// 동시 픽업 레이스 컨디션 방지: 서버 틱 단일 스레드 특성 이용 (동기 함수 호출 안에서 끊김 없이 검사+설정).
 	UPROPERTY(Replicated)
 	bool bIsBeingClaimed = false;
+
+	// 파손형 누적 파손 횟수. ItemData->MaxBreakCount에서 멈춘다.
+	UPROPERTY(Replicated)
+	int32 BreakCount = 0;
 };
