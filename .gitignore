@@ -75,3 +75,7 @@ DerivedDataCache/*
 
 # JetBrains Rider project files
 .idea/
+
+# Local ThirdPerson test content
+/Content/LocalThirdPerson/
+
