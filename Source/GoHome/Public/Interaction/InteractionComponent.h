@@ -34,6 +34,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Interaction")
 	float TraceInterval = 0.1f;
 
+
+	// 지금 조준 중인 대상 (없으면 nullptr). HUD/디버깅에서 조회용.
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	AActor* GetCurrentTarget() const { return CurrentTarget; }
+
 protected:
 
 	virtual void BeginPlay() override;

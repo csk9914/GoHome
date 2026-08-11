@@ -8,6 +8,7 @@
 #include "HealthComponent.generated.h"
 
 DECLARE_MULTICAST_DELEGATE(FOnDeath);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDeathDynamic);
 
 /**
  * IDamageable을 구현해 "누가 데미지를 주는지" 몰라도 되게 한다.
@@ -29,6 +30,9 @@ public:
 
 	FOnDeath OnDeath;
 
+	UPROPERTY(BlueprintAssignable, Category = "Health")
+	FOnDeathDynamic OnDeathDynamic;
+
 	virtual void ApplyDamage_Implementation(float Amount, AActor* Instigator, FName DamageType) override;
 
 protected:
@@ -37,6 +41,9 @@ protected:
 	UFUNCTION()
 	void OnRep_HP();
 
-	UPROPERTY(Replicated)
+	UPROPERTY(ReplicatedUsing = OnRep_IsDead)
 	bool bIsDead = false;
+
+	UFUNCTION()
+	void OnRep_IsDead();
 };
