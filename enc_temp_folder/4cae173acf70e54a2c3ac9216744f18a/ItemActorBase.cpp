@@ -95,17 +95,6 @@ void AItemActorBase::NotifyPickedUp()
 	UGoHomeNoiseLibrary::GenerateNoise(this, GetActorLocation(),
 		CurrentNoiseRadius, ENoiseType::Medium, this);
 
-	// 테스트용 디버깅 메시지(추후 삭제할 것).
-
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, FString::Printf(TEXT("소음 발생! 반경 = %.0f(픽업 직후)"),
-			CurrentNoiseRadius));
-	}
-
-
-	// 여기까지 테스트용 디버깅 메시지.
-
 	GetWorldTimerManager().SetTimer(NoiseGrowthTimerHandle, this,
 		&AItemActorBase::GrowNoiseRadius, ItemData->NoiseGrowthIntervalSeconds, true);
 }
@@ -127,12 +116,4 @@ void AItemActorBase::GrowNoiseRadius()
 
 	const ENoiseType Type = (CurrentNoiseRadius >= 1500.f) ? ENoiseType::Large : ENoiseType::Medium; 
 	UGoHomeNoiseLibrary::GenerateNoise(this, GetActorLocation(), CurrentNoiseRadius, Type, this);
-
-	// 테스트용 디버깅 메시지(추후 삭제할 것).
-	if (GEngine)
-	{
-		const TCHAR* TypeStr = (Type == ENoiseType::Large) ? TEXT("Large") : TEXT("Medium");
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow,
-			FString::Printf(TEXT("소음 증가! 반경 = %.0f, Type = %s"), CurrentNoiseRadius, TypeStr));
-	}
 }
