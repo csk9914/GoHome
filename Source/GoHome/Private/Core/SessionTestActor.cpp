@@ -17,10 +17,10 @@ void ASessionTestActor::BeginPlay()
 
 	if (USessionSubsystem* Session = GetSessionSubsystem())
 	{
-		Session->OnCreateSessionComplete_Delegate.AddDynamic(this, &ASessionTestActor::HandleCreateSessionComplete);
-		Session->OnDestroySessionComplete_Delegate.AddDynamic(this, &ASessionTestActor::HandleDestroySessionComplete);
-		Session->OnFindSessionsComplete_Delegate.AddUObject(this, &ASessionTestActor::HandleFindSessionsComplete);
-		Session->OnJoinSessionComplete_Delegate.AddUObject(this, &ASessionTestActor::HandleJoinSessionComplete);
+		Session->OnCreateComplete.AddDynamic(this, &ASessionTestActor::HandleCreateSessionComplete);
+		Session->OnDestroyComplete.AddDynamic(this, &ASessionTestActor::HandleDestroySessionComplete);
+		Session->OnFindComplete.AddUObject(this, &ASessionTestActor::HandleFindSessionsComplete);
+		Session->OnJoinComplete.AddUObject(this, &ASessionTestActor::HandleJoinSessionComplete);
 	}
 }
 
