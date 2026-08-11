@@ -65,5 +65,15 @@ void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp,
 	if (ImpactSpeed >= ItemData->BreakVelocityThreshold)
 	{
 		++BreakCount;
+
+		// 테스트용 디버깅 메시지(추후 삭제하면 된다.)
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(
+				-1, 5.f, FColor::Red, 
+				FString::Printf(TEXT("파손! 속도 =%.0f, BreakCount = %d, 현재가치 = %.0f"), 
+					ImpactSpeed, BreakCount, GetCurrentValue()));
+		}
+
 	}
 }
