@@ -37,6 +37,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Item")
 	float GetCurrentValue() const;
 
+	// 인벤토리에 담길 때 Interaction이 호출한다(소음 유발형이면 반경 증가 타이머 시작).
+	void NotifyPickedUp();
+
+	// 인벤토리에서 빠질 때 Interaction이 호출한다 (타이머 정지 + 반경 리셋).
+	void NotifyDropped();
+
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -57,4 +63,15 @@ protected:
 	// 파손형 누적 파손 횟수. ItemData->MaxBreakCount에서 멈춘다.
 	UPROPERTY(Replicated)
 	int32 BreakCount = 0;
+
+	// 소음 유발형 현재 반경(미보유 시 0).
+	UPROPERTY(Replicated)
+	float CurrentNoiseRadius = 0.f;
+
+private:
+
+	void GrowNoiseRadius();
+
+	FTimerHandle NoiseGrowthTimerHandle;
+
 };

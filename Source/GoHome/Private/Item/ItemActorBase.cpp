@@ -4,6 +4,8 @@
 #include "Item/ItemDataAsset.h"
 #include "Net/UnrealNetwork.h"
 #include "Components/StaticMeshComponent.h"
+#include "AI/NoiseType.h"
+#include "TimerManager.h"
 
 AItemActorBase::AItemActorBase()
 {
@@ -39,12 +41,15 @@ float AItemActorBase::GetCurrentValue() const
 	return ItemData->Value * ValueRatio;
 }
 
+
+
 void AItemActorBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AItemActorBase, bIsBeingClaimed);
 	DOREPLIFETIME(AItemActorBase, BreakCount);
+	DOREPLIFETIME(AItemActorBase, CurrentNoiseRadius);
 }
 
 void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp, 
@@ -76,4 +81,39 @@ void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp,
 		}
 
 	}
+}
+
+
+
+// NoiseType
+
+void AItemActorBase::NotifyPickedUp()
+{
+	if (!HasAuthority() || !ItemData || !ItemData->bMakesNoise) return;
+
+	CurrentNoiseRadius = ItemData->BaseNoiseRadius;
+	UGoHomeNoiseLibrary::GenerateNoise(this, GetActorLocation(),
+		CurrentNoiseRadius, ENoiseType::Medium, this);
+
+	GetWorldTimerManager().SetTimer(NoiseGrowthTimerHandle, this,
+		&AItemActorBase::GrowNoiseRadius, ItemData->NoiseGrowthIntervalSeconds, true);
+}
+
+void AItemActorBase::NotifyDropped()
+{
+	GetWorldTimerManager().ClearTimer(NoiseGrowthTimerHandle);
+	CurrentNoiseRadius = 0.f;
+}
+
+
+void AItemActorBase::GrowNoiseRadius()
+{
+	if (!ItemData) return;
+
+	CurrentNoiseRadius = FMath::Min(
+		CurrentNoiseRadius + ItemData->NoiseRadiusGrowthPerInterval, 
+		ItemData->MaxNoiseRadius);
+
+	const ENoiseType Type = (CurrentNoiseRadius >= 1500.f) ? ENoiseType::Large : ENoiseType::Medium; 
+	UGoHomeNoiseLibrary::GenerateNoise(this, GetActorLocation(), CurrentNoiseRadius, Type, this);
 }
