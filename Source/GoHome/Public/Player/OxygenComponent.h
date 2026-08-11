@@ -1,10 +1,12 @@
-
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Interaction/WeightProvider.h"
 #include "OxygenComponent.generated.h"
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnOxygenChanged, float, CurrentOxygen, float, MaxOxygen);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSafeZoneChanged, bool, bNewInSafeZone);
 
 /**
  * 소모 속도 계산 시 IWeightProvider를 참조한다 (UInventoryComponent를 직접 참조하지 않음).
@@ -18,24 +20,19 @@ class GOHOME_API UOxygenComponent : public UActorComponent
 public:
 	UOxygenComponent();
 
-	// UI 기준 산소 칸 수. 기본 15칸.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "Oxygen")
-	float MaxOxygen = 15.f;
+	// UI가 매 Tick 직접 확인하지 않아도 산소 변경을 받을 수 있게 한다.
+	UPROPERTY(BlueprintAssignable, Category = "Oxygen")
+	FOnOxygenChanged OnOxygenChanged;
 
-	UPROPERTY(ReplicatedUsing = OnRep_Oxygen, BlueprintReadOnly, Category = "Oxygen")
-	float Oxygen = 15.f;
+	UPROPERTY(BlueprintAssignable, Category = "Oxygen")
+	FOnSafeZoneChanged OnSafeZoneChanged;
 
-	// 산소가 가득 찬 상태에서 기본적으로 버티는 시간. 600초 = 10분.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Oxygen")
-	float TargetOxygenDuration = 600.f;
+	// 외부 코드는 산소 값을 직접 쓰지 말고, 읽기 전용 함수로만 접근한다.
+	UFUNCTION(BlueprintPure, Category = "Oxygen")
+	float GetOxygen() const;
 
-	// 무게 1당 추가 산소 소모량. 실제 무게 연결은 IWeightProvider 단계에서 붙인다.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Oxygen")
-	float WeightDrainMultiplier = 0.f;
-
-	// 산소가 0일 때 1초마다 들어가는 질식 데미지.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Oxygen")
-	float SuffocationDamagePerSecond = 5.f;
+	UFUNCTION(BlueprintPure, Category = "Oxygen")
+	float GetMaxOxygen() const;
 
 	// UI에서 15칸 산소 표시할 때 사용할 값.
 	UFUNCTION(BlueprintPure, Category = "Oxygen")
@@ -45,13 +42,64 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Oxygen")
 	float GetOxygenPercent() const;
 
+	UFUNCTION(BlueprintPure, Category = "Oxygen")
+	bool IsInSafeZone() const;
+
+	// 안전지대 판정은 게임 상태라서 서버만 바꾼다.
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Oxygen")
+	void SetInSafeZone(bool bNewInSafeZone);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	float CalculateOxygenDrainRate() const;
+	// UI 기준 산소 칸 수. 기본 15칸.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_Oxygen, Category = "Oxygen", meta = (ClampMin = "0.0", UIMin = "0.0"))
+	float MaxOxygen = 15.f;
+
+	UPROPERTY(ReplicatedUsing = OnRep_Oxygen, BlueprintReadOnly, Category = "Oxygen")
+	float Oxygen = 15.f;
+
+	// 산소가 가득 찬 상태에서 기본적으로 버티는 시간. 600초 = 10분.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Oxygen", meta = (ClampMin = "0.01", UIMin = "1.0"))
+	float TargetOxygenDuration = 600.f;
+
+	// 무게 1당 추가 산소 소모량. 무게 값은 IWeightProvider 구현체에서만 가져온다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Oxygen", meta = (ClampMin = "0.0", UIMin = "0.0"))
+	float WeightDrainMultiplier = 0.f;
+
+	// 산소가 0일 때 1초마다 들어가는 질식 데미지.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Oxygen", meta = (ClampMin = "0.0", UIMin = "0.0"))
+	float SuffocationDamagePerSecond = 5.f;
+
+	// 안전지대 안에서 1초마다 회복되는 산소량.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Oxygen", meta = (ClampMin = "0.0", UIMin = "0.0"))
+	float SafeZoneRecoveryRate = 2.f;
+
+	// 현재 안전지대 안에 있는지 여부.
+	UPROPERTY(ReplicatedUsing = OnRep_InSafeZone, BlueprintReadOnly, Category = "Oxygen")
+	bool bInSafeZone = false;
 
 	UFUNCTION()
 	void OnRep_Oxygen();
+
+	UFUNCTION()
+	void OnRep_InSafeZone();
+
+private:
+	// 무게를 제공하는 인터페이스만 저장한다.
+	// 산소 컴포넌트는 InventoryComponent 같은 구체 클래스를 몰라도 되고, IWeightProvider 계약만 사용한다.
+	UPROPERTY()
+	TArray<TScriptInterface<IWeightProvider>> CachedWeightProviders;
+
+	bool HasOwnerAuthority() const;
+	void FindWeightProviderComponents();
+	void UpdateOxygen(float DeltaTime);
+	void RecoverOxygen(float DeltaTime);
+	void DrainOxygen(float DeltaTime);
+	void ApplySuffocationDamage(float DeltaTime);
+	void SetOxygen(float NewOxygen);
+	float CalculateOxygenDrainRate() const;
+	float GetCachedTotalWeight() const;
 };

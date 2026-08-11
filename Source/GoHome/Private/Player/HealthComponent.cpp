@@ -31,6 +31,7 @@ void UHealthComponent::ApplyDamage_Implementation(float Amount, AActor* Instigat
 	{
 		bIsDead = true;
 		OnDeath.Broadcast();
+		OnDeathDynamic.Broadcast();
 	}
 }
 
@@ -45,4 +46,12 @@ void UHealthComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 
 void UHealthComponent::OnRep_HP()
 {
+}
+
+void UHealthComponent::OnRep_IsDead()
+{
+	if (bIsDead)
+	{
+		OnDeathDynamic.Broadcast();
+	}
 }
