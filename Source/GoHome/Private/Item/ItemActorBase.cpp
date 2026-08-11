@@ -91,7 +91,11 @@ void AItemActorBase::NotifyPickedUp()
 {
 	if (!HasAuthority() || !ItemData || !ItemData->bMakesNoise) return;
 
-	CurrentNoiseRadius = ItemData->BaseNoiseRadius;
+	if (CurrentNoiseRadius <= 0.f)
+	{
+		CurrentNoiseRadius = ItemData->BaseNoiseRadius;
+	}
+
 	UGoHomeNoiseLibrary::GenerateNoise(this, GetActorLocation(),
 		CurrentNoiseRadius, ENoiseType::Medium, this);
 
@@ -113,7 +117,7 @@ void AItemActorBase::NotifyPickedUp()
 void AItemActorBase::NotifyDropped()
 {
 	GetWorldTimerManager().ClearTimer(NoiseGrowthTimerHandle);
-	CurrentNoiseRadius = 0.f;
+	// CurrentNoiseRadius는 그대로 둔다 -> 아이템을 드랍한 후 다시 주우면 멈췄던 지점에서 타이머가 이어서 증가.
 }
 
 
