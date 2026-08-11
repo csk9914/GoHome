@@ -11,6 +11,8 @@ Content rules specific to `Docs/Design/` (single-source-of-truth, editing proced
 
 ## Document Map
 
+**Read any `Docs/Dev/*.md` file by section, not whole-file**: these are organized under distinct headers per system/topic. For a normal dev-loop question (e.g. "what class do I need for X", or a routing question answered by `AI_AGENT_GUIDE.md`'s table), `Grep -n "^#"` first to find the right header, then read from that header to the next same-level header — not the whole file. Whole-file reads are fine for meta questions about the docs themselves (e.g. "what's in Docs/Dev overall").
+
 | Doc | Location | Role |
 |---|---|---|
 | `Docs/Design/01_GoHome_기획서.md` | md/git | Core game design (core loop, system specs, phase 1/2 scope, map plan) |
@@ -24,6 +26,8 @@ Content rules specific to `Docs/Design/` (single-source-of-truth, editing proced
 | `Docs/Dev/CODING_CONVENTIONS.md` | md/git (dev) | C++ coding standards, folder rules, C++/Blueprint boundary |
 | `Docs/Dev/AI_AGENT_GUIDE.md` | md/git (dev) | Procedure teammates use to ask their AI coding agent about their assigned work |
 | `Docs/Dev/GIT_WORKFLOW.md` | md/git (dev) | GitHub Desktop workflow, branch strategy, when to adopt PRs |
+| `Docs/Dev/NODECASTER_GUIDE.md` | md/git (dev) | NodeCaster install check + Blueprint graph JSON procedure — only opened for Blueprint node-graph questions |
+| `Docs/Dev/BP_COMMENT_COLORS.md` | md/git (dev) | Blueprint comment-box color semantics (HSV/Hex table) — only opened when adding comment boxes to a BP graph |
 
 ## Validation Script
 

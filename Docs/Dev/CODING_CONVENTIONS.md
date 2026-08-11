@@ -15,6 +15,16 @@ Epic 공식 C++ 코딩 표준(Epic Coding Standard)을 그대로 따른다.
 - 함수는 `PascalCase`, 매개변수/지역 변수는 `PascalCase` (Epic 표준 그대로, camelCase 아님)
 - `UPROPERTY`/`UFUNCTION` 매크로에 `BlueprintReadOnly`/`BlueprintReadWrite`/`Replicated` 등 의도를 명시적으로 표기 (기본값에 의존하지 않음)
 
+## OOP/SOLID 적용 방식
+
+객체지향/SOLID 원칙은 지키되, 순수 C++ 패턴이 아니라 언리얼이 이미 제공하는 대체 수단으로 구현한다:
+
+- 옵저버 패턴 → 델리게이트(`DECLARE_DYNAMIC_MULTICAST_DELEGATE`)
+- 상태 동기화 → Replication/RepNotify (수동 폴링 금지)
+- 횡단 관심사 분리 → Actor Component
+- 전역/생명주기 서비스 → Subsystem(`UGameInstanceSubsystem` 등), 수동 싱글톤 금지
+- 타입 무관 계약 → `UINTERFACE`/`IInterface`
+
 ## 에셋 명명 규칙
 
 콘텐츠 브라우저 에셋은 `Prefix_BaseAssetName_Suffix` 형식을 따른다. 이 프로젝트에서 실제로 쓰는 접두사만 추린 목록:
@@ -72,7 +82,7 @@ AI는 워크플로 선택으로 다른 시스템보다 BP 비중이 크지만, �
 - `AMonsterBase`(C++)가 경계 인터페이스([ARCHITECTURE.md "AI (경계만)"](ARCHITECTURE.md#ai-경계만) 참고)를 `BlueprintNativeEvent`로 노출하고, `BP_Monster`(`AMonsterBase` 자식 BP)에서 상태 머신·Steering Behaviors를 구현한다.
 - 데미지 적용·소음 판정·상태 브로드캐스트처럼 서버 권위가 걸린 처리는 BP가 직접 구현하지 않고 C++ 함수 호출로 끝낸다 — 위 "C++ / Blueprint 경계" 절의 원칙이 AI에도 동일하게 적용된다.
 - 상태 머신을 Behavior Tree + Blackboard로 구성해도 무방하다(권장일 뿐, 02문서의 "Enum 상태 머신 + Steering Behaviors" 결정을 대체하는 게 아니라 병행 가능한 구현 수단).
-- 경계 인터페이스 시그니처 변경이 필요하면 C++ 담당과 사전 협의한다 — 소유권 규칙은 [ARCHITECTURE.md "소유권 규칙"](ARCHITECTURE.md#병렬-착수를-위한-헤더-스텁과-소유권) 참고.
+- 경계 인터페이스 시그니처 변경이 필요하면 C++ 담당과 사전 협의한다 — 소유권 규칙은 [ARCHITECTURE.md "소유권 규칙"](ARCHITECTURE.md#헤더-소유권) 참고.
 
 ## 블루프린트 변수 규칙
 
@@ -88,21 +98,7 @@ AI는 워크플로 선택으로 다른 시스템보다 BP 비중이 크지만, �
 
 ## 블루프린트 코멘트 박스 색상 규칙
 
-그래프가 길어지는 BP(`BP_Monster` 상태 머신, 레벨 BP 이벤트 그래프)에서 코멘트 박스(`C` 단축키) 색상으로 블록의 성격을 의미론적으로 표시한다. 기본 뼈대는 [Semantic Comment Colors in Blueprint (danjb.com)](https://www.danjb.com/articles/blueprint_colors)의 Success/Info/Warn/Error 4종에 이 프로젝트용 3종(Network / Debug / Tunable)을 추가했다. 톤 원칙: 평소 자주 붙는 코멘트는 채도를 낮춘(subdued) 색, "이거 놓치면 안 된다" 신호를 줘야 하는 카테고리(Error/Network)만 고채도로 남긴다.
-
-| 색상 | 카테고리 | 톤 | 의미 | HSV (H, S, V) | 참고 Hex(불투명 기준) |
-|---|---|---|---|---|---|
-| 🟩 | Success | subdued | 정상 동작 확인된 완료 블록, 의도적 설계 | (120, 0.4, 0.4) | `#3D663D` |
-| 🟦 | Info | subdued | 중립적 설명/참고용 주석 | (220, 0.4, 0.6) | `#5C7099` |
-| 🔷 | Tunable *(GoHome 추가)* | subdued | 밸런스 수치(무게/가치/소음 반경, 몬스터 감지 범위 등)처럼 기획 조정을 자주 받는 노출 변수 블록. 코드 담당이 아닌 사람이 그래프를 열었을 때 "여기는 값만 바꿔도 되는 곳"을 바로 찾게 하려는 목적 | (180, 0.4, 0.6) | `#5C9999` |
-| 🟧 | Warn | 중간 | 주의해서 다뤄야 하는 블록(원인 불명확한 위험, 재확인이 필요하지만 아래 Network만큼 항상 그런 건 아닌 경우) | (40, 0.6, 0.6) | `#997A3D` |
-| ⬛ | Debug *(GoHome 추가)* | subdued(무채색) | 확인·테스트용으로 일부러 넣은 임시 로직(치트, 강제 스폰, 로그 출력 등). Error(알려진 문제)와 성격이 달라 구분한다 — 채도 0이라 "이 블록은 정식 로직이 아니다"가 색만 봐도 드러난다 | (0, 0, 0.35) | `#595959` |
-| 🟥 | Error | 고채도(눈에 띄게) | 알려진 문제·미완성·위험한 임시 코드(커밋 전 제거하거나 비활성화 여부 확인) — 그래프에서 정말 놓치면 안 되는 항목이라 원색을 유지 | (0, 1, 0.6) | `#990000` |
-| 🟪 | Network *(GoHome 추가)* | 고채도(눈에 띄게) | 서버 권위 판정·리플리케이션이 걸린 블록. 이 프로젝트는 협동 멀티플레이가 핵심이라 "네트워크 관련"이 일반 Warn과 뭉뚱그려지면 정작 중요한 걸 놓친다 — Warn에서 분리하고 Error급으로 눈에 띄게 유지. `Replicated`/`RunOnServer` 계열이 섞인 블록엔 무조건 이 색을 쓴다 | (280, 1, 0.75) | `#8000BF` |
-
-`색상` 열은 표 훑어보기용 이모지일 뿐(이모지는 원색 고정이라 subdued 톤을 표현 못함) — 실제 입력값은 항상 `HSV`/`Hex` 열 기준이다.
-
-알파는 0.2(20% 불투명도)로 통일 — 코멘트 박스가 그 안의 노드를 가리면 안 되기 때문. 색상은 코멘트 박스 Details 패널에서 위 표 값을 그대로 입력하며, 이 표를 단일 출처로 삼는다(에디터 설정 파일로 공유하지 않음). 카테고리를 늘리기 전에 기존 7종으로 표현이 안 되는지 먼저 확인한다.
+블루프린트 그래프에 코멘트 박스를 넣을 때만 참고 — [BP_COMMENT_COLORS.md](BP_COMMENT_COLORS.md) 참고.
 
 ## Git / Git LFS
 
@@ -112,6 +108,6 @@ AI는 워크플로 선택으로 다른 시스템보다 BP 비중이 크지만, �
 
 ## 커밋 전 체크
 
-- 새 클래스를 추가했으면 [ARCHITECTURE.md](ARCHITECTURE.md)의 매핑 표가 여전히 맞는지 확인
+- 새 폴더 간 경계(인터페이스 시그니처, decoupling 규칙)를 바꿨으면 [ARCHITECTURE.md](ARCHITECTURE.md)의 "시스템별 결정과 경계"·"시스템 간 인터페이스 계약"이 여전히 맞는지 확인
 - 기획 문서(`Docs/Design/`)를 여는 것은 예외 상황에서만: 유저에게 보이는 동작·밸런스 수치·시스템 범위 자체를 바꾸는 변경일 때만 해당 절을 읽고 어긋나지 않는지 확인한다 — 어긋나면 코드가 아니라 기획서 쪽을 먼저 팀과 조율. ARCHITECTURE.md 스펙대로의 순수 구현 작업(리팩터링, 버그 수정, 이미 확정된 클래스/인터페이스 구현)에는 기획 문서를 열 필요가 없다
 - 블루프린트를 수정했으면 경고·오류 없이 컴파일되는지 확인
