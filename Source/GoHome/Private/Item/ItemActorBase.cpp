@@ -9,13 +9,28 @@
 
 AItemActorBase::AItemActorBase()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = false; // 진단용 true였던 거 원복
 	bReplicates = true;
+
+	// AActor는 Pawn/Character와 달리 bReplicateMovement가 꺼져 있는 것으로 보임. 그래서 생성자에서 켜줘야함.
+	SetReplicateMovement(true); 
 
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	RootComponent = MeshComponent;
-	MeshComponent->SetSimulatePhysics(true);
 	MeshComponent->SetNotifyRigidBodyCollision(true);
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> DefaultMeshAsset(TEXT("/Engine/BasicShapes/Cube.Cube"));
+	if (DefaultMeshAsset.Succeeded())
+	{
+		MeshComponent->SetStaticMesh(DefaultMeshAsset.Object);
+	}
+}
+
+void AItemActorBase::BeginPlay()
+{
+	Super::BeginPlay();
+
+	MeshComponent->SetSimulatePhysics(HasAuthority());
 }
 
 bool AItemActorBase::CanInteract(APawn* InstigatorPawn) const
