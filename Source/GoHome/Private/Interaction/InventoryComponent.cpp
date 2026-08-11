@@ -48,6 +48,7 @@ bool UInventoryComponent::TryAddItem(AItemActorBase* Item)
 
 	Slots[EmptyIndex].Item = Item;
 	Slots[EmptyIndex].Quantity = 1;
+	Item->NotifyPickedUp();
 	return true;
 }
 
@@ -61,9 +62,9 @@ bool UInventoryComponent::RemoveItem(AItemActorBase* Item)
 		{
 			Slot.Item = nullptr;
 			Slot.Quantity = 0;
+			Item->NotifyDropped();
 			return true;
 		}
-
 	}
 	return false;
 }

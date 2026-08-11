@@ -31,14 +31,17 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_Slots)
 	FInventorySlot Slots[GoHomeInventorySlotCount];
 
+	UFUNCTION(BlueprintPure, Category = "Interaction")
 	virtual float GetTotalWeight() const override;
 
 	// 빈 슬롯을 찾아 Item을 채운다. 빈 슬롯이 없으면 false.
 	// 서버에서만 호출할 것.
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	bool TryAddItem(AItemActorBase* Item);
 
 	// Item이 들어있는 슬롯을 비운다. 찾아서 비웠으면 true.
 	// 서버에서만 호출할 것.
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	bool RemoveItem(AItemActorBase* Item);
 
 

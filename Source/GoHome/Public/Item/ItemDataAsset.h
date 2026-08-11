@@ -46,4 +46,22 @@ public:
 			ClampMin = "0.0", ClampMax = "1.0"))
 	float MinValuePercent = 0.4f;
 
+
+	// 소음 유발형 전용(bMakeNoise일 때만 의미 있음).
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item",
+		meta = (ToolTip = "보유 시작 시 기본 소음 반경"))
+	float BaseNoiseRadius = 800.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item",
+		meta = (ToolTip = "보유 중 반경이 증가하는 주기(초)", ClampMin = "0.1"))
+	float NoiseGrowthIntervalSeconds = 30.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item",
+		meta = (ToolTip = "주기마다 증가하는 반경"))
+	float NoiseRadiusGrowthPerInterval = 200.f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item",
+		meta = (ToolTip = "최대 소음 반경", ClampMin = "0.0"))
+	float MaxNoiseRadius = 2000.f;
+
 };
