@@ -274,6 +274,7 @@ decisions:
 | 도킹 문 상태 | Core | `bool IsOpen() const` / `FOnDoorStateChanged(bool bOpen)` | AI(위협 판정 구독), 13-1 게이트(기반 재사용 후보) | 02문서 1·13-1절 |
 | 인벤토리 슬롯 | Interaction | `UPROPERTY(ReplicatedUsing=OnRep_Slot) FInventorySlot Slots[4]` | UI(슬롯별 바인딩) | 02문서 4·6절 |
 | `OnDeath` (신설 제안) | Player | `FOnDeath OnDeath` (서버 전용 브로드캐스트, `DECLARE_MULTICAST_DELEGATE`) | Core(GameState 생존자 수 추적, 탐사마다 재구독) | 위 "Player" 절 HP 0 처리 결정 참고 |
+| `GetCurrentValue()` (신설 제안) | Item | `float GetCurrentValue() const` (`AItemActorBase` 멤버) | Interaction(납품 시 `ItemData->Value` 대신 이 값을 `GameState->AddDeliveredValue()`에 전달) | 위 "Item" 절 파손형 결정 참고 — `ItemData->Value`는 애셋 공유값이라 인스턴스별 파손 반영 불가, 그래서 신설 |
 | 정산/납품 값 흐름 | Interaction → Core → Save | `GameState->AddDeliveredValue(int32 Value)`(신설 제안 시그니처) | Interaction(딜리버리 존 진입 시 호출), Save(스키마 반영) | 02문서 4·9·13-2절 |
 
 ## 병렬 착수를 위한 헤더 스텁과 소유권
