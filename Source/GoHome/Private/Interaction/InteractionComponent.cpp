@@ -10,7 +10,8 @@ UInteractionComponent::UInteractionComponent()
 	PrimaryComponentTick.bCanEverTick = true;
 
 	// Server RPC를 쓰려면 컴포넌트 자체가 리플리케이트 되어야 한다.
-	SetIsReplicated(true);
+	// 생성자(CDO 초기화) 시점에는 SetIsReplicated 대신 SetIsReplicatedByDefault를 써야 ensure가 안 뜬다.
+	SetIsReplicatedByDefault(true);
 }
 
 void UInteractionComponent::BeginPlay()
