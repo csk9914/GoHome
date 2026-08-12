@@ -28,6 +28,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void TryInteract();
 
+	UFUNCTION(Server, Reliable)
+	void Server_RequestInteract(AActor* Target);
+
 	UPROPERTY(EditAnywhere, Category = "Interaction")
 	float TraceDistance = 200.f;
 

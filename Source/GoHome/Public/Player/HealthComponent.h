@@ -1,11 +1,13 @@
+
+
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Player/Damageable.h"
+#include "Player/DeathNotifier.h"
 #include "HealthComponent.generated.h"
 
-DECLARE_MULTICAST_DELEGATE(FOnDeath);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDeathDynamic);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHPChanged, float, CurrentHP, float, MaxHP);
 
@@ -17,7 +19,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHPChanged, float, CurrentHP, flo
  * 클라이언트와 UI는 복제/델리게이트를 통해 결과만 받아서 표시합니다.
  */
 UCLASS(ClassGroup = (Player), meta = (BlueprintSpawnableComponent))
-class GOHOME_API UHealthComponent : public UActorComponent, public IDamageable
+class GOHOME_API UHealthComponent : public UActorComponent, public IDamageable, public IDeathNotifier
 {
 	GENERATED_BODY()
 
@@ -28,8 +30,11 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Health")
 	FOnHPChanged OnHPChanged;
 
+
 	// GameState 같은 C++ 시스템이 서버에서 사망자를 집계할 때 사용합니다.
 	FOnDeath OnDeath;
+
+	FSimpleMulticastDelegate OnDeath;
 
 	// 블루프린트에서 사망 연출, UI, 사운드 등을 연결할 때 사용합니다.
 	UPROPERTY(BlueprintAssignable, Category = "Health")
@@ -45,6 +50,8 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Health")
 	bool IsDead() const { return bIsDead; }
+
+	virtual FSimpleMulticastDelegate& GetOnDeathDelegate() override { return OnDeath; }
 
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

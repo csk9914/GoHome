@@ -6,6 +6,9 @@
 #include "Components/StaticMeshComponent.h"
 #include "AI/NoiseType.h"
 #include "TimerManager.h"
+#include "Interaction/InventoryComponent.h"
+#include "Player/GoHomeCharacter.h"
+
 
 AItemActorBase::AItemActorBase()
 {
@@ -17,6 +20,7 @@ AItemActorBase::AItemActorBase()
 
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	RootComponent = MeshComponent;
+	MeshComponent->SetIsReplicated(false);
 	MeshComponent->SetNotifyRigidBodyCollision(true);
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> DefaultMeshAsset(TEXT("/Engine/BasicShapes/Cube.Cube"));
@@ -25,6 +29,7 @@ AItemActorBase::AItemActorBase()
 		MeshComponent->SetStaticMesh(DefaultMeshAsset.Object);
 	}
 }
+
 
 void AItemActorBase::BeginPlay()
 {
@@ -40,7 +45,47 @@ bool AItemActorBase::CanInteract(APawn* InstigatorPawn) const
 
 void AItemActorBase::OnInteract(APawn* InstigatorPawn)
 {
+	if (!HasAuthority() || !InstigatorPawn) return;
+
+	UInventoryComponent* Inventory = InstigatorPawn->FindComponentByClass<UInventoryComponent>();
+	if (!Inventory) return;
+
+	if (!Inventory->TryAddItem(this)) return;
+
+	bIsBeingClaimed = true;
+	HoldingPawn = InstigatorPawn;
+
+	MeshComponent->SetSimulatePhysics(false);
+	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	UpdateAttachment(); // 서버 자신은 RepNotify가 안 불리니 직접 호출
 }
+
+void AItemActorBase::OnRep_HoldingPawn(APawn* OldHoldingPawn)
+{
+	UpdateAttachment(OldHoldingPawn);
+}
+
+void AItemActorBase::UpdateAttachment(APawn* OldHoldingPawn)
+{
+	if (HoldingPawn)
+	{
+		if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(HoldingPawn))
+		{
+			Character->AttachItemToRightHand(MeshComponent);
+		}
+	}
+
+	else
+	{
+		MeshComponent->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+
+		if (AGoHomeCharacter* PrevCharacter = Cast<AGoHomeCharacter>(OldHoldingPawn))
+		{
+			PrevCharacter->DetachItemFromRightHand();
+		}
+	}
+}
+
 
 float AItemActorBase::GetTotalWeight() const
 {
@@ -65,6 +110,7 @@ void AItemActorBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AItemActorBase, bIsBeingClaimed);
 	DOREPLIFETIME(AItemActorBase, BreakCount);
 	DOREPLIFETIME(AItemActorBase, CurrentNoiseRadius);
+	DOREPLIFETIME(AItemActorBase, HoldingPawn);
 }
 
 void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp, 
@@ -133,6 +179,33 @@ void AItemActorBase::NotifyDropped()
 {
 	GetWorldTimerManager().ClearTimer(NoiseGrowthTimerHandle);
 	// CurrentNoiseRadius는 그대로 둔다 -> 아이템을 드랍한 후 다시 주우면 멈췄던 지점에서 타이머가 이어서 증가.
+}
+
+void AItemActorBase::ServerDrop()
+{
+	if (!HasAuthority() || !HoldingPawn) return;
+
+	APawn* PreviousHolder = HoldingPawn;
+
+	bIsBeingClaimed = false;
+	HoldingPawn = nullptr;
+
+	// 서버 자신은 RepNotify 자동 발동 안 되므로 직접 호출(Old holder 넘겨줌).
+	UpdateAttachment(PreviousHolder);
+
+	MeshComponent->SetSimulatePhysics(true);
+	// 파손 감지(NotifyHit)에 필요한 원래 콜리전으로 복원.
+	MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
+	// 제자리에 툭 떨어지지 않게 앞+위 방향으로 던지는 초기 속도 부여.
+	const FVector ThrowDirection = (PreviousHolder->GetActorForwardVector() + FVector::UpVector * 0.3f).GetSafeNormal();
+	MeshComponent->SetPhysicsLinearVelocity(ThrowDirection * DropThrowSpeed);
+
+	if (UInventoryComponent* Inventory = PreviousHolder->FindComponentByClass<UInventoryComponent>())
+	{
+		// 내부에서 NotifyDropped() 호출(소음 타이머 정지).
+		Inventory->RemoveItem(this);
+	}
 }
 
 
