@@ -44,8 +44,20 @@ public:
 	void NotifyDropped();
 
 protected:
-	
+
 	virtual void BeginPlay() override;
+
+
+	UPROPERTY(ReplicatedUsing = OnRep_HoldingPawn)
+	TObjectPtr<APawn> HoldingPawn = nullptr;
+
+	UFUNCTION()
+	void OnRep_HoldingPawn();
+
+	void UpdateAttachment();
+
+
+
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
