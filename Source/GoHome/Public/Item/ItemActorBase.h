@@ -43,9 +43,27 @@ public:
 	// 인벤토리에서 빠질 때 Interaction이 호출한다 (타이머 정지 + 반경 리셋).
 	void NotifyDropped();
 
+	// 드롭 시 앞으로 던져지는 초기 속도. 값 낮추면 툭 떨어지고, 높이면 멀리 날아간다.
+	UPROPERTY(EditAnywhere, Category = "Item")
+	float DropThrowSpeed = 500.f;
+
+
+	// 서버 권위 : 부착 해제( + 캐릭터 쪽 애니메이션 리셋 ) + 물리/콜리전 복원 + 인벤토리에서 제거.
+	// InventoryComponent::Server_RequestDrop이 소유권 검증 후 호출한다. 서버에서만 호출할 것.
+	void ServerDrop();
+
 protected:
-	
+
 	virtual void BeginPlay() override;
+
+
+	UPROPERTY(ReplicatedUsing = OnRep_HoldingPawn)
+	TObjectPtr<APawn> HoldingPawn = nullptr;
+
+	UFUNCTION()
+	void OnRep_HoldingPawn(APawn* OldHoldingPawn);
+
+	void UpdateAttachment(APawn* OldHoldingPawn = nullptr);
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
