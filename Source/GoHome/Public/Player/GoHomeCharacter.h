@@ -1,4 +1,4 @@
-
+﻿
 
 #pragma once
 
@@ -42,5 +42,14 @@ private:
 
 public:	
 	
+	// 핸들 소켓 선언.
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
+	FName RightHandSocketName = "Hand_R";
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
+	FName LeftHandSocketName = "Hand_L";
+
+
 };
 
