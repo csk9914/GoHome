@@ -7,8 +7,8 @@
 #include "AI/NoiseType.h"
 #include "TimerManager.h"
 #include "Interaction/InventoryComponent.h"
-#include "Player/GoHomeCharacter.h"
-
+#include "Player/SocketProvider.h"
+#include "GameFramework/Character.h"
 
 AItemActorBase::AItemActorBase()
 {
@@ -60,29 +60,27 @@ void AItemActorBase::OnInteract(APawn* InstigatorPawn)
 	UpdateAttachment(); // 서버 자신은 RepNotify가 안 불리니 직접 호출
 }
 
-void AItemActorBase::OnRep_HoldingPawn(APawn* OldHoldingPawn)
+void AItemActorBase::OnRep_HoldingPawn()
 {
-	UpdateAttachment(OldHoldingPawn);
+	UpdateAttachment();
 }
 
-void AItemActorBase::UpdateAttachment(APawn* OldHoldingPawn)
+void AItemActorBase::UpdateAttachment()
 {
 	if (HoldingPawn)
 	{
-		if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(HoldingPawn))
+		ACharacter* Character = Cast<ACharacter>(HoldingPawn);
+		ISocketProvider* SocketProvider = Cast<ISocketProvider>(HoldingPawn);
+		if (Character && SocketProvider)
 		{
-			Character->AttachItemToRightHand(MeshComponent);
+			MeshComponent->AttachToComponent(Character->GetMesh(),
+				FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+				SocketProvider->GetRightHandSocketName());
 		}
 	}
-
 	else
 	{
 		MeshComponent->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
-
-		if (AGoHomeCharacter* PrevCharacter = Cast<AGoHomeCharacter>(OldHoldingPawn))
-		{
-			PrevCharacter->DetachItemFromRightHand();
-		}
 	}
 }
 

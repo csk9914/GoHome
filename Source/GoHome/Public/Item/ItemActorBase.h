@@ -52,9 +52,12 @@ protected:
 	TObjectPtr<APawn> HoldingPawn = nullptr;
 
 	UFUNCTION()
-	void OnRep_HoldingPawn(APawn* OldHoldingPawn);
+	void OnRep_HoldingPawn();
 
-	void UpdateAttachment(APawn* OldHoldingPawn = nullptr);
+	void UpdateAttachment();
+
+
+
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
