@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
+#include "Player/SocketProvider.h"
 #include "GoHomeCharacter.generated.h"
 
 class UInputAction;
@@ -12,7 +13,7 @@ class UInputMappingContext;
 class UCameraComponent;
 
 UCLASS()
-class GOHOME_API AGoHomeCharacter : public ACharacter
+class GOHOME_API AGoHomeCharacter : public ACharacter, public ISocketProvider
 {
 	GENERATED_BODY()
 
@@ -49,6 +50,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
 	FName LeftHandSocketName = "Hand_L";
+
+	virtual FName GetRightHandSocketName() const override { return RightHandSocketName; }
+	virtual FName GetLeftHandSocketName() const override { return LeftHandSocketName; }
+
 
 
 };
