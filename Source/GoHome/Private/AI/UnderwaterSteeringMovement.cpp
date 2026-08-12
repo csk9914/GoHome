@@ -165,12 +165,29 @@ FVector UUnderwaterSteeringMovement::GetSteeringDirection(FVector DesiredDir, fl
 	}
 
 	AActor* Owner = GetOwner();
-	const FVector ForwardDir = Owner ? Owner->GetActorForwardVector().GetSafeNormal() : Desired;
-	const FVector RightDir = Owner ? Owner->GetActorRightVector().GetSafeNormal() : FVector::RightVector;
+	// 이동하려는 목표 방향을 기준으로 회피 방향을 만든다. Actor Forward를 쓰면 몸이 아직 덜 돌아간 순간에 엉뚱한 방향을 검사할 수 있다.
+	const FVector ForwardDir = Desired;
+	FVector RightDir = FVector::CrossProduct(FVector::UpVector, ForwardDir).GetSafeNormal();
+	if (RightDir.IsNearlyZero())
+	{
+		// 목표 방향이 거의 수직이면 UpVector와 외적한 RightDir이 0에 가까워지므로 Owner의 현재 오른쪽 방향을 예외값으로 쓴다.
+		RightDir = Owner ? Owner->GetActorRightVector().GetSafeNormal() : FVector::RightVector;
+	}
 	const FVector LeftDir = -RightDir;
 	const FVector UpDir = FVector::UpVector;
 	const FVector DownDir = -FVector::UpVector;
 	const FVector BackDir = -ForwardDir;
+
+	// 뒤로 빠지는 중이어도 목표 방향이 다시 열리면 즉시 탈출 상태를 끊는다.
+	if (bForceEscape && !IsDirectionBlocked(ForwardDir))
+	{
+		bForceEscape = false;
+		ForceEscapeTime = 0.0f;
+		ForceEscapeDir = FVector::ZeroVector;
+		bAvoidLocked = false;
+		AvoidLockTime = 0.0f;
+		AvoidLockedDir = FVector::ZeroVector;
+	}
 
 	// 강제 탈출 중이면 다른 계산보다 우선해서 뒤로 빠진다.
 	FVector OutDir;
@@ -194,7 +211,7 @@ FVector UUnderwaterSteeringMovement::GetSteeringDirection(FVector DesiredDir, fl
 		AvoidLockedDir = FVector::ZeroVector;
 	}
 
-	// 벽검사는 목표 지점 방향이 아니라 몬스터 몸 기준 앞/오른쪽/왼쪽/아래/위 5방향으로 한다.
+	// 벽검사는 목표 지점 방향 기준 앞/오른쪽/왼쪽/아래/위 5방향으로 한다.
 	const bool bFrontBlocked = IsDirectionBlocked(ForwardDir);
 	const bool bRightBlocked = IsDirectionBlocked(RightDir);
 	const bool bLeftBlocked = IsDirectionBlocked(LeftDir);
