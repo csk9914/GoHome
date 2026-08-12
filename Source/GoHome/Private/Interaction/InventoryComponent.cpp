@@ -69,7 +69,6 @@ bool UInventoryComponent::RemoveItem(AItemActorBase* Item)
 	return false;
 }
 
-
 int32 UInventoryComponent::FindEmptySlotIndex() const
 {
 	for (int32 Index = 0; Index < GoHomeInventorySlotCount; ++Index)
@@ -80,4 +79,37 @@ int32 UInventoryComponent::FindEmptySlotIndex() const
 		}
 	}
 	return INDEX_NONE;
+}
+
+void UInventoryComponent::TryDropItem(AItemActorBase* ItemToDrop)
+{
+	if (!ItemToDrop) return;
+	Server_RequestDrop(ItemToDrop);
+}
+
+void UInventoryComponent::Server_RequestDrop_Implementation(AItemActorBase* ItemToDrop)
+{
+	if (!ItemToDrop) return;
+
+	// 클라이언트 요청을 그대로 신뢰하지 않음 -> 실제 내 인벤토리에 있는 아이템인지 검증함.
+	bool bOwnsItem = false;
+	for (const FInventorySlot& Slot : Slots)
+	{
+		if (Slot.Item == ItemToDrop)
+		{
+			bOwnsItem = true;
+			break;
+		}
+	}
+
+	if (!bOwnsItem) return;
+
+	ItemToDrop->ServerDrop();
+}
+
+AItemActorBase* UInventoryComponent::GetItemInSlot(int32 SlotIndex) const
+{
+	// Slots는 고정 C 배열이라 수동 범위 체크.
+	if (SlotIndex < 0 || SlotIndex >= GoHomeInventorySlotCount) return nullptr;
+	return Slots[SlotIndex].Item;
 }
