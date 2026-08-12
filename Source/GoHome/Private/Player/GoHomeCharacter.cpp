@@ -8,6 +8,8 @@
 #include "InputAction.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Net/UnrealNetwork.h"
 
 AGoHomeCharacter::AGoHomeCharacter()
 {
@@ -101,4 +103,34 @@ void AGoHomeCharacter::Look(const FInputActionValue& Value)
 	const FVector2D LookVector = Value.Get<FVector2D>();
 	AddControllerYawInput(LookVector.X);
 	AddControllerPitchInput(LookVector.Y);
+}
+
+void AGoHomeCharacter::AttachItemToRightHand(UStaticMeshComponent* ItemMeshComponent)
+{
+	if (!ItemMeshComponent) return;
+
+	ItemMeshComponent->AttachToComponent(
+		GetMesh(),
+		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+		RightHandSocketName);
+
+	bIsHoldingItem = true;
+}
+
+void AGoHomeCharacter::DetachItemFromRightHand()
+{
+	bIsHoldingItem = false;
+	// 실제 Detach(월드에 다시 떨어뜨리는 것)는 ItemActorBase 쪽에서
+	// 자기 자신을 Detach + 위치 지정하는 게 자연스러움 (소유권 문제라).
+}
+
+void AGoHomeCharacter::OnRep_IsHoldingItem()
+{
+	// 필요하면 여기서 사운드/이펙트 등 클라 전용 후처리
+}
+
+void AGoHomeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AGoHomeCharacter, bIsHoldingItem);
 }
