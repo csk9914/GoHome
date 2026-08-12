@@ -1,8 +1,7 @@
 #include "Player/OxygenComponent.h"
-#include "Curves/CurveFloat.h"
 #include "Net/UnrealNetwork.h"
-#include "Player/CarryWeightProvider.h"
 #include "Player/Damageable.h"
+#include "Interaction/WeightProvider.h"
 
 UOxygenComponent::UOxygenComponent()
 {
@@ -67,7 +66,7 @@ void UOxygenComponent::BeginPlay()
 		return;
 	}
 
-	FindCarryWeightProviderComponent();
+	FindWeightProviderComponents();
 	SetOxygen(MaxOxygen);
 }
 
@@ -98,10 +97,9 @@ bool UOxygenComponent::HasOwnerAuthority() const
 	return Owner && Owner->HasAuthority();
 }
 
-void UOxygenComponent::FindCarryWeightProviderComponent()
+void UOxygenComponent::FindWeightProviderComponents()
 {
-	CachedCarryWeightProvider.SetObject(nullptr);
-	CachedCarryWeightProvider.SetInterface(nullptr);
+	CachedWeightProviders.Reset();
 
 	const AActor* OwnerActor = GetOwner();
 	if (!OwnerActor)
@@ -112,22 +110,25 @@ void UOxygenComponent::FindCarryWeightProviderComponent()
 	const TSet<UActorComponent*>& OwnerComponents = OwnerActor->GetComponents();
 	for (UActorComponent* OwnerComponent : OwnerComponents)
 	{
-		// 자기 자신이거나 비어 있는 컴포넌트는 무게 상태 제공 대상이 아니다.
+		// 자기 자신이거나 비어 있는 컴포넌트는 무게 계산 대상이 아니다.
 		if (!OwnerComponent || OwnerComponent == this)
 		{
 			continue;
 		}
 
-		ICarryWeightProvider* CarryWeightProvider = Cast<ICarryWeightProvider>(OwnerComponent);
-		if (!CarryWeightProvider)
+		IWeightProvider* WeightProvider = Cast<IWeightProvider>(OwnerComponent);
+		if (!WeightProvider)
 		{
 			continue;
 		}
 
-		// 산소는 운반 무게 계산 방식은 모르고, 초과 무게 계약만 읽는다.
-		CachedCarryWeightProvider.SetObject(OwnerComponent);
-		CachedCarryWeightProvider.SetInterface(CarryWeightProvider);
-		return;
+		// TScriptInterface는 UObject 포인터와 Interface 포인터를 함께 들고 있다.
+		// 그래서 "어떤 오브젝트인지"와 "어떤 인터페이스로 부를지"를 둘 다 넣어준다.
+		TScriptInterface<IWeightProvider> WeightProviderInterface;
+		WeightProviderInterface.SetObject(OwnerComponent);
+		WeightProviderInterface.SetInterface(WeightProvider);
+
+		CachedWeightProviders.Add(WeightProviderInterface);
 	}
 }
 
@@ -201,41 +202,30 @@ float UOxygenComponent::CalculateOxygenDrainRate() const
 	}
 
 	const float BaseDrainRate = MaxOxygen / TargetOxygenDuration;
-	const float OverweightDrainMultiplier = CalculateOverweightDrainMultiplier();
+	const float WeightDrainRate = GetCachedTotalWeight() * FMath::Max(0.f, WeightDrainMultiplier);
 
-	return FMath::Max(0.f, BaseDrainRate * OverweightDrainMultiplier);
+	return FMath::Max(0.f, BaseDrainRate + WeightDrainRate);
 }
 
-float UOxygenComponent::CalculateOverweightDrainMultiplier() const
+float UOxygenComponent::GetCachedTotalWeight() const
 {
-	const float OverweightAmount = GetCachedOverweightAmount();
-	if (OverweightAmount <= 0.f || !OverweightDrainMultiplierCurve)
+	float TotalWeight = 0.f;
+
+	for (const TScriptInterface<IWeightProvider>& CachedWeightProvider : CachedWeightProviders)
 	{
-		return 1.f;
+		const UObject* WeightProviderObject = CachedWeightProvider.GetObject();
+		const IWeightProvider* WeightProvider = CachedWeightProvider.GetInterface();
+
+		// 캐시된 오브젝트가 삭제됐거나 인터페이스가 없으면 무시한다.
+		if (!IsValid(WeightProviderObject) || !WeightProvider)
+		{
+			continue;
+		}
+
+		TotalWeight += FMath::Max(0.f, WeightProvider->GetTotalWeight());
 	}
 
-	const float CurveMultiplier = OverweightDrainMultiplierCurve->GetFloatValue(OverweightAmount);
-	return FMath::Max(1.f, CurveMultiplier);
-}
-
-float UOxygenComponent::GetCachedOverweightAmount() const
-{
-	const UObject* CarryWeightProviderObject = CachedCarryWeightProvider.GetObject();
-	const ICarryWeightProvider* CarryWeightProvider = CachedCarryWeightProvider.GetInterface();
-
-	if (!IsValid(CarryWeightProviderObject) || !CarryWeightProvider)
-	{
-		const_cast<UOxygenComponent*>(this)->FindCarryWeightProviderComponent();
-		CarryWeightProviderObject = CachedCarryWeightProvider.GetObject();
-		CarryWeightProvider = CachedCarryWeightProvider.GetInterface();
-	}
-
-	if (!IsValid(CarryWeightProviderObject) || !CarryWeightProvider)
-	{
-		return 0.f;
-	}
-
-	return FMath::Max(0.f, CarryWeightProvider->GetOverweightAmount());
+	return TotalWeight;
 }
 
 void UOxygenComponent::OnRep_Oxygen()
