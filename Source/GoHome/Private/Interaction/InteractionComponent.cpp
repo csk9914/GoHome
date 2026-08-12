@@ -8,6 +8,9 @@
 UInteractionComponent::UInteractionComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
+
+	// Server RPC를 쓰려면 컴포넌트 자체가 리플리케이트 되어야 한다.
+	SetIsReplicated(true);
 }
 
 void UInteractionComponent::BeginPlay()
@@ -72,17 +75,26 @@ void UInteractionComponent::TryInteract()
 	APawn* OwnerPawn = Cast<APawn>(GetOwner());
 	if (Interactable->CanInteract(OwnerPawn))
 	{
-		// TODO(Phase 2): OnInteract가 아직 빈 스텁이라 지금은 로컬 직접 호출이 안전하지만,
-		// 실제 픽업 로직이 들어가면 클라이언트가 직접 호출하면 안 됨
-		// Server_RequestInteract(CurrentTarget) 서버 RPC로 교체 필요
-		// (02문서 4절 "소유권 이전은 서버 RPC 요청 후 승인").
+		Server_RequestInteract(CurrentTarget);
+	}
+}
 
+void UInteractionComponent::Server_RequestInteract_Implementation(AActor* Target)
+{
+	IInteractable* Interactable = Cast<IInteractable>(Target);
+
+	if (!Interactable) return;
+
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (!OwnerPawn) return;
+
+	// 서버에서 다시 검증 -> 클라이언트가 보낸 요청을 그대로 신뢰하지 않는다.
+	if (Interactable->CanInteract(OwnerPawn))
+	{
 		Interactable->OnInteract(OwnerPawn);
 	}
 
 }
-
-
 
 
 

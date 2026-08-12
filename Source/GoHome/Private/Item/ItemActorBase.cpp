@@ -6,6 +6,9 @@
 #include "Components/StaticMeshComponent.h"
 #include "AI/NoiseType.h"
 #include "TimerManager.h"
+#include "Interaction/InventoryComponent.h"
+#include "Player/SocketProvider.h"
+#include "GameFramework/Character.h"
 
 AItemActorBase::AItemActorBase()
 {
@@ -17,6 +20,7 @@ AItemActorBase::AItemActorBase()
 
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	RootComponent = MeshComponent;
+	MeshComponent->SetIsReplicated(false);
 	MeshComponent->SetNotifyRigidBodyCollision(true);
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> DefaultMeshAsset(TEXT("/Engine/BasicShapes/Cube.Cube"));
@@ -25,6 +29,7 @@ AItemActorBase::AItemActorBase()
 		MeshComponent->SetStaticMesh(DefaultMeshAsset.Object);
 	}
 }
+
 
 void AItemActorBase::BeginPlay()
 {
@@ -40,7 +45,45 @@ bool AItemActorBase::CanInteract(APawn* InstigatorPawn) const
 
 void AItemActorBase::OnInteract(APawn* InstigatorPawn)
 {
+	if (!HasAuthority() || !InstigatorPawn) return;
+
+	UInventoryComponent* Inventory = InstigatorPawn->FindComponentByClass<UInventoryComponent>();
+	if (!Inventory) return;
+
+	if (!Inventory->TryAddItem(this)) return;
+
+	bIsBeingClaimed = true;
+	HoldingPawn = InstigatorPawn;
+
+	MeshComponent->SetSimulatePhysics(false);
+	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	UpdateAttachment(); // 서버 자신은 RepNotify가 안 불리니 직접 호출
 }
+
+void AItemActorBase::OnRep_HoldingPawn()
+{
+	UpdateAttachment();
+}
+
+void AItemActorBase::UpdateAttachment()
+{
+	if (HoldingPawn)
+	{
+		ACharacter* Character = Cast<ACharacter>(HoldingPawn);
+		ISocketProvider* SocketProvider = Cast<ISocketProvider>(HoldingPawn);
+		if (Character && SocketProvider)
+		{
+			MeshComponent->AttachToComponent(Character->GetMesh(),
+				FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+				SocketProvider->GetRightHandSocketName());
+		}
+	}
+	else
+	{
+		MeshComponent->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+	}
+}
+
 
 float AItemActorBase::GetTotalWeight() const
 {
@@ -65,6 +108,7 @@ void AItemActorBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AItemActorBase, bIsBeingClaimed);
 	DOREPLIFETIME(AItemActorBase, BreakCount);
 	DOREPLIFETIME(AItemActorBase, CurrentNoiseRadius);
+	DOREPLIFETIME(AItemActorBase, HoldingPawn);
 }
 
 void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp, 
