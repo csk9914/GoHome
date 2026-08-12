@@ -7,8 +7,8 @@
 #include "AI/NoiseType.h"
 #include "TimerManager.h"
 #include "Interaction/InventoryComponent.h"
-#include "Player/GoHomeCharacter.h"
-
+#include "Player/SocketProvider.h"
+#include "GameFramework/Character.h"
 
 AItemActorBase::AItemActorBase()
 {
@@ -60,29 +60,27 @@ void AItemActorBase::OnInteract(APawn* InstigatorPawn)
 	UpdateAttachment(); // 서버 자신은 RepNotify가 안 불리니 직접 호출
 }
 
-void AItemActorBase::OnRep_HoldingPawn(APawn* OldHoldingPawn)
+void AItemActorBase::OnRep_HoldingPawn()
 {
-	UpdateAttachment(OldHoldingPawn);
+	UpdateAttachment();
 }
 
-void AItemActorBase::UpdateAttachment(APawn* OldHoldingPawn)
+void AItemActorBase::UpdateAttachment()
 {
 	if (HoldingPawn)
 	{
-		if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(HoldingPawn))
+		ACharacter* Character = Cast<ACharacter>(HoldingPawn);
+		ISocketProvider* SocketProvider = Cast<ISocketProvider>(HoldingPawn);
+		if (Character && SocketProvider)
 		{
-			Character->AttachItemToRightHand(MeshComponent);
+			MeshComponent->AttachToComponent(Character->GetMesh(),
+				FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+				SocketProvider->GetRightHandSocketName());
 		}
 	}
-
 	else
 	{
 		MeshComponent->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
-
-		if (AGoHomeCharacter* PrevCharacter = Cast<AGoHomeCharacter>(OldHoldingPawn))
-		{
-			PrevCharacter->DetachItemFromRightHand();
-		}
 	}
 }
 
@@ -179,33 +177,6 @@ void AItemActorBase::NotifyDropped()
 {
 	GetWorldTimerManager().ClearTimer(NoiseGrowthTimerHandle);
 	// CurrentNoiseRadius는 그대로 둔다 -> 아이템을 드랍한 후 다시 주우면 멈췄던 지점에서 타이머가 이어서 증가.
-}
-
-void AItemActorBase::ServerDrop()
-{
-	if (!HasAuthority() || !HoldingPawn) return;
-
-	APawn* PreviousHolder = HoldingPawn;
-
-	bIsBeingClaimed = false;
-	HoldingPawn = nullptr;
-
-	// 서버 자신은 RepNotify 자동 발동 안 되므로 직접 호출(Old holder 넘겨줌).
-	UpdateAttachment(PreviousHolder);
-
-	MeshComponent->SetSimulatePhysics(true);
-	// 파손 감지(NotifyHit)에 필요한 원래 콜리전으로 복원.
-	MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-
-	// 제자리에 툭 떨어지지 않게 앞+위 방향으로 던지는 초기 속도 부여.
-	const FVector ThrowDirection = (PreviousHolder->GetActorForwardVector() + FVector::UpVector * 0.3f).GetSafeNormal();
-	MeshComponent->SetPhysicsLinearVelocity(ThrowDirection * DropThrowSpeed);
-
-	if (UInventoryComponent* Inventory = PreviousHolder->FindComponentByClass<UInventoryComponent>())
-	{
-		// 내부에서 NotifyDropped() 호출(소음 타이머 정지).
-		Inventory->RemoveItem(this);
-	}
 }
 
 

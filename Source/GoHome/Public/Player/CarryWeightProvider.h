@@ -1,10 +1,12 @@
+/*
+
 #pragma once
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
 #include "CarryWeightProvider.generated.h"
 
-// Unreal reflection wrapper for ICarryWeightProvider.
+// This class does not need to be modified.
 UINTERFACE(MinimalAPI)
 class UCarryWeightProvider : public UInterface
 {
@@ -12,11 +14,9 @@ class UCarryWeightProvider : public UInterface
 };
 
 /**
- * í˜„ì¬ ìš´ë°˜ ë¬´ê²Œ ìƒíƒœë¥¼ ì œê³µí•˜ëŠ” ê³„ì•½.
- * ì‚°ì†Œ, UI, ìˆ˜ë¥˜ ê°™ì€ ì‹œìŠ¤í…œì€ CarryWeightComponentì˜ êµ¬ì²´ íƒ€ì…ì„ ëª°ë¼ë„
- * ì´ ì¸í„°í˜ì´ìŠ¤ë§Œ ë³´ê³  í˜„ì¬ë¬´ê²Œ/ìµœëŒ€ë¬´ê²Œ/ì´ˆê³¼ë¬´ê²Œë¥¼ ì½ì„ ìˆ˜ ìˆë‹¤.
- */
-  
+ * ÇöÀç ¼ÒÁö ¹«°Ô¿Í ÃÖ´ë Çã¿ë ¹«°Ô¸¦ ¾Ë·ÁÁÙ ¼ö ÀÖ´Â ¿ÀºêÁ§Æ®°¡ ±¸ÇöÇÑ´Ù.
+ * OxygenComponent´Â ±¸Ã¼ Å¬·¡½º°¡ ¾Æ´Ï¶ó ÀÌ ÀÎÅÍÆäÀÌ½º¸¸ º¸°í ÃÊ°ú ¹«°Ô¸¦ °è»êÇÑ´Ù.
+ 
 class GOHOME_API ICarryWeightProvider
 {
 	GENERATED_BODY()
@@ -26,3 +26,4 @@ public:
 	virtual float GetMaxCarryWeight() const = 0;
 	virtual float GetOverweightAmount() const = 0;
 };
+*/

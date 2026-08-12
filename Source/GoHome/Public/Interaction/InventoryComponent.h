@@ -44,25 +44,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	bool RemoveItem(AItemActorBase* Item);
 
-	// 로컬에서 호출(드롭 입력 바인딩용) -> 서버에 드롭 요청.
-	UFUNCTION(BlueprintCallable, Category = "Interaction")
-	void TryDropItem(AItemActorBase* ItemToDrop);
-
-	UFUNCTION(Server, Reliable)
-	void Server_RequestDrop(AItemActorBase* ItemToDrop);
-
-	// 슬롯 인덱스로 아이템 조회 (인벤토리 UI/드롭 테스트용).
-	UFUNCTION(BlueprintPure, Category = "Interaction")
-	AItemActorBase* GetItemInSlot(int32 SlotIndex) const;
-
-	// 사망 등으로 인벤토리 전체를 한번에 비워야 할 때 호출(각 아이템의 ServerDrop() 재사용).
-	void ServerDropAllItems();
-
 
 protected:
-
-	virtual void BeginPlay() override;
-
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UFUNCTION()
