@@ -1,4 +1,4 @@
-
+ï»¿
 
 
 #include "Player/GoHomeCharacter.h"
@@ -18,27 +18,27 @@ AGoHomeCharacter::AGoHomeCharacter()
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.f);
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
-	Camera->SetupAttachment(GetMesh(), "Spine_03"); // Ä«¸Ş¶ó´Â ÀÓ½Ã·Î ¸öÅë(Spine_03)¿¡ ºÎÂø
+	Camera->SetupAttachment(GetMesh(), "Spine_03"); // ì¹´ë©”ë¼ëŠ” ì„ì‹œë¡œ ëª¸í†µ(Spine_03)ì— ë¶€ì°©
 	Camera->SetRelativeLocation(FVector(0.f, 0.f, 70.f));
 	Camera->bUsePawnControlRotation = true;
 
-	//GetMesh()->SetOwnerNoSee(true); // ¼ÒÀ¯ÀÚ°¡ ÀÚ½ÅÀ» º¸Áö ¸øÇÏµµ·Ï ÇÏ´Â ÄÚµå(ÀÏ´Ü ÁÖ¼®Ã³¸®)
+	//GetMesh()->SetOwnerNoSee(true); // ì†Œìœ ìê°€ ìì‹ ì„ ë³´ì§€ ëª»í•˜ë„ë¡ í•˜ëŠ” ì½”ë“œ(ì¼ë‹¨ ì£¼ì„ì²˜ë¦¬)
 
-	GetMesh()->SetCastShadow(false); // ±×¸²ÀÚ ²ô±â
+	GetMesh()->SetCastShadow(false); // ê·¸ë¦¼ì ë„ê¸°
 
-	bUseControllerRotationYaw = true; // ¸öÅëµµ ½Ã¼± Yaw¸¦ µû¶ó°¡°Ô ÇÔ
+	bUseControllerRotationYaw = true; // ëª¸í†µë„ ì‹œì„  Yawë¥¼ ë”°ë¼ê°€ê²Œ í•¨
 
 	AddTickPrerequisiteComponent(GetMesh());
 
-	// FirstPersonArmsMesh ºÎºĞ
+	// FirstPersonArmsMesh ë¶€ë¶„
 	FirstPersonArmsMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FirstPersonArmsMesh"));
-	FirstPersonArmsMesh->SetupAttachment(GetCapsuleComponent()); // GetMesh()¶û °°Àº ºÎ¸ğ¿¡ ºÙ¿©¼­ Æ®·£½ºÆû ¸ÂÃã
+	FirstPersonArmsMesh->SetupAttachment(GetCapsuleComponent()); // GetMesh()ë‘ ê°™ì€ ë¶€ëª¨ì— ë¶™ì—¬ì„œ íŠ¸ëœìŠ¤í¼ ë§ì¶¤
 	FirstPersonArmsMesh->SetRelativeLocation(GetMesh()->GetRelativeLocation());
 	FirstPersonArmsMesh->SetRelativeRotation(GetMesh()->GetRelativeRotation());
 	FirstPersonArmsMesh->SetOnlyOwnerSee(true);
-	FirstPersonArmsMesh->SetCastShadow(false); // º»ÀÎ ½Ã¾ß¿¡ ÀÌ»óÇÑ ÆÈ ±×¸²ÀÚ ¾È »ı±â°Ô
+	FirstPersonArmsMesh->SetCastShadow(false); // ë³¸ì¸ ì‹œì•¼ì— ì´ìƒí•œ íŒ” ê·¸ë¦¼ì ì•ˆ ìƒê¸°ê²Œ
 
-	GetMesh()->SetOwnerNoSee(true); // º»ÀÎÇÑÅ×´Â Àü½Å ¸Ş½Ã ¾È º¸ÀÌ°Ô
+	GetMesh()->SetOwnerNoSee(true); // ë³¸ì¸í•œí…ŒëŠ” ì „ì‹  ë©”ì‹œ ì•ˆ ë³´ì´ê²Œ
 
 }
 
@@ -48,7 +48,7 @@ void AGoHomeCharacter::BeginPlay()
 
 	FirstPersonArmsMesh->SetLeaderPoseComponent(GetMesh());
 
-	// Ä³¸¯ÅÍ ¼ö¿µ ¸ğµå °­Á¦ ÁøÀÔ
+	// ìºë¦­í„° ìˆ˜ì˜ ëª¨ë“œ ê°•ì œ ì§„ì…
 	GetCharacterMovement()->SetMovementMode(MOVE_Swimming);
 	GetCharacterMovement()->Buoyancy = 1.0f;
 
@@ -73,7 +73,7 @@ void AGoHomeCharacter::Tick(float DeltaTime)
 		GetMesh()->HideBoneByName(TEXT("Head"), EPhysBodyOp::PBO_None);
 
 		//const float Pitch = FRotator::NormalizeAxis(GetControlRotation().Pitch);
-		//constexpr float BodyHidePitchThreshold = 30.f; // ÀÌ °¢µµ ÀÌ»óÀÌ¸é ¸ö ÀüÃ¼ ¼û±è
+		//constexpr float BodyHidePitchThreshold = 30.f; // ì´ ê°ë„ ì´ìƒì´ë©´ ëª¸ ì „ì²´ ìˆ¨ê¹€
 
 		//if (FMath::Abs(Pitch) > BodyHidePitchThreshold)
 		//{
@@ -132,13 +132,13 @@ void AGoHomeCharacter::AttachItemToRightHand(UStaticMeshComponent* ItemMeshCompo
 void AGoHomeCharacter::DetachItemFromRightHand()
 {
 	bIsHoldingItem = false;
-	// ½ÇÁ¦ Detach(¿ùµå¿¡ ´Ù½Ã ¶³¾î¶ß¸®´Â °Í)´Â ItemActorBase ÂÊ¿¡¼­
-	// ÀÚ±â ÀÚ½ÅÀ» Detach + À§Ä¡ ÁöÁ¤ÇÏ´Â °Ô ÀÚ¿¬½º·¯¿ò (¼ÒÀ¯±Ç ¹®Á¦¶ó).
+	// ì‹¤ì œ Detach(ì›”ë“œì— ë‹¤ì‹œ ë–¨ì–´ëœ¨ë¦¬ëŠ” ê²ƒ)ëŠ” ItemActorBase ìª½ì—ì„œ
+	// ìê¸° ìì‹ ì„ Detach + ìœ„ì¹˜ ì§€ì •í•˜ëŠ” ê²Œ ìì—°ìŠ¤ëŸ¬ì›€ (ì†Œìœ ê¶Œ ë¬¸ì œë¼).
 }
 
 void AGoHomeCharacter::OnRep_IsHoldingItem()
 {
-	// ÇÊ¿äÇÏ¸é ¿©±â¼­ »ç¿îµå/ÀÌÆåÆ® µî Å¬¶ó Àü¿ë ÈÄÃ³¸®
+	// í•„ìš”í•˜ë©´ ì—¬ê¸°ì„œ ì‚¬ìš´ë“œ/ì´í™íŠ¸ ë“± í´ë¼ ì „ìš© í›„ì²˜ë¦¬
 }
 
 void AGoHomeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const

@@ -1,4 +1,4 @@
-/*
+ï»¿/*
 
 #pragma once
 
@@ -23,22 +23,22 @@ public:
 protected:
 	virtual void BeginPlay() override;
 
-	// Ä³¸¯ÅÍÀÇ ±âº» ÃÖ´ë Çã¿ë ¹«°Ô. BP¿¡¼­ Ä³¸¯ÅÍ¸¶´Ù Á¶Á¤ °¡´É.
+	// ìºë¦­í„°ì˜ ê¸°ë³¸ ìµœëŒ€ í—ˆìš© ë¬´ê²Œ. BPì—ì„œ ìºë¦­í„°ë§ˆë‹¤ ì¡°ì • ê°€ëŠ¥.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Carry Weight", meta = (ClampMin = "0.0", UIMin = "0.0"))
 	float BaseMaxCarryWeight = 100.f;
 
-	// ¾÷±×·¹ÀÌµå ½Ã½ºÅÛÀÌ Àû¿ëÇÑ ÃÖ´ë Çã¿ë ¹«°Ô º¸³Ê½º.
-	// ¿ÜºÎ¿¡¼­´Â Set ÇÔ¼ö·Î¸¸ º¯°æÇÑ´Ù.
+	// ì—…ê·¸ë ˆì´ë“œ ì‹œìŠ¤í…œì´ ì ìš©í•œ ìµœëŒ€ í—ˆìš© ë¬´ê²Œ ë³´ë„ˆìŠ¤.
+	// ì™¸ë¶€ì—ì„œëŠ” Set í•¨ìˆ˜ë¡œë§Œ ë³€ê²½í•œë‹¤.
 	UPROPERTY(BlueprintReadOnly, Category = "Carry Weight")
 	float MaxCarryWeightBonus = 0.f;
 
-	// ¹öÇÁ/µğ¹öÇÁ ½Ã½ºÅÛÀÌ Àû¿ëÇÑ ÀÓ½Ã ÃÖ´ë Çã¿ë ¹«°Ô º¸Á¤°ª.
-	// ¿ÜºÎ¿¡¼­´Â Set ÇÔ¼ö·Î¸¸ º¯°æÇÑ´Ù.
+	// ë²„í”„/ë””ë²„í”„ ì‹œìŠ¤í…œì´ ì ìš©í•œ ì„ì‹œ ìµœëŒ€ í—ˆìš© ë¬´ê²Œ ë³´ì •ê°’.
+	// ì™¸ë¶€ì—ì„œëŠ” Set í•¨ìˆ˜ë¡œë§Œ ë³€ê²½í•œë‹¤.
 	UPROPERTY(BlueprintReadOnly, Category = "Carry Weight")
 	float TemporaryMaxCarryWeightModifier = 0.f;
 
 private:
-	// °°Àº Owner¿¡ ºÙÀº IWeightProviderµéÀ» ÀúÀåÇÑ´Ù. º¸Åë InventoryComponent°¡ µé¾î°£´Ù.
+	// ê°™ì€ Ownerì— ë¶™ì€ IWeightProviderë“¤ì„ ì €ì¥í•œë‹¤. ë³´í†µ InventoryComponentê°€ ë“¤ì–´ê°„ë‹¤.
 	UPROPERTY()
 	TArray<TScriptInterface<IWeightProvider>> CachedWeightProviders;
 

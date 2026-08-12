@@ -1,4 +1,4 @@
-
+О╩©
 
 #include "Player/HealthComponent.h"
 #include "Net/UnrealNetwork.h"
@@ -11,22 +11,22 @@ UHealthComponent::UHealthComponent()
 
 void UHealthComponent::ApplyDamage_Implementation(float Amount, AActor* Instigator, FName DamageType)
 {
-	// ╪╜╧Ж ╬ф╢о╦И ╧╚╫ц
+	// Л└°К╡└ Л∙└К▀┬К╘╢ К╛╢Л▀°
 	if (!GetOwner() || !GetOwner()->HasAuthority())
 	{
 		return;
 	}
 
-	// юл╧л ав╬Зю╦╦И /╣╔╧лаЖ 0 юлго╦И ╧╚╫ц
+	// Л²╢К╞╦ Лё╫Л≈┬Л°╪К╘╢ /К█╟К╞╦Л╖─ 0 Л²╢М∙≤К╘╢ К╛╢Л▀°
 	if (bIsDead || Amount <= 0.f)
 	{
 		return;
 	}
 
-	// HP╦╕ ╣╔╧лаЖ╦╦е╜ ╠П╟М 0 ╬ф╥║╥н Ё╩╥а╟║аЖ ╬й╟т а╕гя
+	// HPК╔╪ К█╟К╞╦Л╖─К╖▄М│╪ Й╧▌ЙЁ═ 0 Л∙└К·≤К║° К┌╢К═╓Й╟─Л╖─ Л∙┼Й╡▄ Л═°М∙°
 	HP = FMath::Clamp(HP - Amount, 0.f, MaxHP);
 
-	// 0 юлго╦И авю╫
+	// 0 Л²╢М∙≤К╘╢ Лё╫Л²▄
 	if (HP <= 0.f)
 	{
 		bIsDead = true;
