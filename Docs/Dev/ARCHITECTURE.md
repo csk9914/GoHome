@@ -28,6 +28,8 @@
 
 `Source/GoHome/`은 02문서의 기능별 분리(`Player`/`Interaction`/`AI`/`Item`/`UI`/`Save`)를 따르되, 02문서에 없는 `Core/`를 신설한다 — GameState 상태 머신·세션/로비 흐름은 특정 시스템이 아닌 게임 흐름 자체라 별도 폴더가 필요했다(이 문서가 유일한 출처).
 
+`Core/` 내부는 다시 두 성격으로 나뉜다: 흐름 제어 클래스(GameMode/GameState/PlayerController/SessionSubsystem류, 월드에 배치되지 않음)는 `Core/` 바로 아래, 월드에 실제로 배치되는 액터(`AZoneSelectMonitor`, `ADepartureButton` 등 로비 Zone 선택/출발 상호작용 오브젝트)는 `Core/Actors/`로 분리한다 — `Item/`의 `AItemActorBase`처럼 배치형 액터는 성격이 달라 같은 상위 폴더 안에서도 구분해두는 편이 탐색에 낫다는 판단.
+
 폴더별 클래스/인터페이스는 `Source/GoHome/<폴더>/`가 유일한 출처(`grep -rl`로 구현체 검색). 코드에 없는 정보인 폴더 ↔ 02문서 시스템 번호 대응만 아래에 남긴다:
 
 | 폴더 | 대응 시스템 (02문서 번호) |

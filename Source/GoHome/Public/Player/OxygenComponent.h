@@ -2,14 +2,16 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "Interaction/WeightProvider.h"
+#include "Player/CarryWeightProvider.h"
 #include "OxygenComponent.generated.h"
+
+class UCurveFloat;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnOxygenChanged, float, CurrentOxygen, float, MaxOxygen);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSafeZoneChanged, bool, bNewInSafeZone);
 
 /**
- * 소모 속도 계산 시 IWeightProvider를 참조한다 (UInventoryComponent를 직접 참조하지 않음).
+ * 소모 속도 계산 시 ICarryWeightProvider의 초과 무게를 참조한다.
  * 산소 0 도달 시 Owner의 IDamageable::ApplyDamage를 동기 호출한다 (별도 이벤트 계층 없음).
  */
 UCLASS(ClassGroup = (Player), meta = (BlueprintSpawnableComponent))
@@ -65,9 +67,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Oxygen", meta = (ClampMin = "0.01", UIMin = "1.0"))
 	float TargetOxygenDuration = 600.f;
 
-	// 무게 1당 추가 산소 소모량. 무게 값은 IWeightProvider 구현체에서만 가져온다.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Oxygen", meta = (ClampMin = "0.0", UIMin = "0.0"))
-	float WeightDrainMultiplier = 0.f;
+	// 초과 무게를 산소 소모 배율로 바꾸는 곡선.
+	// X축은 초과 무게, Y축은 기본 산소 소모량에 곱할 배율이다 (0 -> 1 권장).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Oxygen|Weight")
+	TObjectPtr<UCurveFloat> OverweightDrainMultiplierCurve;
 
 	// 산소가 0일 때 1초마다 들어가는 질식 데미지.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Oxygen", meta = (ClampMin = "0.0", UIMin = "0.0"))
@@ -88,18 +91,19 @@ protected:
 	void OnRep_InSafeZone();
 
 private:
-	// 무게를 제공하는 인터페이스만 저장한다.
-	// 산소 컴포넌트는 InventoryComponent 같은 구체 클래스를 몰라도 되고, IWeightProvider 계약만 사용한다.
+	// 초과 무게 상태를 제공하는 인터페이스만 저장한다.
+	// 산소 컴포넌트는 CarryWeightComponent 구체 클래스나 InventoryComponent를 몰라도 된다.
 	UPROPERTY()
-	TArray<TScriptInterface<IWeightProvider>> CachedWeightProviders;
+	TScriptInterface<ICarryWeightProvider> CachedCarryWeightProvider;
 
 	bool HasOwnerAuthority() const;
-	void FindWeightProviderComponents();
+	void FindCarryWeightProviderComponent();
 	void UpdateOxygen(float DeltaTime);
 	void RecoverOxygen(float DeltaTime);
 	void DrainOxygen(float DeltaTime);
 	void ApplySuffocationDamage(float DeltaTime);
 	void SetOxygen(float NewOxygen);
 	float CalculateOxygenDrainRate() const;
-	float GetCachedTotalWeight() const;
+	float CalculateOverweightDrainMultiplier() const;
+	float GetCachedOverweightAmount() const;
 };
