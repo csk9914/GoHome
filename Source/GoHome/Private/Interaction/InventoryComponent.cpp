@@ -3,12 +3,25 @@
 #include "Interaction/InventoryComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Item/ItemActorBase.h"
+#include "Player/DeathNotifier.h"
 
 UInventoryComponent::UInventoryComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
 }
+
+void UInventoryComponent::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (IDeathNotifier* DeathNotifier = GetOwner()->FindComponentByInterface<IDeathNotifier>())
+	{
+		DeathNotifier->GetOnDeathDelegate().AddUObject(this, &UInventoryComponent::ServerDropAllItems);
+	}
+
+}
+
 
 float UInventoryComponent::GetTotalWeight() const
 {
@@ -81,6 +94,24 @@ int32 UInventoryComponent::FindEmptySlotIndex() const
 	return INDEX_NONE;
 }
 
+void UInventoryComponent::ServerDropAllItems()
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+
+	for (FInventorySlot& Slot : Slots)
+	{
+		if (Slot.Item)
+		{
+			Slot.Item->ServerDrop();
+		}
+
+	}
+
+}
+
+
+
+
 void UInventoryComponent::TryDropItem(AItemActorBase* ItemToDrop)
 {
 	if (!ItemToDrop) return;
@@ -113,3 +144,4 @@ AItemActorBase* UInventoryComponent::GetItemInSlot(int32 SlotIndex) const
 	if (SlotIndex < 0 || SlotIndex >= GoHomeInventorySlotCount) return nullptr;
 	return Slots[SlotIndex].Item;
 }
+

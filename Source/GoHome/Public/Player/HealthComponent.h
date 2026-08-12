@@ -1,13 +1,13 @@
-
+﻿
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
 #include "Player/Damageable.h"
+#include "Player/DeathNotifier.h"
 #include "HealthComponent.generated.h"
 
-DECLARE_MULTICAST_DELEGATE(FOnDeath);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDeathDynamic);
 
 /**
@@ -15,7 +15,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDeathDynamic);
  * HP 0 도달 시 서버 전용 OnDeath를 1회만 브로드캐스트한다 (bIsDead로 중복 방지).
  */
 UCLASS(ClassGroup = (Player), meta = (BlueprintSpawnableComponent))
-class GOHOME_API UHealthComponent : public UActorComponent, public IDamageable
+class GOHOME_API UHealthComponent : public UActorComponent, public IDamageable, public IDeathNotifier
 {
 	GENERATED_BODY()
 
@@ -28,12 +28,14 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_HP, BlueprintReadOnly, Category = "Health")
 	float HP = 100.f;
 
-	FOnDeath OnDeath;
+	FSimpleMulticastDelegate OnDeath;
 
 	UPROPERTY(BlueprintAssignable, Category = "Health")
 	FOnDeathDynamic OnDeathDynamic;
 
 	virtual void ApplyDamage_Implementation(float Amount, AActor* Instigator, FName DamageType) override;
+
+	virtual FSimpleMulticastDelegate& GetOnDeathDelegate() override { return OnDeath; }
 
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;

@@ -55,10 +55,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	AItemActorBase* GetItemInSlot(int32 SlotIndex) const;
 
-
+	// 사망 등으로 인벤토리 전체를 한번에 비워야 할 때 호출(각 아이템의 ServerDrop() 재사용).
+	void ServerDropAllItems();
 
 
 protected:
+
+	virtual void BeginPlay() override;
+
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UFUNCTION()
