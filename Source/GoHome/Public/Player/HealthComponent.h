@@ -9,6 +9,7 @@
 
 DECLARE_MULTICAST_DELEGATE(FOnDeath);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDeathDynamic);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHPChanged, float, CurrentHP, float, MaxHP);
 
 /**
  * IDamageable을 구현해 "누가 데미지를 주는지" 몰라도 되게 한다.
@@ -33,10 +34,24 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Health")
 	FOnDeathDynamic OnDeathDynamic;
 
+	// HP UI는 이 이벤트를 구독해서 텍스트를 갱신한다.
+	UPROPERTY(BlueprintAssignable, Category = "Health")
+	FOnHPChanged OnHPChanged;
+
 	virtual void ApplyDamage_Implementation(float Amount, AActor* Instigator, FName DamageType) override;
+
+	UFUNCTION(BlueprintPure, Category = "Health")
+	float GetHP() const { return HP; }
+
+	UFUNCTION(BlueprintPure, Category = "Health")
+	float GetMaxHP() const { return MaxHP; }
+
+	UFUNCTION(BlueprintPure, Category = "Health")
+	bool IsDead() const { return bIsDead; }
 
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void BeginPlay() override;
 
 	UFUNCTION()
 	void OnRep_HP();
@@ -46,4 +61,7 @@ protected:
 
 	UFUNCTION()
 	void OnRep_IsDead();
+
+private:
+	void BroadcastHPChanged();
 };

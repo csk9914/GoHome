@@ -1,12 +1,10 @@
-﻿/*
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "UObject/Interface.h"
 #include "CarryWeightProvider.generated.h"
 
-// This class does not need to be modified.
+// Unreal reflection wrapper for ICarryWeightProvider.
 UINTERFACE(MinimalAPI)
 class UCarryWeightProvider : public UInterface
 {
@@ -14,9 +12,10 @@ class UCarryWeightProvider : public UInterface
 };
 
 /**
- * 현재 소지 무게와 최대 허용 무게를 알려줄 수 있는 오브젝트가 구현한다.
- * OxygenComponent는 구체 클래스가 아니라 이 인터페이스만 보고 초과 무게를 계산한다.
- 
+ * 현재 운반 무게 상태를 제공하는 계약.
+ * 산소, UI, 수류 같은 시스템은 CarryWeightComponent의 구체 타입을 몰라도
+ * 이 인터페이스만 보고 현재무게/최대무게/초과무게를 읽을 수 있다.
+ */
 class GOHOME_API ICarryWeightProvider
 {
 	GENERATED_BODY()
@@ -26,4 +25,3 @@ public:
 	virtual float GetMaxCarryWeight() const = 0;
 	virtual float GetOverweightAmount() const = 0;
 };
-*/
