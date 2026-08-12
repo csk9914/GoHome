@@ -11,6 +11,7 @@
 class UInputAction;
 class UInputMappingContext;
 class UCameraComponent;
+class USkeletalMeshComponent;
 
 UCLASS()
 class GOHOME_API AGoHomeCharacter : public ACharacter, public ISocketProvider
@@ -29,6 +30,9 @@ protected:
 	void Look(const FInputActionValue& Value);
 
 private:
+	UPROPERTY(VisibleAnywhere, Category = "Mesh")
+	TObjectPtr<USkeletalMeshComponent> FirstPersonArmsMesh;
+	
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<UCameraComponent> Camera;
 

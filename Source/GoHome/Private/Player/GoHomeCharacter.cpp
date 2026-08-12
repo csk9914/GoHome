@@ -30,11 +30,23 @@ AGoHomeCharacter::AGoHomeCharacter()
 
 	AddTickPrerequisiteComponent(GetMesh());
 
+	// FirstPersonArmsMesh 부분
+	FirstPersonArmsMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("FirstPersonArmsMesh"));
+	FirstPersonArmsMesh->SetupAttachment(GetCapsuleComponent()); // GetMesh()랑 같은 부모에 붙여서 트랜스폼 맞춤
+	FirstPersonArmsMesh->SetRelativeLocation(GetMesh()->GetRelativeLocation());
+	FirstPersonArmsMesh->SetRelativeRotation(GetMesh()->GetRelativeRotation());
+	FirstPersonArmsMesh->SetOnlyOwnerSee(true);
+	FirstPersonArmsMesh->SetCastShadow(false); // 본인 시야에 이상한 팔 그림자 안 생기게
+
+	GetMesh()->SetOwnerNoSee(true); // 본인한테는 전신 메시 안 보이게
+
 }
 
 void AGoHomeCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	FirstPersonArmsMesh->SetLeaderPoseComponent(GetMesh());
 
 	// 캐릭터 수영 모드 강제 진입
 	GetCharacterMovement()->SetMovementMode(MOVE_Swimming);
@@ -60,17 +72,17 @@ void AGoHomeCharacter::Tick(float DeltaTime)
 	{
 		GetMesh()->HideBoneByName(TEXT("Head"), EPhysBodyOp::PBO_None);
 
-		const float Pitch = FRotator::NormalizeAxis(GetControlRotation().Pitch);
-		constexpr float BodyHidePitchThreshold = 30.f; // 이 각도 이상이면 몸 전체 숨김
+		//const float Pitch = FRotator::NormalizeAxis(GetControlRotation().Pitch);
+		//constexpr float BodyHidePitchThreshold = 30.f; // 이 각도 이상이면 몸 전체 숨김
 
-		if (FMath::Abs(Pitch) > BodyHidePitchThreshold)
-		{
-			GetMesh()->HideBoneByName(TEXT("Pelvis"), EPhysBodyOp::PBO_None);
-		}
-		else
-		{
-			GetMesh()->UnHideBoneByName(TEXT("Pelvis"));
-		}
+		//if (FMath::Abs(Pitch) > BodyHidePitchThreshold)
+		//{
+		//	GetMesh()->HideBoneByName(TEXT("Pelvis"), EPhysBodyOp::PBO_None);
+		//}
+		//else
+		//{
+		//	GetMesh()->UnHideBoneByName(TEXT("Pelvis"));
+		//}
 	}
 
 }
