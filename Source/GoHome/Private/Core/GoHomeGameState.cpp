@@ -9,6 +9,15 @@ AGoHomeGameState::AGoHomeGameState()
 	DockingDoorComponent = CreateDefaultSubobject<UDockingDoorComponent>(TEXT("DockingDoorComponent"));
 }
 
+void AGoHomeGameState::SetState(EExpeditionState NewState)
+{
+	
+	CurrentState = NewState;
+	OnStateChanged.Broadcast((CurrentState));
+	
+	// UE_LOG(LogTemp, Warning, TEXT("AGoHomeGameState::SetState(): Class=%s CurrentState=%s"), *GetClass()->GetName(), *UEnum::GetValueAsString(CurrentState));
+}
+
 void AGoHomeGameState::AddDeliveredValue(int32 Value)
 {
 }
@@ -21,14 +30,16 @@ void AGoHomeGameState::OnPlayerRemovedFromParty(APlayerState* PlayerState)
 {
 }
 
+
+
 void AGoHomeGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-	DOREPLIFETIME(AGoHomeGameState, State);
+	DOREPLIFETIME(AGoHomeGameState, CurrentState);
 }
 
 void AGoHomeGameState::OnRep_State()
 {
-	OnStateChanged.Broadcast(State);
+	OnStateChanged.Broadcast(CurrentState);
 }
