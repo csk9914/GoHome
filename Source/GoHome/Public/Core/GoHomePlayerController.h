@@ -15,6 +15,9 @@ class GOHOME_API AGoHomePlayerController : public APlayerController
 	GENERATED_BODY()
 	
 public:
+	UFUNCTION(BlueprintImplementableEvent, Category="UI")                                     
+	void OnOpenSelectZone();
+	
 	UFUNCTION(Server, Reliable)                                                                       
 	void Server_SelectZone(FName ZoneId);
 	

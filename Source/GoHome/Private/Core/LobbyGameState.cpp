@@ -22,6 +22,8 @@ void ALobbyGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 
 void ALobbyGameState::SetSelectedZone(FName ZoneId)
 {
+	UE_LOG(LogTemp, Warning, TEXT("SetSelectedZone called with %s"), *ZoneId.ToString());
+	
 	// 서버가 클라이언트 RPC로 받은 값을 그대로 신뢰하지 않고 검증
 	const bool bIsValidZone = AvailableZones.ContainsByPredicate
 	([ZoneId](const UExpeditionZoneDataAsset* Zone)
@@ -30,8 +32,11 @@ void ALobbyGameState::SetSelectedZone(FName ZoneId)
 	});
 	
 	if (!bIsValidZone) return;
-	
+
 	SelectedZoneId = ZoneId;
+
+	// OnRep은 서버 자신에게는 자동 호출되지 않으므로 직접 호출해 서버(호스트) 쪽 UI도 갱신되게 함
+	OnRep_SelectedZone();
 }
 
 const UExpeditionZoneDataAsset* ALobbyGameState::GetSelectedZone() const
