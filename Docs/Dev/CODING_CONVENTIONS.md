@@ -9,7 +9,7 @@
 Epic 공식 C++ 코딩 표준(Epic Coding Standard)을 그대로 따른다.
 
 - 클래스 접두사: `U`(UObject 파생), `A`(Actor 파생), `F`(구조체/일반 클래스), `I`(인터페이스), `E`(Enum), `T`(템플릿)
-- **파일명에는 접두사를 붙이지 않는다** (`IDamageable.h`가 아니라 `Damageable.h`). "Add C++ Class" 마법사가 Name 필드 값 앞에 타입별 접두사를 자동으로 붙이므로 Name 필드에는 접두사 없는 베이스 이름만 입력(예: `Damageable`, `WeightProvider`, `Interactable`) — 안 그러면 `IIDamageable`처럼 중복 접두사가 붙는다.
+- **파일명에는 접두사를 붙이지 않는다** (`IDamageable.h`가 아니라 `Damageable.h`). "Add C++ Class" 마법사가 Name 필드 값 앞에 타입별 접두사를 자동으로 붙이므로 Name 필드에는 베이스 이름만 입력(예: `Damageable`, `WeightProvider`, `Interactable`) — 안 그러면 `IIDamageable`처럼 접두사가 중복된다.
 - 헤더(`Public/`)와 구현(`Private/`)을 반드시 분리
 - 멤버 변수는 `PascalCase`, `bool`은 `b` + 형용사(`Is` 생략, `bSubmerged` — Epic 원문 예시 `bPendingDestruction`도 동일). 블루프린트 변수도 동일 규칙([블루프린트 변수 규칙](#블루프린트-변수-규칙) 참고)
 - 함수는 `PascalCase`, 매개변수/지역 변수는 `PascalCase` (Epic 표준 그대로, camelCase 아님)
@@ -50,18 +50,18 @@ AI 컨트롤러(`AIC_`), 파티클 시스템(`PS_`) 등 위 표에 없는 타입
 
 ### Source (C++)
 
-기능별 분리, [ARCHITECTURE.md](ARCHITECTURE.md)의 폴더 구조를 그대로 따른다: `Public`/`Private`을 `Source/GoHome/` 최상위에 두고, 그 아래 각 기능 폴더(`Core` / `Player` / `Interaction` / `AI` / `Item` / `UI` / `Save`)를 중첩한다(예: `Public/Core/`, `Private/Core/`).
+기능별 분리, [ARCHITECTURE.md](ARCHITECTURE.md)의 폴더 구조를 그대로 따른다: `Public`/`Private`을 `Source/GoHome/` 최상위에 두고, 그 아래 각 기능 폴더(`Core`/`Player`/`Interaction`/`AI`/`Item`/`UI`/`Save`)를 중첩한다(예: `Public/Core/`, `Private/Core/`).
 
 - 새 시스템이 기존 7개 폴더 중 어디에도 안 맞으면, 새 폴더를 만들기 전에 [ARCHITECTURE.md](ARCHITECTURE.md)에 먼저 매핑을 기록한다 (폴더 구조의 단일 출처는 그 문서).
 - 폴더를 넘나드는 의존은 인터페이스(`IInteractable`, `IWeightProvider`류)로만 한다 — 컴포넌트가 다른 폴더의 구체 클래스를 직접 include하지 않는다.
 
 ### Content (에셋)
 
-`Content/GoHome/` 아래를 위 Source와 동일한 7개 기능 폴더로 맞춘다 — 코드-에셋 대응이 바로 보이도록 함. 그 외:
+`Content/GoHome/` 아래를 위 Source와 동일한 7개 기능 폴더로 맞춘다 — 코드-에셋 대응이 바로 보이게. 그 외:
 
-- `Maps/`: 모든 레벨을 여기 모은다 (기획서 맵별로 하위 폴더 분리 가능)
+- `Maps/`: 모든 레벨(기획서 맵별로 하위 폴더 분리 가능)
 - `MaterialLibrary/`: 여러 기능 폴더에서 공유하는 마스터 머티리얼/유틸리티만
-- `Developers/<이름>/`: 개인 실험용 샌드박스. 완성된 에셋은 반드시 해당 기능 폴더로 옮긴다 — `Developers/` 안의 에셋을 다른 시스템이 직접 참조하지 않는다
+- `Developers/<이름>/`: 개인 실험용 샌드박스. 완성된 에셋은 반드시 해당 기능 폴더로 옮긴다 — 다른 시스템이 직접 참조하지 않는다
 - 폴더명은 `PascalCase`, 공백·특수문자 금지
 
 ## C++ / Blueprint 경계
@@ -79,8 +79,8 @@ AI 컨트롤러(`AIC_`), 파티클 시스템(`PS_`) 등 위 표에 없는 타입
 
 AI는 워크플로 선택으로 다른 시스템보다 BP 비중이 크지만, 필요하면 AI 담당도 C++ 쪽을 직접 고칠 수 있다.
 
-- `AMonsterBase`(C++)가 경계 인터페이스([ARCHITECTURE.md "AI (경계만)"](ARCHITECTURE.md#ai-경계만) 참고)를 `BlueprintNativeEvent`로 노출하고, `BP_Monster`(`AMonsterBase` 자식 BP)에서 상태 머신·Steering Behaviors를 구현한다.
-- 데미지 적용·소음 판정·상태 브로드캐스트처럼 서버 권위가 걸린 처리는 BP가 직접 구현하지 않고 C++ 함수 호출로 끝낸다 — 위 "C++ / Blueprint 경계" 절의 원칙이 AI에도 동일하게 적용된다.
+- `AMonsterBase`(C++)가 경계 인터페이스([ARCHITECTURE.md "AI (경계만)"](ARCHITECTURE.md#ai-경계만))를 `BlueprintNativeEvent`로 노출하고, `BP_Monster`(`AMonsterBase` 자식 BP)에서 상태 머신·Steering Behaviors를 구현한다.
+- 데미지 적용·소음 판정·상태 브로드캐스트처럼 서버 권위가 걸린 처리는 BP가 직접 구현하지 않고 C++ 함수 호출로 끝낸다 — 위 "C++ / Blueprint 경계" 원칙이 AI에도 동일 적용.
 - 상태 머신을 Behavior Tree + Blackboard로 구성해도 무방하다(권장일 뿐, 02문서의 "Enum 상태 머신 + Steering Behaviors" 결정을 대체하는 게 아니라 병행 가능한 구현 수단).
 - 경계 인터페이스 시그니처 변경이 필요하면 C++ 담당과 사전 협의한다 — 소유권 규칙은 [ARCHITECTURE.md "소유권 규칙"](ARCHITECTURE.md#헤더-소유권) 참고.
 
@@ -108,6 +108,6 @@ AI는 워크플로 선택으로 다른 시스템보다 BP 비중이 크지만, �
 
 ## 커밋 전 체크
 
-- 새 폴더 간 경계(인터페이스 시그니처, decoupling 규칙)를 바꿨으면 [ARCHITECTURE.md](ARCHITECTURE.md)의 "시스템별 결정과 경계"·"시스템 간 인터페이스 계약"이 여전히 맞는지 확인
-- 기획 문서(`Docs/Design/`)를 여는 것은 예외 상황에서만: 유저에게 보이는 동작·밸런스 수치·시스템 범위 자체를 바꾸는 변경일 때만 해당 절을 읽고 어긋나지 않는지 확인한다 — 어긋나면 코드가 아니라 기획서 쪽을 먼저 팀과 조율. ARCHITECTURE.md 스펙대로의 순수 구현 작업(리팩터링, 버그 수정, 이미 확정된 클래스/인터페이스 구현)에는 기획 문서를 열 필요가 없다
+- 폴더 간 경계(인터페이스 시그니처, decoupling 규칙)를 바꿨으면 [ARCHITECTURE.md](ARCHITECTURE.md)의 "시스템별 결정과 경계"·"시스템 간 인터페이스 계약"이 여전히 맞는지 확인
+- 기획 문서(`Docs/Design/`)는 예외 상황에서만 연다: 유저에게 보이는 동작·밸런스 수치·시스템 범위 자체를 바꾸는 변경일 때만 해당 절을 읽고 어긋나지 않는지 확인 — 어긋나면 코드가 아니라 기획서 쪽을 먼저 팀과 조율. ARCHITECTURE.md 스펙대로의 순수 구현 작업(리팩터링, 버그 수정, 이미 확정된 클래스/인터페이스 구현)에는 열 필요 없다
 - 블루프린트를 수정했으면 경고·오류 없이 컴파일되는지 확인

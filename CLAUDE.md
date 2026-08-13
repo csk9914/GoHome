@@ -29,10 +29,16 @@ Content rules specific to `Docs/Design/` (single-source-of-truth, editing proced
 | `Docs/Dev/NODECASTER_GUIDE.md` | md/git (dev) | NodeCaster install check + Blueprint graph JSON procedure — only opened for Blueprint node-graph questions |
 | `Docs/Dev/BP_COMMENT_COLORS.md` | md/git (dev) | Blueprint comment-box color semantics (HSV/Hex table) — only opened when adding comment boxes to a BP graph |
 
-## Validation Script
+## Validation Scripts
 
 ```
 node Docs/tools/check_doc_links.js
 ```
 
 Reproduces GitHub's anchor-generation rule for every header in this file, `Docs/Design/*.md`, and `Docs/Dev/*.md`, then checks that every markdown cross-link with an anchor (relative path, including Dev → `../Design/...`) resolves to a real header. Run this habitually after any header-text change, in this file or Design/Dev docs alike. Assumes the repo is viewed on GitHub.
+
+```
+node Docs/tools/check_architecture_symbols.js
+```
+
+Checks that backtick-quoted UE class/interface/enum names and `.h`/`.cpp` filenames in `ARCHITECTURE.md` actually exist under `Source/GoHome/`. Run this after renaming/deleting a class the doc names, or after editing `ARCHITECTURE.md`'s class references. Items tagged "(신설 제안)" in the doc are expected to be missing — treat those as noise, not failures.

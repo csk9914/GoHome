@@ -4,6 +4,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Item/ItemActorBase.h"
 #include "Player/DeathNotifier.h"
+#include "Core/GoHomeGameState.h"
 
 UInventoryComponent::UInventoryComponent()
 {
@@ -50,6 +51,13 @@ void UInventoryComponent::OnRep_Slots()
 bool UInventoryComponent::TryAddItem(AItemActorBase* Item)
 {
 	if (!Item) return false;
+
+	// 이미 인벤토리 어딘가에 있는 아이템이면 중복 등록 방지.
+
+	for (const FInventorySlot& Slot : Slots)
+	{
+		if (Slot.Item == Item) return false;
+	}
 
 	const int32 EmptyIndex = FindEmptySlotIndex();
 	if (EmptyIndex == INDEX_NONE)
@@ -103,6 +111,43 @@ void UInventoryComponent::ServerDropAllItems()
 		{
 			Slot.Item->ServerDrop();
 		}
+	}
+}
+
+void UInventoryComponent::ServerDeliverAllItems()
+{
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, TEXT("ServerDeliverAllItems 진입"));
+	}
+
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+
+	AGoHomeGameState* GameState = GetWorld()->GetGameState<AGoHomeGameState>();
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange,
+			FString::Printf(TEXT("GameState = %s"), GameState ? *GameState->GetName() : TEXT("null")));
+	}
+
+	if (!GameState) return;
+
+	for (FInventorySlot& Slot : Slots)
+	{
+		AItemActorBase* Item = Slot.Item;
+		if (!Item) continue;
+
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange,
+				FString::Printf(TEXT("정산 처리 중: %s"), *Item->GetName()));
+		}
+
+		GameState->AddDeliveredValue(FMath::RoundToInt(Item->GetCurrentValue()));
+		// 슬롯 비우기 + NotifyDropped() (소음 타이머 정지).
+		RemoveItem(Item);
+		Item->Destroy();
 	}
 }
 
