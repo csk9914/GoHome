@@ -41,6 +41,7 @@ void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(UInventoryComponent, Slots);
+	DOREPLIFETIME(UInventoryComponent, ActiveSlotIndex);
 }
 
 void UInventoryComponent::OnRep_Slots()
@@ -182,4 +183,52 @@ AItemActorBase* UInventoryComponent::GetItemInSlot(int32 SlotIndex) const
 	// Slots는 고정 C 배열이라 수동 범위 체크.
 	if (SlotIndex < 0 || SlotIndex >= GoHomeInventorySlotCount) return nullptr;
 	return Slots[SlotIndex].Item;
+}
+
+
+void UInventoryComponent::SetActiveSlot(int32 NewIndex)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
+	if (NewIndex < 0 || NewIndex >= GoHomeInventorySlotCount) return;
+	if (NewIndex == ActiveSlotIndex) return;
+
+	if (AItemActorBase* OldActive = GetItemInSlot(ActiveSlotIndex))
+	{
+		OldActive->SetActiveHeld(false);
+	}
+
+	ActiveSlotIndex = NewIndex;
+
+	if (AItemActorBase* NewActive = GetItemInSlot(ActiveSlotIndex))
+	{
+		NewActive->SetActiveHeld(true);
+	}
+}
+
+void UInventoryComponent::TrySetActiveSlot(int32 NewIndex)
+{
+	Server_RequestSetActiveSlot(NewIndex);
+}
+
+void UInventoryComponent::Server_RequestSetActiveSlot_Implementation(int32 NewIndex)
+{
+	SetActiveSlot(NewIndex);
+}
+
+void UInventoryComponent::OnRep_ActiveSlotIndex()
+{
+}
+
+AItemActorBase* UInventoryComponent::GetActiveItem() const
+{
+	return GetItemInSlot(ActiveSlotIndex);
+}
+
+int32 UInventoryComponent::FindSlotIndexOf(AItemActorBase* Item) const
+{
+	for (int32 Index = 0; Index < GoHomeInventorySlotCount; ++Index)
+	{
+		if (Slots[Index].Item == Item) return Index;
+	}
+	return INDEX_NONE;
 }
