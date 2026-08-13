@@ -7,8 +7,7 @@
 #include "AI/NoiseType.h"
 #include "TimerManager.h"
 #include "Interaction/InventoryComponent.h"
-#include "Player/SocketProvider.h"
-#include "GameFramework/Character.h"
+#include "Player/GoHomeCharacter.h"
 
 AItemActorBase::AItemActorBase()
 {
@@ -55,37 +54,57 @@ void AItemActorBase::OnInteract(APawn* InstigatorPawn)
 	bIsBeingClaimed = true;
 	HoldingPawn = InstigatorPawn;
 
-	MeshComponent->SetSimulatePhysics(false);
-	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	UpdateAttachment(); // 서버 자신은 RepNotify가 안 불리니 직접 호출
 }
 
-void AItemActorBase::OnRep_HoldingPawn()
+void AItemActorBase::OnRep_HoldingPawn(APawn* OldHoldingPawn)
 {
-	UpdateAttachment();
+	UpdateAttachment(OldHoldingPawn);
 }
 
-void AItemActorBase::UpdateAttachment()
+void AItemActorBase::UpdateAttachment(APawn* OldHoldingPawn)
 {
 	if (HoldingPawn)
 	{
-		ACharacter* Character = Cast<ACharacter>(HoldingPawn);
-		ISocketProvider* SocketProvider = Cast<ISocketProvider>(HoldingPawn);
-		if (Character && SocketProvider)
+		// 콜리전은 서버/클라 모두 여기서 꺼야 함 - 서버에서만 끄면 클라에선
+		// 계속 켜진 채로 손에 붙어서, 캐릭터 이동 시 자기 콜리전과 부딪혀 떨림.
+		MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+		// 물리 시뮬레이션은 서버 권위만 유지(클라가 로컬로 물리를 돌리면
+		// 서버 리플리케이트 위치랑 따로 놀 수 있음).
+		if (HasAuthority())
 		{
 			MeshComponent->AttachToComponent(Character->GetMesh(),
 				FAttachmentTransformRules::SnapToTargetNotIncludingScale,
 				SocketProvider->GetRightHandSocketName());
 
 			SocketProvider->SetHoldingItem(true);   // 추가: 캐릭터한테 "들고 있음" 알림
+			MeshComponent->SetSimulatePhysics(false);
+		}
+
+		if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(HoldingPawn))
+		{
+			Character->AttachItemToRightHand(MeshComponent);
 		}
 	}
 	else
 	{
 		MeshComponent->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+
+		// 파손 감지(NotifyHit)에 필요한 원래 콜리전으로 복원.
+		MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
+		if (HasAuthority())
+		{
+			MeshComponent->SetSimulatePhysics(true);
+		}
+
+		if (AGoHomeCharacter* PrevCharacter = Cast<AGoHomeCharacter>(OldHoldingPawn))
+		{
+			PrevCharacter->DetachItemFromRightHand();
+		}
 	}
 }
-
 
 float AItemActorBase::GetTotalWeight() const
 {
@@ -202,6 +221,8 @@ void AItemActorBase::ServerDrop()
 	MeshComponent->SetSimulatePhysics(true);
 	// 파손 감지(NotifyHit)에 필요한 원래 콜리전으로 복원.
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	// 서버 자신은 RepNotify 자동 발동 안 되므로 직접 호출(Old holder 넘겨줌).
+	UpdateAttachment(PreviousHolder);
 
 	// 제자리에 툭 떨어지지 않게 앞+위 방향으로 던지는 초기 속도 부여.
 	const FVector ThrowDirection = (PreviousHolder->GetActorForwardVector() + FVector::UpVector * 0.3f).GetSafeNormal();

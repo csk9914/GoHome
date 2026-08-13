@@ -2,7 +2,7 @@
 
 > `Docs/Dev/` 문서군. [CODING_CONVENTIONS.md](CODING_CONVENTIONS.md)에서 분리된 절 — 블루프린트 그래프에 코멘트 박스를 넣을 때만 연다.
 
-그래프가 길어지는 BP(`BP_Monster` 상태 머신, 레벨 BP 이벤트 그래프)에서 코멘트 박스(`C` 단축키) 색상으로 블록의 성격을 의미론적으로 표시한다. 기본 뼈대는 [Semantic Comment Colors in Blueprint (danjb.com)](https://www.danjb.com/articles/blueprint_colors)의 Success/Info/Warn/Error 4종에 이 프로젝트용 3종(Network / Debug / Tunable)을 추가했다. 톤 원칙: 평소 자주 붙는 코멘트는 채도를 낮춘(subdued) 색, "이거 놓치면 안 된다" 신호를 줘야 하는 카테고리(Error/Network)만 고채도로 남긴다.
+그래프가 길어지는 BP(`BP_Monster` 상태 머신, 레벨 BP 이벤트 그래프)에서 코멘트 박스(`C` 단축키) 색상으로 블록의 성격을 의미론적으로 표시한다. 기본 뼈대는 [Semantic Comment Colors in Blueprint (danjb.com)](https://www.danjb.com/articles/blueprint_colors)의 Success/Info/Warn/Error 4종에 이 프로젝트용 3종(Network/Debug/Tunable)을 추가했다. 톤 원칙: 평소 자주 붙는 코멘트는 채도를 낮춘(subdued) 색, "놓치면 안 된다" 신호가 필요한 카테고리(Error/Network)만 고채도로 남긴다.
 
 | 색상 | 카테고리 | 톤 | 의미 | HSV (H, S, V) | 참고 Hex(불투명 기준) |
 |---|---|---|---|---|---|

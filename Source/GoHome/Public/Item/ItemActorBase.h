@@ -60,9 +60,9 @@ protected:
 	TObjectPtr<APawn> HoldingPawn = nullptr;
 
 	UFUNCTION()
-	void OnRep_HoldingPawn();
+	void OnRep_HoldingPawn(APawn* OldHoldingPawn);
 
-	void UpdateAttachment();
+	void UpdateAttachment(APawn* OldHoldingPawn = nullptr);
 
 
 
