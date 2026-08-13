@@ -2,9 +2,9 @@
 
 > `Docs/Dev/` 문서군. 링크 검증은 아래 "Docs/Design 참조 점검 체크리스트" 절 참고.
 >
-> 코드로 알 수 있는 것(클래스/필드 목록)은 담지 않는다 — 이 문서는 컴파일러가 강제하지 않는 경계 규칙, 코드만 봐선 안 보이는 계약, 그 결정의 이유만 다룬다. 인일/복잡도/담당자 수치는 [02문서](../Design/02_GoHome_기술분석서.md)가, 경계 인터페이스의 이유·호출/구독 관계는 이 문서(아래 "시스템별 결정과 경계", "시스템 간 인터페이스 계약")가, 정확한 시그니처는 `Source/GoHome/Public/` 헤더가 각각 유일한 출처다(헤더가 문서보다 최신일 수 있어 시그니처는 옮겨 적지 않는다).
+> 코드로 알 수 있는 것(클래스/필드 목록)은 담지 않는다 — 컴파일러가 강제하지 않는 경계 규칙, 코드만 봐선 안 보이는 계약, 그 결정 이유만 다룬다. 인일/복잡도/담당자 수치는 [02문서](../Design/02_GoHome_기술분석서.md), 경계 인터페이스의 이유·호출/구독 관계는 이 문서(아래 "시스템별 결정과 경계", "시스템 간 인터페이스 계약"), 정확한 시그니처는 `Source/GoHome/Public/` 헤더가 각각 유일한 출처(헤더가 최신일 수 있어 시그니처는 옮겨 적지 않는다).
 >
-> AI 내부 구현(상태 머신·조향 로직)은 팀원 재량이라 다루지 않는다 — 데미지 전달·소음 감지·도킹 문 상태 구독 등 경계 인터페이스만 고정한다. 이 경계만 지키면 AI 내부 구현이 바뀌어도 다른 시스템은 영향받지 않는다.
+> AI 내부 구현(상태 머신·조향 로직)은 팀원 재량이라 다루지 않는다 — 데미지 전달·소음 감지·도킹 문 상태 구독 등 경계 인터페이스만 고정한다. 이 경계만 지키면 내부 구현이 바뀌어도 다른 시스템은 영향받지 않는다.
 
 ## 목차
 
@@ -19,16 +19,16 @@
 
 ## Docs/Design 참조 점검 체크리스트
 
-스크립트 동작 방식은 저장소 루트 [CLAUDE.md 검증 스크립트](../../CLAUDE.md#validation-script) 절 참고. 스크립트가 못 잡는 부분(본문 텍스트로만 언급된 절 번호)이 있으니, `Docs/Design/01`·`02`문서의 절 번호나 헤더 제목을 바꿀 때마다 아래를 추가로 확인한다:
+스크립트 동작 방식은 저장소 루트 [CLAUDE.md 검증 스크립트](../../CLAUDE.md#validation-scripts) 참고. 스크립트가 못 잡는 부분(본문 텍스트로만 언급된 절 번호)이 있으니, `Docs/Design/01`·`02`문서의 절 번호나 헤더 제목을 바꿀 때마다 추가로 확인한다:
 
-1. `grep -rn "Design/0" Docs/Dev/` 로 이 문서군에서 Design 문서를 참조하는 모든 줄을 찾아, 절 번호가 **본문 텍스트로만**(링크가 아닌 형태로) 언급된 곳이 있는지 확인한다.
-2. 헤더 번호(예: "10. 착수 순서", "13-1. ...")가 바뀌었다면, 이 문서의 "의존성/착수 순서"·"2차 프로토타입 추가 시스템 배치" 절에서 같은 번호를 인용한 곳도 함께 갱신한다.
+1. `grep -rn "Design/0" Docs/Dev/`로 이 문서군에서 Design 문서를 참조하는 줄을 찾아, 절 번호가 **본문 텍스트로만**(링크 아닌 형태로) 언급된 곳이 있는지 확인한다.
+2. 헤더 번호(예: "10. 착수 순서", "13-1. ...")가 바뀌었다면 "의존성/착수 순서"·"2차 프로토타입 추가 시스템 배치" 절의 같은 번호 인용도 함께 갱신한다.
 
 ## 모듈/폴더 구조
 
 `Source/GoHome/`은 02문서의 기능별 분리(`Player`/`Interaction`/`AI`/`Item`/`UI`/`Save`)를 따르되, 02문서에 없는 `Core/`를 신설한다 — GameState 상태 머신·세션/로비 흐름은 특정 시스템이 아닌 게임 흐름 자체라 별도 폴더가 필요했다(이 문서가 유일한 출처).
 
-`Core/` 내부는 다시 두 성격으로 나뉜다: 흐름 제어 클래스(GameMode/GameState/PlayerController/SessionSubsystem류, 월드에 배치되지 않음)는 `Core/` 바로 아래, 월드에 실제로 배치되는 액터(`AZoneSelectMonitor`, `ADepartureButton` 등 로비 Zone 선택/출발 상호작용 오브젝트)는 `Core/Actors/`로 분리한다 — `Item/`의 `AItemActorBase`처럼 배치형 액터는 성격이 달라 같은 상위 폴더 안에서도 구분해두는 편이 탐색에 낫다는 판단.
+`Core/` 내부는 두 성격으로 나뉜다: 흐름 제어 클래스(GameMode/GameState/PlayerController/SessionSubsystem류, 월드 미배치)는 `Core/` 바로 아래, 월드에 실제 배치되는 액터(`AZoneSelectMonitor`, `ADepartureButton` 등 로비 상호작용 오브젝트)는 `Core/Actors/`로 분리한다 — `Item/`의 `AItemActorBase`처럼 배치형 액터는 성격이 달라 같은 상위 폴더 안에서도 구분해두는 편이 탐색에 낫다는 판단.
 
 폴더별 클래스/인터페이스는 `Source/GoHome/<폴더>/`가 유일한 출처(`grep -rl`로 구현체 검색). 코드에 없는 정보인 폴더 ↔ 02문서 시스템 번호 대응만 아래에 남긴다:
 
@@ -51,7 +51,7 @@
 ### Core
 ```yaml
 decoupling:
-  - 도킹 문 상태는 GameState가 직접 들고 있지 않고 UDockingDoorComponent가 별도로 소유한다 — GameState는 탐사 진행 단계(로비/탐사/정산 등)만 책임진다.
+  - 도킹 문 상태는 GameState가 아니라 UDockingDoorComponent가 별도 소유한다 — GameState는 탐사 진행 단계(로비/탐사/정산 등)만 책임진다.
   - AI는 도킹 문 상태를 읽을 때 GameState 전체가 아니라 UDockingDoorComponent의 공개 상태(IsOpen(), 상태 변경 델리게이트)만 구독한다 — 게임 흐름 전체와 결합되지 않도록.
 
 decisions:
@@ -63,16 +63,16 @@ decisions:
     detail: |
       - Lobby → ZoneSelect: 전원 지역 확정 시
       - ZoneSelect → Departure: 전원 준비 완료 시
-      - Departure → Exploration: 하강 로딩 연출 종료 시(01문서 "출발 → 하강 로딩 연출" 참고, 정확한 서버 트리거는 미확정 — 검증 필요)
+      - Departure → Exploration: 하강 로딩 연출 종료 시(01문서 "출발 → 하강 로딩 연출" 참고, 정확한 서버 트리거 미확정 — 검증 필요)
       - Exploration → Return: 생존자 전원 잠수정 콜리전 볼륨 내부 진입
       - Return → Settlement: 도킹 문 닫힘 확인 후 즉시
-      - Exploration/Return → Failed: 제한 시간 만료 또는 도킹 문 위협 판정(→ AI 경계 참고) 또는 생존자 0명(→ Player 절 HP 0 처리 참고)
+      - Exploration/Return → Failed: 제한 시간 만료 또는 도킹 문 위협 판정(→ AI 경계) 또는 생존자 0명(→ Player 절 HP 0 처리)
 ```
 
 ### Player
 ```yaml
 decoupling:
-  - "UOxygenComponent는 소모 속도 계산 시 Interaction의 IWeightProvider를 참조하되, UInventoryComponent를 직접 참조하지 않고 인터페이스로만 접근한다."
+  - "UOxygenComponent는 소모 속도 계산 시 Interaction의 IWeightProvider를 참조하되, UInventoryComponent는 직접 참조하지 않고 인터페이스로만 접근한다."
   - "UHealthComponent는 \"누가 데미지를 주는지\" 몰라야 한다 → IDamageable(아래 인터페이스 계약 참고)로 노출해 호출자가 Character 타입을 몰라도 되게 한다."
 
 decisions:
@@ -81,7 +81,7 @@ decisions:
   - name: 산소 0 → 데미지 경로
     detail: UOxygenComponent가 산소 0시 매 틱 IDamageable::ApplyDamage(질식 데미지, Owner, "Suffocation") 동기 호출.
   - name: 중복 사망 방지
-    detail: OnDeath는 캐릭터당 탐사 1회만 브로드캐스트됨 — Core가 생존자 수를 추적하므로 이 보장이 깨지면 카운트가 틀어진다.
+    detail: OnDeath는 캐릭터당 탐사 1회만 브로드캐스트 — Core가 생존자 수를 추적하므로 이 보장이 깨지면 카운트가 틀어진다.
   - name: 접속 종료 처리 (예정 — 두 함수 모두 현재 빈 스텁)
     detail: "설계 의도: Logout이 GameState::OnPlayerRemovedFromParty(APlayerState*)를 호출해 OnDeath와 같은 경로로 합류(TSet으로 멱등 보장). 현재 Logout은 Super::Logout 한 줄, OnPlayerRemovedFromParty도 빈 함수 — 미연결이라 접속 종료가 생존자 수에 반영되지 않는다."
 ```
@@ -89,7 +89,7 @@ decisions:
 ### Interaction
 ```yaml
 decoupling:
-  - 소켓 어태치는 Player의 스켈레탈 메시 소켓에 접근해야 하므로 두 폴더 사이의 결합 지점이다 — 소켓 어태치 헬퍼는 Interaction에 두되, Character는 "오른손/왼손 소켓 이름"만 공개 프로퍼티로 노출해 Interaction이 Character 내부 구조를 몰라도 되게 한다.
+  - 소켓 어태치는 Player의 스켈레탈 메시 소켓에 접근해야 하므로 두 폴더 사이의 결합 지점이다 — 헬퍼는 Interaction에 두되, Character는 "오른손/왼손 소켓 이름"만 공개 프로퍼티로 노출해 Interaction이 Character 내부 구조를 몰라도 되게 한다.
 
 decisions:
   - name: 동시 픽업 레이스 컨디션
@@ -97,7 +97,7 @@ decisions:
   - name: 정산 값 전달
     detail: Interaction이 GameState->AddDeliveredValue(int32)를 직접 호출(델리게이트로 감싸지 않음).
   - name: 상호작용 대상 탐지 방식
-    detail: 로컬 컨트롤 폰에서만 탐지가 동작한다 — 다른 클라이언트의 리플리케이트된 폰까지 트레이스하면 안 되므로(코드만 봐서는 이 의도가 드러나지 않는 subtle한 제약). 구체 탐지 파라미터는 `UInteractionComponent` 소스가 유일한 출처.
+    detail: 로컬 컨트롤 폰에서만 탐지가 동작한다 — 다른 클라이언트의 리플리케이트된 폰까지 트레이스하면 안 되므로(코드만 봐선 안 드러나는 subtle한 제약). 구체 탐지 파라미터는 `UInteractionComponent` 소스가 유일한 출처.
 ```
 
 ### AI (경계만)
@@ -143,7 +143,7 @@ decisions:
 
 ## 시스템 간 인터페이스 계약
 
-시스템 경계를 넘는 접점만 모은 표. 권한 표시 없는 항목은 서버 전용, "신설 제안"은 02문서에 없는 이 문서의 새 결정이다. 정확한 시그니처는 헤더(`Source/GoHome/Public/`)가 유일한 출처.
+시스템 경계를 넘는 접점만 모은 표. 권한 표시 없는 항목은 서버 전용, "신설 제안"은 02문서에 없는 이 문서의 새 결정이다. 정확한 시그니처는 헤더(`Source/GoHome/Public/`)가 유일한 출처다.
 
 | 접점 | 정의 위치 | 호출·구독 측 | 근거 |
 |---|---|---|---|
@@ -160,9 +160,9 @@ decisions:
 
 ## 헤더 소유권
 
-Day 1 병렬 착수용 헤더 스텁(`IWeightProvider`, `IInteractable`, `IDamageable`, `ENoiseType`, `EExpeditionState`, `EFailReason`, `UDockingDoorComponent`, `AGoHomeGameState`, `UHealthComponent` 등)은 이미 `Source/GoHome/Public/`에 커밋되어 있다 — 선언은 헤더가, 시그니처는 위 "시스템 간 인터페이스 계약" 표를 따른다.
+Day 1 병렬 착수용 헤더 스텁(`IWeightProvider`, `IInteractable`, `IDamageable`, `ENoiseType`, `EExpeditionState`, `EFailReason`, `UDockingDoorComponent`, `AGoHomeGameState`, `UHealthComponent` 등)은 이미 `Source/GoHome/Public/`에 커밋되어 있다 — 선언은 헤더, 시그니처는 위 "시스템 간 인터페이스 계약" 표를 따른다.
 
-**소유권 규칙**: 각 헤더는 소유 폴더(대응은 위 "모듈/폴더 구조" 표) 담당자만 수정한다. 다른 폴더는 include해서 소비만 하고, 필드/시그니처 변경은 소유자 리뷰를 거친다. `AGoHomeGameState`처럼 여러 폴더가 쓰는 공유 클래스는 **필드 선언은 Core만**, 다른 폴더는 퍼블릭 서버 함수(`AddDeliveredValue` 등)로만 값을 바꾼다 — `GameState.h` 동시 편집 충돌 방지용. 검증: `grep -rn "GameState->\w*\s*=" Source/GoHome/`가 Core 밖에서 나오면 위반.
+**소유권 규칙**: 각 헤더는 소유 폴더(대응은 위 "모듈/폴더 구조" 표) 담당자만 수정한다. 다른 폴더는 include해서 소비만 하고, 필드/시그니처 변경은 소유자 리뷰를 거친다. `AGoHomeGameState`처럼 여러 폴더가 쓰는 공유 클래스는 **필드 선언은 Core만**, 다른 폴더는 퍼블릭 서버 함수(`AddDeliveredValue` 등)로만 값을 바꾼다 — `GoHomeGameState.h` 동시 편집 충돌 방지용. 검증: `grep -rn "GameState->\w*\s*=" Source/GoHome/`가 Core 밖에서 나오면 위반.
 
 ## 의존성/착수 순서
 
@@ -192,7 +192,7 @@ Save/ (9. 세이브 스키마) ──▶ Save/ (8. 장비 강화)
 
 [../Design/02_GoHome_기술분석서.md 13. 2차 프로토타입 추가 시스템](../Design/02_GoHome_기술분석서.md#13-2차-프로토타입-추가-시스템) 참고. 폴더 배치는:
 
-- 13-1 동시 트리거 게이트(`UMultiActorGateComponent`) → `Core/`(도킹 문 컴포넌트 확장). **동시 활성화 판정**: 트리거별 서버 전용 `bool` 배열을 소유, 각 트리거의 `OnInteract`가 `Server_SetTriggerActive(int32, bool)`를 호출하면 같은 호출 안에서 전원 활성 여부를 동기 검사해 게이트를 연다 — 서버는 한 틱에 한 RPC씩 순차 처리하므로 "동시" 입력도 레이스 없이 처리된다(Interaction의 동시 픽업과 같은 논리).
+- 13-1 동시 트리거 게이트(`UMultiActorGateComponent` (신설 제안)) → `Core/`(도킹 문 컴포넌트 확장). **동시 활성화 판정**: 트리거별 서버 전용 `bool` 배열을 소유, 각 트리거의 `OnInteract`가 `Server_SetTriggerActive(int32, bool)`를 호출하면 같은 호출 안에서 전원 활성 여부를 동기 검사해 게이트를 연다 — 서버는 한 틱에 한 RPC씩 순차 처리하므로 "동시" 입력도 레이스 없이 처리된다(Interaction의 동시 픽업과 같은 논리).
 - 13-2 목표 점수 시스템 → `Core/`(GameState 필드) + `Save/`(스키마) + `UI/`(표시)
 - 13-3 수류 구간(`PhysicsVolume`) → `Player/`(이동 시스템과 통합) 또는 레벨 배치, `IWeightProvider` 참조
 

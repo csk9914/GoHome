@@ -10,7 +10,7 @@
 // Docs/Dev/*.md (개발 문서, ARCHITECTURE/CODING_CONVENTIONS/AI_AGENT_GUIDE 등). 링크는 절대경로가
 // 아니라 파일 기준 상대경로로 해석하므로 Docs/Dev/ 문서가 ../Design/...md#앵커 형태로 기획서를
 // 참조하는 링크, CLAUDE.md와 Docs/Design/·Docs/Dev/ 사이를 오가는 링크도 함께 검증된다.
-// md↔Notion 경계(하이퍼링크를 걸지 않기로 한 부분)는 애초에 이 스크립트의 검사 대상이 아니다.
+// Notion 링크(URL)는 md 파일이 아니므로 애초에 이 스크립트의 검사 대상이 아니다 — 깨졌는지는 수동 확인.
 //
 // 문서 내용을 고친 뒤에는 습관적으로 이 스크립트를 돌려서 0 errors를 확인할 것.
 
