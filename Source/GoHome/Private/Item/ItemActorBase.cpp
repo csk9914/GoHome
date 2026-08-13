@@ -74,6 +74,11 @@ void AItemActorBase::UpdateAttachment(APawn* OldHoldingPawn)
 		// 서버 리플리케이트 위치랑 따로 놀 수 있음).
 		if (HasAuthority())
 		{
+			MeshComponent->AttachToComponent(Character->GetMesh(),
+				FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+				SocketProvider->GetRightHandSocketName());
+
+			SocketProvider->SetHoldingItem(true);   // 추가: 캐릭터한테 "들고 있음" 알림
 			MeshComponent->SetSimulatePhysics(false);
 		}
 
@@ -204,6 +209,18 @@ void AItemActorBase::ServerDrop()
 	bIsBeingClaimed = false;
 	HoldingPawn = nullptr;
 
+	// 서버 자신은 RepNotify 자동 발동 안 되므로 직접 호출.
+	UpdateAttachment();
+
+	// 캐릭터한테 "이제 안 들고 있음" 알림 → AnimBP의 HoldAlpha가 내려가면서 원래 Locomotion으로 복귀
+	if (ISocketProvider* SocketProvider = Cast<ISocketProvider>(PreviousHolder))
+	{
+		SocketProvider->SetHoldingItem(false);
+	}
+
+	MeshComponent->SetSimulatePhysics(true);
+	// 파손 감지(NotifyHit)에 필요한 원래 콜리전으로 복원.
+	MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	// 서버 자신은 RepNotify 자동 발동 안 되므로 직접 호출(Old holder 넘겨줌).
 	UpdateAttachment(PreviousHolder);
 
@@ -216,6 +233,7 @@ void AItemActorBase::ServerDrop()
 		// 내부에서 NotifyDropped() 호출(소음 타이머 정지).
 		Inventory->RemoveItem(this);
 	}
+
 }
 
 

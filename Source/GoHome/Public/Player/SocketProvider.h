@@ -23,4 +23,5 @@ class GOHOME_API ISocketProvider
 public:
 	virtual FName GetRightHandSocketName() const = 0;
 	virtual FName GetLeftHandSocketName() const = 0;
+	virtual void SetHoldingItem(bool bHolding) {}
 };
