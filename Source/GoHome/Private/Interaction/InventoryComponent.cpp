@@ -190,16 +190,18 @@ void UInventoryComponent::SetActiveSlot(int32 NewIndex)
 {
 	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
 	if (NewIndex < 0 || NewIndex >= GoHomeInventorySlotCount) return;
-	if (NewIndex == ActiveSlotIndex) return;
 
-	if (AItemActorBase* OldActive = GetItemInSlot(ActiveSlotIndex))
+	AItemActorBase* OldActive = GetItemInSlot(ActiveSlotIndex);
+	AItemActorBase* NewActive = GetItemInSlot(NewIndex);
+
+	if (OldActive && OldActive != NewActive)
 	{
 		OldActive->SetActiveHeld(false);
 	}
 
 	ActiveSlotIndex = NewIndex;
 
-	if (AItemActorBase* NewActive = GetItemInSlot(ActiveSlotIndex))
+	if (NewActive)
 	{
 		NewActive->SetActiveHeld(true);
 	}
