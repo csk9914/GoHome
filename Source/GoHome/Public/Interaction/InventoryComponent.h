@@ -12,6 +12,8 @@
 // 클래스 멤버가 아니라 파일 스코프 상수로 둬야 한다 (클래스 내부 선언 순서와 무관하게 항상 보이도록).
 inline constexpr int32 GoHomeInventorySlotCount = 4;
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryChanged);
+
 /**
  * 4슬롯 인벤토리. IWeightProvider를 구현해 보유 아이템 무게 합산을 노출한다.
  */
@@ -61,6 +63,10 @@ public:
 	// 납품 지점에서 호출: 인벤토리 전체를 정산(AddDeliveredValue) 후 제거.
 	void ServerDeliverAllItems();
 
+	// 인벤토리 UI가 구독 : 슬롯 내용 또는 활성 슬롯이 바뀔때마다 브로드캐스트.
+	UPROPERTY(BlueprintAssignable, Category = "Interaction")
+	FOnInventoryChanged OnInventoryChanged;
+
 	UPROPERTY(ReplicatedUsing = OnRep_ActiveSlotIndex, BlueprintReadOnly, Category = "Interaction")
 	int32 ActiveSlotIndex = 0;
 
@@ -74,6 +80,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	AItemActorBase* GetActiveItem() const;
+
+	// UI가 슬롯 개수를 하드코딩하지 않고 물어볼 수 있게(나중에 슬롯 수가 바뀌어도 UI 코드 안 건드려도 됨).
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	int32 GetInventorySlotCount() const { return GoHomeInventorySlotCount; }
 
 	int32 FindSlotIndexOf(AItemActorBase* Item) const;
 

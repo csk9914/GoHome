@@ -56,3 +56,8 @@ void ADeliveryPoint::OnInteract(APawn* InstigatorPawn)
 		Inventory->ServerDeliverAllItems();
 	}
 }
+
+FText ADeliveryPoint::GetInteractionPromptText_Implementation() const
+{
+	return FText::FromString(TEXT("납품하기"));
+}

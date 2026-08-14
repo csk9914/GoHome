@@ -68,9 +68,10 @@ void AGoHomeCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	// 블랜더로 메시를 자체 수정함에 따라 해당 코드 불필요, 주석처리
 	if (IsLocallyControlled())
 	{
-		GetMesh()->HideBoneByName(TEXT("Head"), EPhysBodyOp::PBO_None);
+		//GetMesh()->HideBoneByName(TEXT("Head"), EPhysBodyOp::PBO_None);
 
 		//const float Pitch = FRotator::NormalizeAxis(GetControlRotation().Pitch);
 		//constexpr float BodyHidePitchThreshold = 30.f; // 이 각도 이상이면 몸 전체 숨김
@@ -103,6 +104,25 @@ void AGoHomeCharacter::Tick(float DeltaTime)
 		{
 			// 순수 원격 클라이언트인 경우 -> 서버에 전송
 			ServerUpdatePitch(CurrentPitch);
+		}
+	}
+
+	if (HasAuthority())
+	{
+		const bool bIsSwimming = GetVelocity().Size() > 50.f;
+
+		if (bIsSwimming)
+		{
+			TimeSinceLastSwimNoise += DeltaTime;
+			if (TimeSinceLastSwimNoise >= SwimNoiseInterval)
+			{
+				UGoHomeNoiseLibrary::GenerateNoise(this, GetActorLocation(), SwimNoiseRadius, SwimNoiseType, this);
+				TimeSinceLastSwimNoise = 0.f;
+			}
+		}
+		else
+		{
+			TimeSinceLastSwimNoise = 0.f; // 멈추면 타이머 리셋 -> 멈췄다 바로 움직였을 때 즉시 안 쏘게
 		}
 	}
 }

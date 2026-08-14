@@ -14,6 +14,7 @@ UInteractionComponent::UInteractionComponent()
 	SetIsReplicatedByDefault(true);
 }
 
+
 void UInteractionComponent::BeginPlay()
 {
 	Super::BeginPlay();
@@ -98,6 +99,20 @@ void UInteractionComponent::Server_RequestInteract_Implementation(AActor* Target
 }
 
 
+FText UInteractionComponent::GetInteractionPromptTextFor(AActor* Target)
+{
+	if (Target && Target->Implements<UInteractable>())
+	{
+		const FText PromptText = IInteractable::Execute_GetInteractionPromptText(Target);
+		if (!PromptText.IsEmpty())
+		{
+			return PromptText;
+		}
+
+	}
+
+	return FText::FromString(TEXT("상호작용"));
+}
 
 
 

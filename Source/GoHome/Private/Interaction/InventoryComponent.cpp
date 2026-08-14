@@ -46,6 +46,7 @@ void UInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& 
 
 void UInventoryComponent::OnRep_Slots()
 {
+	OnInventoryChanged.Broadcast();
 }
 
 
@@ -69,6 +70,7 @@ bool UInventoryComponent::TryAddItem(AItemActorBase* Item)
 	Slots[EmptyIndex].Item = Item;
 	Slots[EmptyIndex].Quantity = 1;
 	Item->NotifyPickedUp();
+	OnInventoryChanged.Broadcast(); // 추가: 서버 자신의 UI도 즉시 갱신함.
 	return true;
 }
 
@@ -83,6 +85,7 @@ bool UInventoryComponent::RemoveItem(AItemActorBase* Item)
 			Slot.Item = nullptr;
 			Slot.Quantity = 0;
 			Item->NotifyDropped();
+			OnInventoryChanged.Broadcast();
 			return true;
 		}
 	}
@@ -205,6 +208,7 @@ void UInventoryComponent::SetActiveSlot(int32 NewIndex)
 	{
 		NewActive->SetActiveHeld(true);
 	}
+	OnInventoryChanged.Broadcast();
 }
 
 void UInventoryComponent::TrySetActiveSlot(int32 NewIndex)
@@ -219,6 +223,7 @@ void UInventoryComponent::Server_RequestSetActiveSlot_Implementation(int32 NewIn
 
 void UInventoryComponent::OnRep_ActiveSlotIndex()
 {
+	OnInventoryChanged.Broadcast();
 }
 
 AItemActorBase* UInventoryComponent::GetActiveItem() const
