@@ -111,7 +111,7 @@ FText UInteractionComponent::GetInteractionPromptTextFor(AActor* Target)
 
 	}
 
-	return FText::FromString(TEXT("E: 상호작용"));
+	return FText::FromString(TEXT("상호작용"));
 }
 
 

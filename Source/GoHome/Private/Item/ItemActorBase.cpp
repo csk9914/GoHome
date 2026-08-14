@@ -234,7 +234,7 @@ void AItemActorBase::SetActiveHeld(bool bNewActive)
 
 FText AItemActorBase::GetInteractionPromptText_Implementation() const
 {
-	return FText::FromString(TEXT("E: 줍기"));
+	return FText::FromString(TEXT("줍기"));
 }
 
 void AItemActorBase::OnRep_IsActiveHeld()

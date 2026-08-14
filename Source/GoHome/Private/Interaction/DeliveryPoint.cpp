@@ -59,5 +59,5 @@ void ADeliveryPoint::OnInteract(APawn* InstigatorPawn)
 
 FText ADeliveryPoint::GetInteractionPromptText_Implementation() const
 {
-	return FText::FromString(TEXT("E: 납품하기"));
+	return FText::FromString(TEXT("납품하기"));
 }
