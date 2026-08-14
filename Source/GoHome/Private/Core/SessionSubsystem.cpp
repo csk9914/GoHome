@@ -86,7 +86,8 @@ void USessionSubsystem::CreateSession(int32 NumPublicConnections)
 	LastSessionSettings->bShouldAdvertise = true;								// 세션 목록 노출 여부
 	LastSessionSettings->bUsesPresence = true;									// Presence 기능 사용
 	LastSessionSettings->bUseLobbiesIfAvailable = true;							// 스팀 로비 API(Steam Lobbies) 사용
-	LastSessionSettings->BuildUniqueId = 1;										// 빌드 버전 고유 ID (같은 버전끼리만 검색됨)
+	// BuildUniqueId는 엔진 기본값(빌드 기준 자동 계산)에 맡김 — 여기서 고정값(예: 1)으로 강제하면
+	// FindSessions 쪽 검색 요청의 빌드 ID와 불일치해서 LAN 검색이 결과 0개로 조용히 실패함
 
 	// 로컬 플레이어의 NetID를 가져와 세션 생성 요청
 	const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
@@ -112,7 +113,11 @@ void USessionSubsystem::FindSessions(int32 MaxSearchResults)
 	LastSessionSearch = MakeShareable(new FOnlineSessionSearch());
 	LastSessionSearch->MaxSearchResults = MaxSearchResults;														// 최대 검색 결과 수
 	LastSessionSearch->bIsLanQuery = IOnlineSubsystem::Get()->GetSubsystemName() == "NULL";						// LAN 여부
-	LastSessionSearch->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);	// 로비 세션 검색
+
+	if (!LastSessionSearch->bIsLanQuery)
+	{
+		LastSessionSearch->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);	// 로비 세션 검색 (Steam 전용, LAN 쿼리엔 적용 안 함)
+	}
 
 	const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
 	if (!LocalPlayer || !SessionInterface->FindSessions(*LocalPlayer->GetPreferredUniqueNetId(), LastSessionSearch.ToSharedRef()))

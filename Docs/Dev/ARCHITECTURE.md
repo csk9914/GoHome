@@ -61,9 +61,9 @@ decisions:
     detail: "GoHomeGameMode.cpp: bUseSeamlessTravel = true. Save 절의 '재구독' 전제는 이 기준이며, 전환용 임시 GameState 구간의 재구독 타이밍은 미검증(관련 이슈: 클라 시멀리스 트래블 중 끊김, 원인 미상)."
   - name: 상태 전이 트리거 (EExpeditionState 7종, 02문서에 없어 이 문서에서 확정)
     detail: |
-      - Lobby → ZoneSelect: 전원 지역 확정 시
-      - ZoneSelect → Departure: 전원 준비 완료 시
-      - Departure → Exploration: 하강 로딩 연출 종료 시(01문서 "출발 → 하강 로딩 연출" 참고, 정확한 서버 트리거 미확정 — 검증 필요)
+      - Lobby → Departure: 출발 버튼(`ADepartureButton`) 상호작용 시, 전원 확정 없이 즉시(`ServerTravelToMap`이 트래블 직전 `SetState(Departure)` 호출)
+      - `ZoneSelect`: 미사용 — Zone 선택은 상태 전이가 아니라 `LobbyGameState::SelectedZoneId` 값 변경(단일값, 팀 컨센서스 없음)만으로 처리
+      - Departure → Exploration: 트래블 완료 후 `ExplorationGameState` 생성자가 `CurrentState`를 바로 초기화(로딩 연출 UI 미구현, 붙이면 타이밍 재검증 필요)
       - Exploration → Return: 생존자 전원 잠수정 콜리전 볼륨 내부 진입
       - Return → Settlement: 도킹 문 닫힘 확인 후 즉시
       - Exploration/Return → Failed: 제한 시간 만료 또는 도킹 문 위협 판정(→ AI 경계) 또는 생존자 0명(→ Player 절 HP 0 처리)
