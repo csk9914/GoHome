@@ -61,6 +61,9 @@ public:
 	// 서버 전용: InventoryComponent가 활성 슬롯 전환 시 호출한다.
 	void SetActiveHeld(bool bNewActive);
 
+	virtual FText GetInteractionPromptText_Implementation() const override;
+
+
 protected:
 
 	virtual void BeginPlay() override;

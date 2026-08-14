@@ -42,6 +42,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	AActor* GetCurrentTarget() const { return CurrentTarget; }
 
+	// NewTarget이 IInteractable을 구현하면 그 프롬프트 문구를 그 외에는 기본 문구를 반환함.
+	// 블루프린트에서 인터페이스 "메시지" 노드를 직접 찾기 애매할 때 쓰라고 만든 함수.
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	static FText GetInteractionPromptTextFor(AActor* Target);
+
+
 protected:
 
 	virtual void BeginPlay() override;
