@@ -51,32 +51,38 @@ public:
 	// InventoryComponent::Server_RequestDrop이 소유권 검증 후 호출한다. 서버에서만 호출할 것.
 	void ServerDrop();
 
+	// 지금 손에 나와있는(활성 슬롯) 아이템인지 여부. false면 인벤토리에 있지만 숨겨진 상태.
+	UPROPERTY(ReplicatedUsing = OnRep_IsActiveHeld)
+	bool bIsActiveHeld = false;
+
+	UFUNCTION()
+	void OnRep_IsActiveHeld();
+
+	// 서버 전용: InventoryComponent가 활성 슬롯 전환 시 호출한다.
+	void SetActiveHeld(bool bNewActive);
+
 protected:
 
 	virtual void BeginPlay() override;
-
 
 	UPROPERTY(ReplicatedUsing = OnRep_HoldingPawn)
 	TObjectPtr<APawn> HoldingPawn = nullptr;
 
 	UFUNCTION()
-	void OnRep_HoldingPawn();
+	void OnRep_HoldingPawn(APawn* OldHoldingPawn);
 
-	void UpdateAttachment();
-
-
-
+	void UpdateAttachment(APawn* OldHoldingPawn = nullptr);
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual void NotifyHit(
-		UPrimitiveComponent* MyComp, 
-		AActor* Other, 
-		UPrimitiveComponent* OtherComp, 
-		bool bSelfMoved, 
-		FVector HitLocation, 
-		FVector HitNormal, 
-		FVector NormalImpulse, 
+		UPrimitiveComponent* MyComp,
+		AActor* Other,
+		UPrimitiveComponent* OtherComp,
+		bool bSelfMoved,
+		FVector HitLocation,
+		FVector HitNormal,
+		FVector NormalImpulse,
 		const FHitResult& Hit) override;
 
 	// 동시 픽업 레이스 컨디션 방지: 서버 틱 단일 스레드 특성 이용 (동기 함수 호출 안에서 끊김 없이 검사+설정).

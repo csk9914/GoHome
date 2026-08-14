@@ -7,16 +7,14 @@
 #include "AI/NoiseType.h"
 #include "TimerManager.h"
 #include "Interaction/InventoryComponent.h"
-#include "Player/SocketProvider.h"
-#include "GameFramework/Character.h"
+#include "Player/GoHomeCharacter.h"
 
 AItemActorBase::AItemActorBase()
 {
-	PrimaryActorTick.bCanEverTick = false; // 진단용 true였던 거 원복
+	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;
 
-	// AActor는 Pawn/Character와 달리 bReplicateMovement가 꺼져 있는 것으로 보임. 그래서 생성자에서 켜줘야함.
-	SetReplicateMovement(true); 
+	SetReplicateMovement(true);
 
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	RootComponent = MeshComponent;
@@ -29,7 +27,6 @@ AItemActorBase::AItemActorBase()
 		MeshComponent->SetStaticMesh(DefaultMeshAsset.Object);
 	}
 }
-
 
 void AItemActorBase::BeginPlay()
 {
@@ -55,35 +52,72 @@ void AItemActorBase::OnInteract(APawn* InstigatorPawn)
 	bIsBeingClaimed = true;
 	HoldingPawn = InstigatorPawn;
 
-	MeshComponent->SetSimulatePhysics(false);
-	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	UpdateAttachment(); // 서버 자신은 RepNotify가 안 불리니 직접 호출
-}
-
-void AItemActorBase::OnRep_HoldingPawn()
-{
-	UpdateAttachment();
-}
-
-void AItemActorBase::UpdateAttachment()
-{
-	if (HoldingPawn)
+	// 새로 주운 아이템을 바로 활성 슬롯으로 전환(손에 부착까지 여기서 처리됨).
+	const int32 SlotIndex = Inventory->FindSlotIndexOf(this);
+	if (SlotIndex != INDEX_NONE)
 	{
-		ACharacter* Character = Cast<ACharacter>(HoldingPawn);
-		ISocketProvider* SocketProvider = Cast<ISocketProvider>(HoldingPawn);
-		if (Character && SocketProvider)
+		Inventory->SetActiveSlot(SlotIndex);
+	}
+}
+
+void AItemActorBase::OnRep_HoldingPawn(APawn* OldHoldingPawn)
+{
+	UpdateAttachment(OldHoldingPawn);
+}
+
+void AItemActorBase::UpdateAttachment(APawn* OldHoldingPawn)
+{
+	if (HoldingPawn && bIsActiveHeld)
+	{
+		// 활성 슬롯: 손에 보이게 부착.
+		MeshComponent->SetVisibility(true, true);
+		MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+		if (HasAuthority())
 		{
-			MeshComponent->AttachToComponent(Character->GetMesh(),
-				FAttachmentTransformRules::SnapToTargetNotIncludingScale,
-				SocketProvider->GetRightHandSocketName());
+			MeshComponent->SetSimulatePhysics(false);
+		}
+
+		if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(HoldingPawn))
+		{
+			Character->AttachItemToRightHand(MeshComponent);
+		}
+	}
+	else if (HoldingPawn && !bIsActiveHeld)
+	{
+		// 인벤토리엔 있지만 비활성 슬롯: 숨기고 부착 해제.
+		MeshComponent->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+		MeshComponent->SetVisibility(false, true);
+		MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+		if (HasAuthority())
+		{
+			MeshComponent->SetSimulatePhysics(false);
+		}
+
+		if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(HoldingPawn))
+		{
+			Character->DetachItemFromRightHand();
 		}
 	}
 	else
 	{
+		// 아무도 안 들고 있음(드롭/납품 취소 등): 원래 월드 오브젝트 상태로 복원.
+		MeshComponent->SetVisibility(true, true);
 		MeshComponent->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+		MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+
+		if (HasAuthority())
+		{
+			MeshComponent->SetSimulatePhysics(true);
+		}
+
+		if (AGoHomeCharacter* PrevCharacter = Cast<AGoHomeCharacter>(OldHoldingPawn))
+		{
+			PrevCharacter->DetachItemFromRightHand();
+		}
 	}
 }
-
 
 float AItemActorBase::GetTotalWeight() const
 {
@@ -99,8 +133,6 @@ float AItemActorBase::GetCurrentValue() const
 	return ItemData->Value * ValueRatio;
 }
 
-
-
 void AItemActorBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -109,15 +141,16 @@ void AItemActorBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AItemActorBase, BreakCount);
 	DOREPLIFETIME(AItemActorBase, CurrentNoiseRadius);
 	DOREPLIFETIME(AItemActorBase, HoldingPawn);
+	DOREPLIFETIME(AItemActorBase, bIsActiveHeld);
 }
 
-void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp, 
-	AActor* Other, 
-	UPrimitiveComponent* OtherComp, 
-	bool bSelfMoved, 
-	FVector HitLocation, 
-	FVector HitNormal, 
-	FVector NormalImpulse, 
+void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp,
+	AActor* Other,
+	UPrimitiveComponent* OtherComp,
+	bool bSelfMoved,
+	FVector HitLocation,
+	FVector HitNormal,
+	FVector NormalImpulse,
 	const FHitResult& Hit)
 {
 	Super::NotifyHit(MyComp, Other, OtherComp, bSelfMoved, HitLocation, HitNormal, NormalImpulse, Hit);
@@ -130,19 +163,15 @@ void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp,
 	{
 		++BreakCount;
 
-		// 테스트용 디버깅 메시지(추후 삭제하면 된다.)
 		if (GEngine)
 		{
 			GEngine->AddOnScreenDebugMessage(
-				-1, 5.f, FColor::Red, 
-				FString::Printf(TEXT("파손! 속도 =%.0f, BreakCount = %d, 현재가치 = %.0f"), 
+				-1, 5.f, FColor::Red,
+				FString::Printf(TEXT("파손! 속도 =%.0f, BreakCount = %d, 현재가치 = %.0f"),
 					ImpactSpeed, BreakCount, GetCurrentValue()));
 		}
-
 	}
 }
-
-
 
 // NoiseType
 
@@ -158,16 +187,11 @@ void AItemActorBase::NotifyPickedUp()
 	UGoHomeNoiseLibrary::GenerateNoise(this, GetActorLocation(),
 		CurrentNoiseRadius, ENoiseType::Medium, this);
 
-	// 테스트용 디버깅 메시지(추후 삭제할 것).
-
 	if (GEngine)
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, FString::Printf(TEXT("소음 발생! 반경 = %.0f(픽업 직후)"),
 			CurrentNoiseRadius));
 	}
-
-
-	// 여기까지 테스트용 디버깅 메시지.
 
 	GetWorldTimerManager().SetTimer(NoiseGrowthTimerHandle, this,
 		&AItemActorBase::GrowNoiseRadius, ItemData->NoiseGrowthIntervalSeconds, true);
@@ -176,7 +200,6 @@ void AItemActorBase::NotifyPickedUp()
 void AItemActorBase::NotifyDropped()
 {
 	GetWorldTimerManager().ClearTimer(NoiseGrowthTimerHandle);
-	// CurrentNoiseRadius는 그대로 둔다 -> 아이템을 드랍한 후 다시 주우면 멈췄던 지점에서 타이머가 이어서 증가.
 }
 
 void AItemActorBase::ServerDrop()
@@ -186,39 +209,45 @@ void AItemActorBase::ServerDrop()
 	APawn* PreviousHolder = HoldingPawn;
 
 	bIsBeingClaimed = false;
+	bIsActiveHeld = false;
 	HoldingPawn = nullptr;
 
-	// 서버 자신은 RepNotify 자동 발동 안 되므로 직접 호출.
-	UpdateAttachment();
+	UpdateAttachment(PreviousHolder);
 
-	MeshComponent->SetSimulatePhysics(true);
-	// 파손 감지(NotifyHit)에 필요한 원래 콜리전으로 복원.
-	MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-
-	// 제자리에 툭 떨어지지 않게 앞+위 방향으로 던지는 초기 속도 부여.
 	const FVector ThrowDirection = (PreviousHolder->GetActorForwardVector() + FVector::UpVector * 0.3f).GetSafeNormal();
 	MeshComponent->SetPhysicsLinearVelocity(ThrowDirection * DropThrowSpeed);
 
 	if (UInventoryComponent* Inventory = PreviousHolder->FindComponentByClass<UInventoryComponent>())
 	{
-		// 내부에서 NotifyDropped() 호출(소음 타이머 정지).
 		Inventory->RemoveItem(this);
 	}
 }
 
+void AItemActorBase::SetActiveHeld(bool bNewActive)
+{
+	if (!HasAuthority()) return;
+	if (bIsActiveHeld == bNewActive) return;
+
+	bIsActiveHeld = bNewActive;
+	UpdateAttachment();
+}
+
+void AItemActorBase::OnRep_IsActiveHeld()
+{
+	UpdateAttachment();
+}
 
 void AItemActorBase::GrowNoiseRadius()
 {
 	if (!ItemData) return;
 
 	CurrentNoiseRadius = FMath::Min(
-		CurrentNoiseRadius + ItemData->NoiseRadiusGrowthPerInterval, 
+		CurrentNoiseRadius + ItemData->NoiseRadiusGrowthPerInterval,
 		ItemData->MaxNoiseRadius);
 
-	const ENoiseType Type = (CurrentNoiseRadius >= 1500.f) ? ENoiseType::Large : ENoiseType::Medium; 
+	const ENoiseType Type = (CurrentNoiseRadius >= 1500.f) ? ENoiseType::Large : ENoiseType::Medium;
 	UGoHomeNoiseLibrary::GenerateNoise(this, GetActorLocation(), CurrentNoiseRadius, Type, this);
 
-	// 테스트용 디버깅 메시지(추후 삭제할 것).
 	if (GEngine)
 	{
 		const TCHAR* TypeStr = (Type == ENoiseType::Large) ? TEXT("Large") : TEXT("Medium");

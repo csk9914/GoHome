@@ -58,6 +58,26 @@ public:
 	// 사망 등으로 인벤토리 전체를 한번에 비워야 할 때 호출(각 아이템의 ServerDrop() 재사용).
 	void ServerDropAllItems();
 
+	// 납품 지점에서 호출: 인벤토리 전체를 정산(AddDeliveredValue) 후 제거.
+	void ServerDeliverAllItems();
+
+	UPROPERTY(ReplicatedUsing = OnRep_ActiveSlotIndex, BlueprintReadOnly, Category = "Interaction")
+	int32 ActiveSlotIndex = 0;
+
+	void SetActiveSlot(int32 NewIndex);
+
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void TrySetActiveSlot(int32 NewIndex);
+
+	UFUNCTION(Server, Reliable)
+	void Server_RequestSetActiveSlot(int32 NewIndex);
+
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	AItemActorBase* GetActiveItem() const;
+
+	int32 FindSlotIndexOf(AItemActorBase* Item) const;
+
+
 protected:
 
 	virtual void BeginPlay() override;
@@ -66,6 +86,9 @@ protected:
 
 	UFUNCTION()
 	void OnRep_Slots();
+
+	UFUNCTION()
+	void OnRep_ActiveSlotIndex();
 
 private:
 	int32 FindEmptySlotIndex() const;

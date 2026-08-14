@@ -85,6 +85,26 @@ void AGoHomeCharacter::Tick(float DeltaTime)
 		//}
 	}
 
+	if (IsLocallyControlled() || HasAuthority())
+	{
+		// 본인 클라이언트거나 서버가 그 캐릭터를 볼 때
+		FRotator ControlRot = GetControlRotation();
+		FRotator ActorRot = GetActorRotation();
+		FRotator DeltaRot = (ControlRot - ActorRot).GetNormalized();
+
+		CurrentPitch = DeltaRot.Pitch;
+
+		if (HasAuthority())
+		{
+			// 호스트(서버+로컬조종) 자기 자신인 경우 -> 바로 리플리케이트 변수에 반영
+			ReplicatedPitch = CurrentPitch;
+		}
+		else
+		{
+			// 순수 원격 클라이언트인 경우 -> 서버에 전송
+			ServerUpdatePitch(CurrentPitch);
+		}
+	}
 }
 
 void AGoHomeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -129,6 +149,14 @@ void AGoHomeCharacter::AttachItemToRightHand(UStaticMeshComponent* ItemMeshCompo
 	bIsHoldingItem = true;
 }
 
+void AGoHomeCharacter::SetHoldingItem(bool bHolding)
+{
+	if (HasAuthority())
+	{
+		bIsHoldingItem = bHolding;
+	}
+}
+
 void AGoHomeCharacter::DetachItemFromRightHand()
 {
 	bIsHoldingItem = false;
@@ -145,4 +173,15 @@ void AGoHomeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AGoHomeCharacter, bIsHoldingItem);
+	DOREPLIFETIME_CONDITION(AGoHomeCharacter, ReplicatedPitch, COND_SkipOwner);
+}
+
+void AGoHomeCharacter::OnRep_ReplicatedPitch()
+{
+	CurrentPitch = ReplicatedPitch;
+}
+
+void AGoHomeCharacter::ServerUpdatePitch_Implementation(float NewPitch)
+{
+	ReplicatedPitch = NewPitch;
 }

@@ -45,7 +45,12 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> LookAction;
 
+	
+
 public:	
+
+	UPROPERTY(BlueprintReadOnly, Category = "Animation")
+	float CurrentPitch = 0.f;
 	
 	// 핸들 소켓 선언.
 
@@ -63,6 +68,7 @@ public:
 	virtual FName GetRightHandSocketName() const override { return RightHandSocketName; }
 	virtual FName GetLeftHandSocketName() const override { return LeftHandSocketName; }
 
+	virtual void SetHoldingItem(bool bHolding) override;
 
 
 	// 아이템을 오른손에서 떼고 애니메이션 상태를 원복
@@ -81,5 +87,14 @@ protected:
 	void OnRep_IsHoldingItem();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UPROPERTY(ReplicatedUsing = OnRep_ReplicatedPitch)
+	float ReplicatedPitch = 0.f;
+
+	UFUNCTION()
+	void OnRep_ReplicatedPitch();
+
+	UFUNCTION(Server, Unreliable)
+	void ServerUpdatePitch(float NewPitch);
 };
 
