@@ -27,7 +27,10 @@ void ADepartureButton::OnInteract(APawn* InstigatorPawn)
 	
 	if (AGoHomeGameMode* GoHomeGameMode = GetWorld()->GetAuthGameMode<AGoHomeGameMode>())
 	{
-		GoHomeGameMode->ServerTravelToMap(SelectedZone->MapPath.ToSoftObjectPath().ToString());
+		// GoHomeGameMode->ServerTravelToMap(SelectedZone->MapPath.ToSoftObjectPath().ToString());
+		
+		// GetLongPackageName()은 오브젝트 이름 부분을 떼고 패키지 경로만 반환
+		GoHomeGameMode->ServerTravelToMap(SelectedZone->MapPath.ToSoftObjectPath().GetLongPackageName());
 	}
 	
 	

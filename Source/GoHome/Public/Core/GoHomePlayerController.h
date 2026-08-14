@@ -18,7 +18,7 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category="UI")                                     
 	void OnOpenSelectZone();
 	
-	UFUNCTION(Server, Reliable)                                                                       
+	UFUNCTION(Server, Reliable, BlueprintCallable)                                                                  
 	void Server_SelectZone(FName ZoneId);
 	
 	// UI 실제 생성/뷰포트 추가는 BP에서 (WBP_ZoneSelect 참조는 C++이 몰라도 되므로)                  
