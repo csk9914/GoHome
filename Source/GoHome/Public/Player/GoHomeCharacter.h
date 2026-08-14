@@ -6,6 +6,7 @@
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
 #include "Player/SocketProvider.h"
+#include "AI/NoiseType.h"
 #include "GoHomeCharacter.generated.h"
 
 class UInputAction;
@@ -45,8 +46,6 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> LookAction;
 
-	
-
 public:	
 
 	UPROPERTY(BlueprintReadOnly, Category = "Animation")
@@ -69,7 +68,6 @@ public:
 	virtual FName GetLeftHandSocketName() const override { return LeftHandSocketName; }
 
 	virtual void SetHoldingItem(bool bHolding) override;
-
 
 	// 아이템을 오른손에서 떼고 애니메이션 상태를 원복
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
@@ -96,5 +94,20 @@ protected:
 
 	UFUNCTION(Server, Unreliable)
 	void ServerUpdatePitch(float NewPitch);
+
+	// 수영, 소음 반경
+	UPROPERTY(EditDefaultsOnly, Category = "Noise")
+	float SwimNoiseRadius = 800.f;
+
+	// 수영, 소음 등급
+	UPROPERTY(EditDefaultsOnly, Category = "Noise")
+	ENoiseType SwimNoiseType = ENoiseType::Small;
+
+	// 소음 몇 초 간격으로 쏠 지
+	UPROPERTY(EditDefaultsOnly, Category = "Noise")
+	float SwimNoiseInterval = 1.5f;
+
+	// 마지막 소음 발생 이후 누적 시간
+	float TimeSinceLastSwimNoise = 0.f;
 };
 
