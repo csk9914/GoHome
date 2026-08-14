@@ -20,6 +20,9 @@ public:
 	float Value = 0.f;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
+	TObjectPtr<UTexture2D> Icon;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	bool bCanBreak = false;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")

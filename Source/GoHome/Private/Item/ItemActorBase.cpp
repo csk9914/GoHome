@@ -232,6 +232,11 @@ void AItemActorBase::SetActiveHeld(bool bNewActive)
 	UpdateAttachment();
 }
 
+FText AItemActorBase::GetInteractionPromptText_Implementation() const
+{
+	return FText::FromString(TEXT("줍기"));
+}
+
 void AItemActorBase::OnRep_IsActiveHeld()
 {
 	UpdateAttachment();
