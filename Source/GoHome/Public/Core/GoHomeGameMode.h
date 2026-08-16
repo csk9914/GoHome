@@ -24,4 +24,11 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category = "Expedition")
 	void ServerTravelToMap(const FString& MapPath);
+	
+	UFUNCTION(BlueprintCallable, Category = "Expedition")
+	void ServerTravelViaLoadingScreen(const FString& FinalMapPath);
+	
+protected:
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
+	FString LoadingMapPath = TEXT("/Game/GoHome/Maps/LV_Loading");
 };
