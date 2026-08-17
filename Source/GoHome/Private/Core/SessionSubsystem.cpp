@@ -5,6 +5,9 @@
 #include "OnlineSessionSettings.h"
 #include "Online/OnlineSessionNames.h"
 
+// 공용 테스트 AppID(480)를 다른 프로젝트들과 같이 쓰기 때문에, 이 키로 우리 세션만 서버 사이드에서 걸러낸다
+static const FName GOHOME_SESSION_KEY = TEXT("GOHOME_MATCH");
+
 // 멤버 초기화 리스트를 통해 엔진 비동기 콜백용 내부 델리게이트들을 C++ 함수 바인딩으로 미리 생성
 USessionSubsystem::USessionSubsystem() :
 	CreateSessionCompleteDelegate(FOnCreateSessionCompleteDelegate::CreateUObject(this, &ThisClass::OnCreateSessionComplete)),
@@ -89,6 +92,9 @@ void USessionSubsystem::CreateSession(int32 NumPublicConnections)
 	// BuildUniqueId는 엔진 기본값(빌드 기준 자동 계산)에 맡김 — 여기서 고정값(예: 1)으로 강제하면
 	// FindSessions 쪽 검색 요청의 빌드 ID와 불일치해서 LAN 검색이 결과 0개로 조용히 실패함
 
+	// 공용 AppID(480)를 쓰는 다른 프로젝트들의 로비와 섞이지 않도록 식별 키를 광고
+	LastSessionSettings->Set(GOHOME_SESSION_KEY, true, EOnlineDataAdvertisementType::ViaOnlineService);
+
 	// 로컬 플레이어의 NetID를 가져와 세션 생성 요청
 	const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
 	if (!LocalPlayer || !SessionInterface->CreateSession(*LocalPlayer->GetPreferredUniqueNetId(), NAME_GameSession, *LastSessionSettings))
@@ -117,6 +123,9 @@ void USessionSubsystem::FindSessions(int32 MaxSearchResults)
 	if (!LastSessionSearch->bIsLanQuery)
 	{
 		LastSessionSearch->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);	// 로비 세션 검색 (Steam 전용, LAN 쿼리엔 적용 안 함)
+
+		// 공용 AppID(480)의 다른 프로젝트 로비를 제외하고 우리 세션만 서버 사이드에서 필터링
+		LastSessionSearch->QuerySettings.Set(GOHOME_SESSION_KEY, true, EOnlineComparisonOp::Equals);
 	}
 
 	const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
