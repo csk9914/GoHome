@@ -42,6 +42,10 @@ void AItemActorBase::OnRep_ReplicatedMovement()
 {
 	Super::OnRep_ReplicatedMovement();
 
+	// 부착된 상태(손에 들려있음)면 Rep.Location은 부모(소켓) 기준 상대 좌표라서 월드 좌표로 취급하면 안 됨.
+	// 월드에 놓여있는(부착 안 된) 경우에만 우리가 직접 이동시킨다.
+	if (MeshComponent->GetAttachParent() != nullptr) return;
+
 	// Super 내부의 SetActorLocationAndRotation이 물리 바디를 가졌지만 시뮬레이션은 꺼진(클라)
 	// 이 컴포넌트를 실제로 못 옮기는 것으로 확인되어, 리플리케이트된 원본 값으로 직접 이동시켜 우회.
 	const FRepMovement& Rep = GetReplicatedMovement();
