@@ -20,6 +20,7 @@ AItemActorBase::AItemActorBase()
 	RootComponent = MeshComponent;
 	MeshComponent->SetIsReplicated(false);
 	MeshComponent->SetNotifyRigidBodyCollision(true);
+	MeshComponent->SetMobility(EComponentMobility::Movable);
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> DefaultMeshAsset(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	if (DefaultMeshAsset.Succeeded())
@@ -32,14 +33,36 @@ void AItemActorBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (ItemData && ItemData->Mesh)
+	SyncVisualsFromItemData();
+
+	MeshComponent->SetSimulatePhysics(HasAuthority());
+}
+
+void AItemActorBase::OnRep_ReplicatedMovement()
+{
+	Super::OnRep_ReplicatedMovement();
+
+	// Super 내부의 SetActorLocationAndRotation이 물리 바디를 가졌지만 시뮬레이션은 꺼진(클라)
+	// 이 컴포넌트를 실제로 못 옮기는 것으로 확인되어, 리플리케이트된 원본 값으로 직접 이동시켜 우회.
+	const FRepMovement& Rep = GetReplicatedMovement();
+	MeshComponent->SetWorldLocationAndRotation(Rep.Location, Rep.Rotation, false, nullptr, ETeleportType::TeleportPhysics);
+}
+
+
+void AItemActorBase::OnRep_ItemData()
+{
+	SyncVisualsFromItemData();
+}
+
+void AItemActorBase::SyncVisualsFromItemData()
+{
+	if (ItemData && ItemData->Mesh && MeshComponent->GetStaticMesh() != ItemData->Mesh)
 	{
 		MeshComponent->SetStaticMesh(ItemData->Mesh);
 		MeshComponent->SetRelativeScale3D(ItemData->Scale);
 	}
-
-	MeshComponent->SetSimulatePhysics(HasAuthority());
 }
+
 
 bool AItemActorBase::CanInteract(APawn* InstigatorPawn) const
 {
@@ -68,6 +91,7 @@ void AItemActorBase::OnInteract(APawn* InstigatorPawn)
 
 void AItemActorBase::OnRep_HoldingPawn(APawn* OldHoldingPawn)
 {
+	if (OldHoldingPawn == HoldingPawn) return;
 	UpdateAttachment(OldHoldingPawn);
 }
 
@@ -148,6 +172,7 @@ void AItemActorBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AItemActorBase, CurrentNoiseRadius);
 	DOREPLIFETIME(AItemActorBase, HoldingPawn);
 	DOREPLIFETIME(AItemActorBase, bIsActiveHeld);
+	DOREPLIFETIME(AItemActorBase, ItemData);
 }
 
 void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp,
