@@ -21,7 +21,11 @@ public:
 	UCarryWeightComponent();
 
 	virtual float GetCurrentCarryWeight() const override;
+	
+	UFUNCTION(BlueprintPure, Category = "Carry Weight")
 	virtual float GetMaxCarryWeight() const override;
+
+	UFUNCTION(BlueprintPure, Category = "Carry Weight")
 	virtual float GetOverweightAmount() const override;
 
 protected:
