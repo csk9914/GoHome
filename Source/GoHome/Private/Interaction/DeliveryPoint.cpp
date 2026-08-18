@@ -31,28 +31,10 @@ bool ADeliveryPoint::CanInteract(APawn* InstigatorPawn) const
 
 void ADeliveryPoint::OnInteract(APawn* InstigatorPawn)
 {
-	// 진단용: 여기까지 오는지부터 확인.
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan,
-			FString::Printf(TEXT("OnInteract 호출됨. HasAuthority=%d, InstigatorPawn=%s"),
-				HasAuthority(), InstigatorPawn ? *InstigatorPawn->GetName() : TEXT("null")));
-	}
-
-
-
 	if (!HasAuthority() || !InstigatorPawn) return;
 
 	if (UInventoryComponent* Inventory = InstigatorPawn->FindComponentByClass<UInventoryComponent>())
 	{
-		// 진단용: 인벤토리 찾았는지, 무게가 얼마인지.
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Cyan,
-				FString::Printf(TEXT("Inventory 찾음. TotalWeight=%.1f"), Inventory->GetTotalWeight()));
-		}
-
-
 		Inventory->ServerDeliverAllItems();
 	}
 }

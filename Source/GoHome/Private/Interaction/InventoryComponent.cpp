@@ -120,33 +120,15 @@ void UInventoryComponent::ServerDropAllItems()
 
 void UInventoryComponent::ServerDeliverAllItems()
 {
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, TEXT("ServerDeliverAllItems 진입"));
-	}
-
 	if (!GetOwner() || !GetOwner()->HasAuthority()) return;
 
 	AGoHomeGameState* GameState = GetWorld()->GetGameState<AGoHomeGameState>();
-
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange,
-			FString::Printf(TEXT("GameState = %s"), GameState ? *GameState->GetName() : TEXT("null")));
-	}
-
 	if (!GameState) return;
 
 	for (FInventorySlot& Slot : Slots)
 	{
 		AItemActorBase* Item = Slot.Item;
 		if (!Item) continue;
-
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange,
-				FString::Printf(TEXT("정산 처리 중: %s"), *Item->GetName()));
-		}
 
 		GameState->AddDeliveredValue(FMath::RoundToInt(Item->GetCurrentValue()));
 		// 슬롯 비우기 + NotifyDropped() (소음 타이머 정지).
