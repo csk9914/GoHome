@@ -32,6 +32,12 @@ void AItemActorBase::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if (ItemData && ItemData->Mesh)
+	{
+		MeshComponent->SetStaticMesh(ItemData->Mesh);
+		MeshComponent->SetRelativeScale3D(ItemData->Scale);
+	}
+
 	MeshComponent->SetSimulatePhysics(HasAuthority());
 }
 
