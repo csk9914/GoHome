@@ -9,10 +9,29 @@ UDockingDoorComponent::UDockingDoorComponent()
 	SetIsReplicatedByDefault(true);
 }
 
-bool UDockingDoorComponent::IsOpen() const
+void UDockingDoorComponent::SetOpen(bool bNewOpen)
 {
-	return bOpen;
+	if (!GetOwner() || !GetOwner()->HasAuthority())
+	{
+		return;
+	}
+
+	if (bOpen == bNewOpen)
+	{
+		return;
+	}
+
+	bOpen = bNewOpen;
+
+	// OnRep은 서버 자신에게는 자동 호출되지 않으므로 직접 호출해 서버(호스트) 쪽 구독자도 갱신되게 함
+	OnRep_bOpen();
 }
+
+void UDockingDoorComponent::OnRep_bOpen()
+{
+	OnDoorStateChanged.Broadcast(bOpen);
+}
+
 
 void UDockingDoorComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -20,8 +39,4 @@ void UDockingDoorComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 
 	DOREPLIFETIME(UDockingDoorComponent, bOpen);
 }
-
-void UDockingDoorComponent::OnRep_bOpen()
-{
-	OnDoorStateChanged.Broadcast(bOpen);
-}
+	
