@@ -26,7 +26,7 @@ public:
 	UPROPERTY(VisibleAnywhere, Category = "Item")
 	TObjectPtr<UStaticMeshComponent> MeshComponent;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_ItemData, Category = "Item")
 	TObjectPtr<UItemDataAsset> ItemData;
 
 	virtual bool CanInteract(APawn* InstigatorPawn) const override;
@@ -71,10 +71,15 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_HoldingPawn)
 	TObjectPtr<APawn> HoldingPawn = nullptr;
 
+	virtual void OnRep_ReplicatedMovement() override;
+
 	UFUNCTION()
 	void OnRep_HoldingPawn(APawn* OldHoldingPawn);
 
 	void UpdateAttachment(APawn* OldHoldingPawn = nullptr);
+
+	UFUNCTION()
+	void OnRep_ItemData();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -103,6 +108,9 @@ protected:
 private:
 
 	void GrowNoiseRadius();
+
+	// Item Data 헬퍼 함수.
+	void SyncVisualsFromItemData();
 
 	FTimerHandle NoiseGrowthTimerHandle;
 

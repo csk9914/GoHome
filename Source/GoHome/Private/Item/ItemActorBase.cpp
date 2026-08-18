@@ -20,6 +20,7 @@ AItemActorBase::AItemActorBase()
 	RootComponent = MeshComponent;
 	MeshComponent->SetIsReplicated(false);
 	MeshComponent->SetNotifyRigidBodyCollision(true);
+	MeshComponent->SetMobility(EComponentMobility::Movable);
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> DefaultMeshAsset(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	if (DefaultMeshAsset.Succeeded())
@@ -32,8 +33,40 @@ void AItemActorBase::BeginPlay()
 {
 	Super::BeginPlay();
 
+	SyncVisualsFromItemData();
+
 	MeshComponent->SetSimulatePhysics(HasAuthority());
 }
+
+void AItemActorBase::OnRep_ReplicatedMovement()
+{
+	Super::OnRep_ReplicatedMovement();
+
+	// 부착된 상태(손에 들려있음)면 Rep.Location은 부모(소켓) 기준 상대 좌표라서 월드 좌표로 취급하면 안 됨.
+	// 월드에 놓여있는(부착 안 된) 경우에만 우리가 직접 이동시킨다.
+	if (MeshComponent->GetAttachParent() != nullptr) return;
+
+	// Super 내부의 SetActorLocationAndRotation이 물리 바디를 가졌지만 시뮬레이션은 꺼진(클라)
+	// 이 컴포넌트를 실제로 못 옮기는 것으로 확인되어, 리플리케이트된 원본 값으로 직접 이동시켜 우회.
+	const FRepMovement& Rep = GetReplicatedMovement();
+	MeshComponent->SetWorldLocationAndRotation(Rep.Location, Rep.Rotation, false, nullptr, ETeleportType::TeleportPhysics);
+}
+
+
+void AItemActorBase::OnRep_ItemData()
+{
+	SyncVisualsFromItemData();
+}
+
+void AItemActorBase::SyncVisualsFromItemData()
+{
+	if (ItemData && ItemData->Mesh && MeshComponent->GetStaticMesh() != ItemData->Mesh)
+	{
+		MeshComponent->SetStaticMesh(ItemData->Mesh);
+		MeshComponent->SetRelativeScale3D(ItemData->Scale);
+	}
+}
+
 
 bool AItemActorBase::CanInteract(APawn* InstigatorPawn) const
 {
@@ -62,6 +95,7 @@ void AItemActorBase::OnInteract(APawn* InstigatorPawn)
 
 void AItemActorBase::OnRep_HoldingPawn(APawn* OldHoldingPawn)
 {
+	if (OldHoldingPawn == HoldingPawn) return;
 	UpdateAttachment(OldHoldingPawn);
 }
 
@@ -142,6 +176,7 @@ void AItemActorBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AItemActorBase, CurrentNoiseRadius);
 	DOREPLIFETIME(AItemActorBase, HoldingPawn);
 	DOREPLIFETIME(AItemActorBase, bIsActiveHeld);
+	DOREPLIFETIME(AItemActorBase, ItemData);
 }
 
 void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp,
@@ -162,14 +197,6 @@ void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp,
 	if (ImpactSpeed >= ItemData->BreakVelocityThreshold)
 	{
 		++BreakCount;
-
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(
-				-1, 5.f, FColor::Red,
-				FString::Printf(TEXT("파손! 속도 =%.0f, BreakCount = %d, 현재가치 = %.0f"),
-					ImpactSpeed, BreakCount, GetCurrentValue()));
-		}
 	}
 }
 
@@ -186,12 +213,6 @@ void AItemActorBase::NotifyPickedUp()
 
 	UGoHomeNoiseLibrary::GenerateNoise(this, GetActorLocation(),
 		CurrentNoiseRadius, ENoiseType::Medium, this);
-
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow, FString::Printf(TEXT("소음 발생! 반경 = %.0f(픽업 직후)"),
-			CurrentNoiseRadius));
-	}
 
 	GetWorldTimerManager().SetTimer(NoiseGrowthTimerHandle, this,
 		&AItemActorBase::GrowNoiseRadius, ItemData->NoiseGrowthIntervalSeconds, true);
@@ -252,11 +273,4 @@ void AItemActorBase::GrowNoiseRadius()
 
 	const ENoiseType Type = (CurrentNoiseRadius >= 1500.f) ? ENoiseType::Large : ENoiseType::Medium;
 	UGoHomeNoiseLibrary::GenerateNoise(this, GetActorLocation(), CurrentNoiseRadius, Type, this);
-
-	if (GEngine)
-	{
-		const TCHAR* TypeStr = (Type == ENoiseType::Large) ? TEXT("Large") : TEXT("Medium");
-		GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Yellow,
-			FString::Printf(TEXT("소음 증가! 반경 = %.0f, Type = %s"), CurrentNoiseRadius, TypeStr));
-	}
 }

@@ -18,19 +18,25 @@ class GOHOME_API UDockingDoorComponent : public UActorComponent
 
 public:
 	UDockingDoorComponent();
+	
+	// 서버 권한 전용. 로비/탐사 어느 쪽 상황에서 불려도 안전하도록 내부에서 HasAuthority 가드.
+	UFUNCTION(BlueprintCallable, Category = "Docking Door")
+	void SetOpen(bool bNewOpen);
 
 	UFUNCTION(BlueprintPure, Category = "Docking Door")
-	bool IsOpen() const;
+	bool IsOpen() const {return bOpen;};
+	
+protected:
+	UFUNCTION()
+	void OnRep_bOpen();
+	
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+public:
 	UPROPERTY(BlueprintAssignable, Category = "Docking Door")
 	FOnDoorStateChanged OnDoorStateChanged;
 
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_bOpen)
 	bool bOpen = false;
-
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
-	UFUNCTION()
-	void OnRep_bOpen();
 };

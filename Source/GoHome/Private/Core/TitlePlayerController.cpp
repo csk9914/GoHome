@@ -4,8 +4,9 @@
 #include "Core/TitlePlayerController.h"
 #include "Core/SessionSubsystem.h"
 #include "OnlineSessionSettings.h"
-#include "OnlineSubsystem.h"                                                      
+#include "OnlineSubsystem.h"
 #include "Online/OnlineSessionNames.h"
+#include "CineCameraActor.h"
 
 void ATitlePlayerController::CreateGameSession(int32 NumPublicConnections)
 {
@@ -50,9 +51,14 @@ void ATitlePlayerController::BeginPlay()
 	if (CachedSessionSubsystem.IsValid())
 	{
 		CachedSessionSubsystem->OnCreateComplete.AddDynamic(this, &ThisClass::HandleCreateComplete);
-		
-		CachedSessionSubsystem->OnFindComplete.AddUObject(this, &ThisClass::HandleFindComplete);          
-		CachedSessionSubsystem->OnJoinComplete.AddUObject(this, &ThisClass::HandleJoinComplete);  
+
+		CachedSessionSubsystem->OnFindComplete.AddUObject(this, &ThisClass::HandleFindComplete);
+		CachedSessionSubsystem->OnJoinComplete.AddUObject(this, &ThisClass::HandleJoinComplete);
+	}
+
+	if (ACineCameraActor* Camera = TitleCamera.LoadSynchronous())
+	{
+		SetViewTargetWithBlend(Camera, 0.f);
 	}
 }
 

@@ -1,10 +1,12 @@
-﻿
+﻿//THE
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
 #include "ItemDataAsset.generated.h"
+
+class UStaticMesh;
 
 /** 아이템 종별 무게/가치/파손·소음 플래그. AItemActorBase가 참조해 종을 구분한다. */
 UCLASS(BlueprintType)
@@ -13,6 +15,10 @@ class GOHOME_API UItemDataAsset : public UPrimaryDataAsset
 	GENERATED_BODY()
 
 public:
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
+	FText DisplayName;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	float Weight = 0.f;
 
@@ -21,6 +27,12 @@ public:
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	TObjectPtr<UTexture2D> Icon;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
+	TObjectPtr<UStaticMesh> Mesh;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
+	FVector Scale = FVector::OneVector;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	bool bCanBreak = false;
