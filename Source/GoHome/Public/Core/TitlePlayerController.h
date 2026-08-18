@@ -17,18 +17,19 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FGoHomeTitleOnJoinComplete, bool, bW
 
 
 class USessionSubsystem;
+class ACineCameraActor;
 
 /**
- * 
+ *
  */
 UCLASS()
 class GOHOME_API ATitlePlayerController : public APlayerController
 {
 	GENERATED_BODY()
-	
+
 public:
-	UFUNCTION(BlueprintCallable, Category = "Title")                                                          
-	void CreateGameSession(int32 NumPublicConnections);                                                       
+	UFUNCTION(BlueprintCallable, Category = "Title")
+	void CreateGameSession(int32 NumPublicConnections);
                                                                                                                   
 	UFUNCTION(BlueprintCallable, Category = "Title")                                                          
 	void FindGameSessions(int32 MaxSearchResults);
@@ -55,6 +56,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Title")
 	FGoHomeTitleOnJoinComplete OnJoinComplete;
 
+	// CineCameraActor는 AutoActivateForPlayer 카테고리를 숨기므로 여기서 명시적으로 뷰타겟을 지정
+	UPROPERTY(EditAnywhere, Category = "Title")
+	TSoftObjectPtr<ACineCameraActor> TitleCamera;
+	
 private:
 	TWeakObjectPtr<USessionSubsystem> CachedSessionSubsystem;
 	
