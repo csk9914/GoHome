@@ -87,6 +87,13 @@ public:
 
 	int32 FindSlotIndexOf(AItemActorBase* Item) const;
 
+	// FlashLight F키 진입.
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void TryToggleFlashlight();
+
+	UFUNCTION(Server, Reliable)
+	void Server_RequestToggleFlashlight();
+
 
 protected:
 

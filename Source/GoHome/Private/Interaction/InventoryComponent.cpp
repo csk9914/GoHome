@@ -128,7 +128,7 @@ void UInventoryComponent::ServerDeliverAllItems()
 	for (FInventorySlot& Slot : Slots)
 	{
 		AItemActorBase* Item = Slot.Item;
-		if (!Item) continue;
+		if (!Item || !Item->IsDeliverable()) continue;
 
 		GameState->AddDeliveredValue(FMath::RoundToInt(Item->GetCurrentValue()));
 		// 슬롯 비우기 + NotifyDropped() (소음 타이머 정지).
@@ -220,4 +220,20 @@ int32 UInventoryComponent::FindSlotIndexOf(AItemActorBase* Item) const
 		if (Slots[Index].Item == Item) return Index;
 	}
 	return INDEX_NONE;
+}
+
+void UInventoryComponent::TryToggleFlashlight()
+{
+	Server_RequestToggleFlashlight();
+}
+
+void UInventoryComponent::Server_RequestToggleFlashlight_Implementation()
+{
+	for (const FInventorySlot& Slot : Slots)
+	{
+		if (Slot.Item)
+		{
+			Slot.Item->ServerUseSpecialAction();
+		}
+	}
 }
