@@ -42,22 +42,16 @@ void AWaterCurrentZone::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (ZoneType == EWaterCurrentZoneType::Current)
-	{
-		DrawFlowDebugVisual();
-	}
-	else if (ZoneType == EWaterCurrentZoneType::Whirlpool)
+	ApplyForceToOverlappingCharacters(DeltaTime);
+
+	if (ZoneType == EWaterCurrentZoneType::Whirlpool)
 	{
 		DrawWhirlpoolDebugVisual();
 	}
-
-	// 이동에 영향을 주는 힘은 서버에서만 계산
-	if (!HasAuthority())
+	else
 	{
-		return;
+		DrawFlowDebugVisual();
 	}
-
-	ApplyForceToOverlappingCharacters(DeltaTime);
 }
 
 void AWaterCurrentZone::OnConstruction(const FTransform& Transform)
@@ -69,30 +63,37 @@ void AWaterCurrentZone::OnConstruction(const FTransform& Transform)
 
 void AWaterCurrentZone::OnEffectAreaBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if (!HasAuthority())
+	ACharacter* OtherCharacter = Cast<ACharacter>(OtherActor);
+	if (!OtherCharacter)
 	{
 		return;
 	}
 
-	ACharacter* OtherCharacter = Cast<ACharacter>(OtherActor);
-	if (!OtherCharacter)
+	if (!HasAuthority() && !OtherCharacter->IsLocallyControlled())
 	{
 		return;
 	}
 
 	OverlappingCharacters.AddUnique(OtherCharacter);
+
+	if (UCharacterMovementComponent* Movement = OtherCharacter->GetCharacterMovement())
+	{
+		OriginalBrakingDeceleration.Add(OtherCharacter, Movement->BrakingDecelerationSwimming);
+		Movement->BrakingDecelerationSwimming = ZoneBrakingDeceleration;
+	}
+
 	OnCharacterEnteredZone(OtherCharacter);
 }
 
 void AWaterCurrentZone::OnEffectAreaEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
-	if (!HasAuthority())
+	ACharacter* OtherCharacter = Cast<ACharacter>(OtherActor);
+	if (!OtherCharacter)
 	{
 		return;
 	}
 
-	ACharacter* OtherCharacter = Cast<ACharacter>(OtherActor);
-	if (!OtherCharacter)
+	if (!HasAuthority() && !OtherCharacter->IsLocallyControlled())
 	{
 		return;
 	}
@@ -107,6 +108,7 @@ void AWaterCurrentZone::OnEffectAreaEndOverlap(UPrimitiveComponent* OverlappedCo
 			OriginalBrakingDeceleration.Remove(OtherCharacter);
 		}
 	}
+
 	OnCharacterExitedZone(OtherCharacter);
 }
 
@@ -115,6 +117,11 @@ void AWaterCurrentZone::ApplyForceToOverlappingCharacters(float DeltaTime)
 	for (ACharacter* Character : OverlappingCharacters)
 	{
 		if (!IsValid(Character))
+		{
+			continue;
+		}
+
+		if (!HasAuthority() && !Character->IsLocallyControlled())
 		{
 			continue;
 		}
