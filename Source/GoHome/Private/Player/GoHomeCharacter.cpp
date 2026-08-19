@@ -169,6 +169,29 @@ void AGoHomeCharacter::AttachItemToRightHand(UStaticMeshComponent* ItemMeshCompo
 	bIsHoldingItem = true;
 }
 
+void AGoHomeCharacter::AttachFlashlightToLeftHand(UStaticMeshComponent* FlashlightMeshComponent)
+{
+	if (!FlashlightMeshComponent) return;
+
+	FlashlightMeshComponent->AttachToComponent(
+		GetMesh(),
+		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
+		LeftHandSocketName);
+
+	bIsHoldingFlashlight = true;
+}
+
+void AGoHomeCharacter::DetachFlashlightFromLeftHand()
+{
+	bIsHoldingFlashlight = false;
+}
+
+void AGoHomeCharacter::OnRep_IsHoldingFlashlight()
+{
+	// 필요하면 여기서 사운드/이펙트 등 클라 전용 후처리
+}
+
+
 void AGoHomeCharacter::SetHoldingItem(bool bHolding)
 {
 	if (HasAuthority())
@@ -194,6 +217,7 @@ void AGoHomeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AGoHomeCharacter, bIsHoldingItem);
 	DOREPLIFETIME_CONDITION(AGoHomeCharacter, ReplicatedPitch, COND_SkipOwner);
+	DOREPLIFETIME(AGoHomeCharacter, bIsHoldingFlashlight);
 }
 
 void AGoHomeCharacter::OnRep_ReplicatedPitch()

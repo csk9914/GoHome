@@ -64,6 +64,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void AttachItemToRightHand(UStaticMeshComponent* ItemMeshComponent);
 	
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void AttachFlashlightToLeftHand(UStaticMeshComponent* FlashlightMeshComponent);
+
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void DetachFlashlightFromLeftHand();
+
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	bool IsHoldingFlashlight() const { return bIsHoldingFlashlight; }
+
 	virtual FName GetRightHandSocketName() const override { return RightHandSocketName; }
 	virtual FName GetLeftHandSocketName() const override { return LeftHandSocketName; }
 
@@ -94,6 +103,12 @@ protected:
 
 	UFUNCTION(Server, Unreliable)
 	void ServerUpdatePitch(float NewPitch);
+
+	UPROPERTY(ReplicatedUsing = OnRep_IsHoldingFlashlight, BlueprintReadOnly, Category = "Interaction")
+	bool bIsHoldingFlashlight = false;
+
+	UFUNCTION()
+	void OnRep_IsHoldingFlashlight();
 
 	// 수영, 소음 반경
 	UPROPERTY(EditDefaultsOnly, Category = "Noise")
