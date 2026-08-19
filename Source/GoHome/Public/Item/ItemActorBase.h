@@ -37,6 +37,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Item")
 	float GetCurrentValue() const;
 
+	// 납품 정산 대상인지 여부. 기본은 true(일반 아이템)
+	// 손전등 처럼 슬롯은 차지하지만 정산되면서 파괴되면 안되는 장비류는 false로 오버라이드.
+	UFUNCTION(BlueprintPure, Category = "Item")
+	virtual bool IsDeliverable() const { return true; }
+
 	// 인벤토리에 담길 때 Interaction이 호출한다(소음 유발형이면 반경 증가 타이머 시작).
 	void NotifyPickedUp();
 
@@ -51,6 +56,11 @@ public:
 	// InventoryComponent::Server_RequestDrop이 소유권 검증 후 호출한다. 서버에서만 호출할 것.
 	void ServerDrop();
 
+	// 보유 중 특수 동작( 예 : 손전등 온/오프).
+	// 기본은 아무 것도 안함 -> 필요한 아이템만 오버라이드.
+	// InventoryComponent가 슬롯 내용물 타입을 몰라도 호출할 수 있게 하기 위한 확장 지점.
+	virtual void ServerUseSpecialAction() {}
+
 	// 지금 손에 나와있는(활성 슬롯) 아이템인지 여부. false면 인벤토리에 있지만 숨겨진 상태.
 	UPROPERTY(ReplicatedUsing = OnRep_IsActiveHeld)
 	bool bIsActiveHeld = false;
@@ -63,6 +73,7 @@ public:
 
 	virtual FText GetInteractionPromptText_Implementation() const override;
 
+	
 
 protected:
 
@@ -76,10 +87,10 @@ protected:
 	UFUNCTION()
 	void OnRep_HoldingPawn(APawn* OldHoldingPawn);
 
-	void UpdateAttachment(APawn* OldHoldingPawn = nullptr);
+	virtual void UpdateAttachment(APawn* OldHoldingPawn = nullptr);
 
 	UFUNCTION()
-	void OnRep_ItemData();
+	virtual void OnRep_ItemData();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
