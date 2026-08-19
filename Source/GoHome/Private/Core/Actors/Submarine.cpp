@@ -1,10 +1,10 @@
 //
 
-#include "Core/Actors/SubmarineDock.h"
+#include "Core/Actors/Submarine.h"
 
 #include "Components/BoxComponent.h"
 
-ASubmarineDock::ASubmarineDock()
+ASubmarine::ASubmarine()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
