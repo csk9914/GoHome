@@ -13,7 +13,10 @@ UCLASS()
 class GOHOME_API AExplorationGameState : public AGoHomeGameState
 {
 	GENERATED_BODY()
-	
+
 public:
 	AExplorationGameState();
+
+protected:
+	virtual void BeginPlay() override;
 };
