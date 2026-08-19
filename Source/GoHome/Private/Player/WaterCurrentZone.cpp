@@ -6,6 +6,8 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Player/CarryWeightProvider.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
 
 AWaterCurrentZone::AWaterCurrentZone()
 {
@@ -22,6 +24,10 @@ AWaterCurrentZone::AWaterCurrentZone()
 	FlowIndicator->SetArrowColor(FLinearColor::Blue);
 	FlowIndicator->ArrowSize = 2.f;
 	FlowIndicator->SetHiddenInGame(true);
+
+	FlowVFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("FlowVFX"));
+	FlowVFX->SetupAttachment(EffectArea);
+	FlowVFX->bAutoActivate = true;
 }
 
 void AWaterCurrentZone::BeginPlay()
@@ -58,6 +64,7 @@ void AWaterCurrentZone::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	UpdateFlowIndicator();
+	UpdateFlowVFX();
 }
 
 void AWaterCurrentZone::OnEffectAreaBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -199,6 +206,45 @@ void AWaterCurrentZone::UpdateFlowIndicator()
 			Direction = FVector::ForwardVector;
 		}
 		FlowIndicator->SetRelativeRotation(Direction.Rotation());
+	}
+}
+
+void AWaterCurrentZone::UpdateFlowVFX()
+{
+	if (!FlowVFX)
+	{
+		return;
+	}
+
+	UNiagaraSystem* TargetAsset = (ZoneType == EWaterCurrentZoneType::Whirlpool)
+		? WhirlpoolVFXAsset
+		: CurrentFlowVFXAsset;
+
+	const bool bShouldShow = (TargetAsset != nullptr);
+	FlowVFX->SetVisibility(bShouldShow);
+
+	if (!bShouldShow)
+	{
+		return;
+	}
+
+	if (FlowVFX->GetAsset() != TargetAsset)
+	{
+		FlowVFX->SetAsset(TargetAsset);
+	}
+
+	if (ZoneType == EWaterCurrentZoneType::Current)
+	{
+		FVector Direction = FlowDirection.GetSafeNormal();
+		if (Direction.IsNearlyZero())
+		{
+			Direction = FVector::ForwardVector;
+		}
+		FlowVFX->SetRelativeRotation(Direction.Rotation());
+	}
+	else
+	{
+		FlowVFX->SetRelativeRotation(FRotator::ZeroRotator);
 	}
 }
 
