@@ -10,6 +10,8 @@ class USphereComponent;
 class UArrowComponent;
 class UPrimitiveComponent;
 class ACharacter;
+class UNiagaraComponent;
+class UNiagaraSystem;
 
 // 수류 구역의 동작 방식
 UENUM(BlueprintType)
@@ -63,6 +65,8 @@ protected:
 
 	void UpdateFlowIndicator();
 
+	void UpdateFlowVFX();
+
 	void DrawFlowDebugVisual() const;
 
 	void DrawWhirlpoolDebugVisual() const;
@@ -75,6 +79,17 @@ protected:
 	// Current 타입일 때 FlowDirection 방향을 화살표로 표시. 게임 중엔 안 보이고 에디터에서만 보임
 	UPROPERTY(VisibleAnywhere, Category = "Water Current")
 	TObjectPtr<UArrowComponent> FlowIndicator;
+
+	// Current 타입일 때 재생할 나이아가라 이펙트. 에디터에서 만든 NS_WaterFlow 같은 걸 여기에 지정
+	UPROPERTY(EditAnywhere, Category = "Water Current")
+	TObjectPtr<UNiagaraSystem> CurrentFlowVFXAsset;
+
+	UPROPERTY(EditAnywhere, Category = "Water Current")
+	TObjectPtr<UNiagaraSystem> WhirlpoolVFXAsset;
+
+	// 위 에셋을 실제로 재생하는 컴포넌트. FlowDirection에 맞춰 자동으로 회전함
+	UPROPERTY(VisibleAnywhere, Category = "Water Current")
+	TObjectPtr<UNiagaraComponent> FlowVFX;
 
 	// 이 구역이 물살인지 소용돌이인지 파악
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Water Current")

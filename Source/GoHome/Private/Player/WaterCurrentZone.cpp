@@ -6,6 +6,8 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Player/CarryWeightProvider.h"
+#include "NiagaraComponent.h"
+#include "NiagaraSystem.h"
 
 AWaterCurrentZone::AWaterCurrentZone()
 {
@@ -22,6 +24,10 @@ AWaterCurrentZone::AWaterCurrentZone()
 	FlowIndicator->SetArrowColor(FLinearColor::Blue);
 	FlowIndicator->ArrowSize = 2.f;
 	FlowIndicator->SetHiddenInGame(true);
+
+	FlowVFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("FlowVFX"));
+	FlowVFX->SetupAttachment(EffectArea);
+	FlowVFX->bAutoActivate = true;
 }
 
 void AWaterCurrentZone::BeginPlay()
@@ -36,56 +42,58 @@ void AWaterCurrentZone::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (ZoneType == EWaterCurrentZoneType::Current)
-	{
-		DrawFlowDebugVisual();
-	}
-	else if (ZoneType == EWaterCurrentZoneType::Whirlpool)
+	ApplyForceToOverlappingCharacters(DeltaTime);
+
+	if (ZoneType == EWaterCurrentZoneType::Whirlpool)
 	{
 		DrawWhirlpoolDebugVisual();
 	}
-
-	// 이동에 영향을 주는 힘은 서버에서만 계산
-	if (!HasAuthority())
+	else
 	{
-		return;
+		DrawFlowDebugVisual();
 	}
-
-	ApplyForceToOverlappingCharacters(DeltaTime);
 }
 
 void AWaterCurrentZone::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	UpdateFlowIndicator();
+	UpdateFlowVFX();
 }
 
 void AWaterCurrentZone::OnEffectAreaBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if (!HasAuthority())
+	ACharacter* OtherCharacter = Cast<ACharacter>(OtherActor);
+	if (!OtherCharacter)
 	{
 		return;
 	}
 
-	ACharacter* OtherCharacter = Cast<ACharacter>(OtherActor);
-	if (!OtherCharacter)
+	if (!HasAuthority() && !OtherCharacter->IsLocallyControlled())
 	{
 		return;
 	}
 
 	OverlappingCharacters.AddUnique(OtherCharacter);
+
+	if (UCharacterMovementComponent* Movement = OtherCharacter->GetCharacterMovement())
+	{
+		OriginalBrakingDeceleration.Add(OtherCharacter, Movement->BrakingDecelerationSwimming);
+		Movement->BrakingDecelerationSwimming = ZoneBrakingDeceleration;
+	}
+
 	OnCharacterEnteredZone(OtherCharacter);
 }
 
 void AWaterCurrentZone::OnEffectAreaEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
 {
-	if (!HasAuthority())
+	ACharacter* OtherCharacter = Cast<ACharacter>(OtherActor);
+	if (!OtherCharacter)
 	{
 		return;
 	}
 
-	ACharacter* OtherCharacter = Cast<ACharacter>(OtherActor);
-	if (!OtherCharacter)
+	if (!HasAuthority() && !OtherCharacter->IsLocallyControlled())
 	{
 		return;
 	}
@@ -100,6 +108,7 @@ void AWaterCurrentZone::OnEffectAreaEndOverlap(UPrimitiveComponent* OverlappedCo
 			OriginalBrakingDeceleration.Remove(OtherCharacter);
 		}
 	}
+
 	OnCharacterExitedZone(OtherCharacter);
 }
 
@@ -108,6 +117,11 @@ void AWaterCurrentZone::ApplyForceToOverlappingCharacters(float DeltaTime)
 	for (ACharacter* Character : OverlappingCharacters)
 	{
 		if (!IsValid(Character))
+		{
+			continue;
+		}
+
+		if (!HasAuthority() && !Character->IsLocallyControlled())
 		{
 			continue;
 		}
@@ -199,6 +213,45 @@ void AWaterCurrentZone::UpdateFlowIndicator()
 			Direction = FVector::ForwardVector;
 		}
 		FlowIndicator->SetRelativeRotation(Direction.Rotation());
+	}
+}
+
+void AWaterCurrentZone::UpdateFlowVFX()
+{
+	if (!FlowVFX)
+	{
+		return;
+	}
+
+	UNiagaraSystem* TargetAsset = (ZoneType == EWaterCurrentZoneType::Whirlpool)
+		? WhirlpoolVFXAsset
+		: CurrentFlowVFXAsset;
+
+	const bool bShouldShow = (TargetAsset != nullptr);
+	FlowVFX->SetVisibility(bShouldShow);
+
+	if (!bShouldShow)
+	{
+		return;
+	}
+
+	if (FlowVFX->GetAsset() != TargetAsset)
+	{
+		FlowVFX->SetAsset(TargetAsset);
+	}
+
+	if (ZoneType == EWaterCurrentZoneType::Current)
+	{
+		FVector Direction = FlowDirection.GetSafeNormal();
+		if (Direction.IsNearlyZero())
+		{
+			Direction = FVector::ForwardVector;
+		}
+		FlowVFX->SetRelativeRotation(Direction.Rotation());
+	}
+	else
+	{
+		FlowVFX->SetRelativeRotation(FRotator::ZeroRotator);
 	}
 }
 
