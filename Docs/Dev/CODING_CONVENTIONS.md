@@ -13,7 +13,7 @@ Epic 공식 C++ 코딩 표준(Epic Coding Standard)을 그대로 따른다.
 - 헤더(`Public/`)와 구현(`Private/`)을 반드시 분리
 - 멤버 변수는 `PascalCase`, `bool`은 `b` + 형용사(`Is` 생략, `bSubmerged` — Epic 원문 예시 `bPendingDestruction`도 동일). 블루프린트 변수도 동일 규칙([블루프린트 변수 규칙](#블루프린트-변수-규칙) 참고)
 - 함수는 `PascalCase`, 매개변수/지역 변수는 `PascalCase` (Epic 표준 그대로, camelCase 아님)
-- `UPROPERTY`/`UFUNCTION` 매크로에 `BlueprintReadOnly`/`BlueprintReadWrite`/`Replicated` 등 의도를 명시적으로 표기 (기본값에 의존하지 않음)
+- `UPROPERTY`/`UFUNCTION` 매크로에 `BlueprintReadOnly`/`BlueprintReadWrite`/`Replicated` 등 의도를 명시적으로 표기 (기본값에 의존하지 않음) — 자동 검증 수단 없음, 코드 리뷰로 확인
 
 ## OOP/SOLID 적용 방식
 
@@ -52,21 +52,22 @@ AI 컨트롤러(`AIC_`), 파티클 시스템(`PS_`) 등 위 표에 없는 타입
 
 기능별 분리, [ARCHITECTURE.md](ARCHITECTURE.md)의 폴더 구조를 그대로 따른다: `Public`/`Private`을 `Source/GoHome/` 최상위에 두고, 그 아래 각 기능 폴더(`Core`/`Player`/`Interaction`/`AI`/`Item`/`UI`/`Save`)를 중첩한다(예: `Public/Core/`, `Private/Core/`).
 
-- 새 시스템이 기존 7개 폴더 중 어디에도 안 맞으면, 새 폴더를 만들기 전에 [ARCHITECTURE.md](ARCHITECTURE.md)에 먼저 매핑을 기록한다 (폴더 구조의 단일 출처는 그 문서).
-- 폴더를 넘나드는 의존은 인터페이스(`IInteractable`, `IWeightProvider`류)로만 한다 — 컴포넌트가 다른 폴더의 구체 클래스를 직접 include하지 않는다.
+- 새 시스템이 기존 7개 폴더([ARCHITECTURE.md 모듈/폴더 구조](ARCHITECTURE.md#모듈폴더-구조) 기준) 중 어디에도 안 맞으면, 새 폴더를 만들기 전에 그 문서에 먼저 매핑을 기록한다 (폴더 구조의 단일 출처는 그 문서).
+- 폴더를 넘나드는 의존은 인터페이스(`IInteractable`, `IWeightProvider`류)로만 한다 — 컴포넌트가 다른 폴더의 구체 클래스를 직접 include하지 않는다. 단, `AGoHomeGameState`처럼 여러 폴더가 공유하는 클래스는 예외 — 퍼블릭 서버 함수(`AddDeliveredValue` 등) 호출 목적의 include는 허용한다([ARCHITECTURE.md 헤더 소유권](ARCHITECTURE.md#헤더-소유권) 참고).
 
 ### Content (에셋)
 
-`Content/GoHome/` 아래를 위 Source와 동일한 7개 기능 폴더로 맞춘다 — 코드-에셋 대응이 바로 보이게. 그 외:
+`Content/GoHome/` 아래는 위 Source의 7개 기능 폴더(`Core`/`Player`/`Interaction`/`AI`/`Item`/`UI`/`Save`)를 기본으로 하되, 아래처럼 여러 기능 폴더가 공유하는 애셋 타입은 별도 폴더로 분리한다 — 무리하게 7개에 끼워 맞추지 않는다:
 
 - `Maps/`: 모든 레벨(기획서 맵별로 하위 폴더 분리 가능)
 - `MaterialLibrary/`: 여러 기능 폴더에서 공유하는 마스터 머티리얼/유틸리티만
+- `Animation/`, `Data/`, `GameMode/`, `GameObject/`, `Input/`, `Sound/`: 타입별 공유 애셋 폴더(현재 저장소에 이미 존재). 특정 기능 폴더 전용 에셋이면 해당 기능 폴더 아래로 넣는다 — 여기는 여러 시스템이 공유하거나 분류상 애매한 것만
 - `Developers/<이름>/`: 개인 실험용 샌드박스. 완성된 에셋은 반드시 해당 기능 폴더로 옮긴다 — 다른 시스템이 직접 참조하지 않는다
 - 폴더명은 `PascalCase`, 공백·특수문자 금지
 
 ## C++ / Blueprint 경계
 
-**C++ 위주** (`Docs/Design/02_GoHome_기술분석서.md` 전제 조건에서 팀 결정), Blueprint는 다음 용도로만 제한한다:
+**C++ 위주**([전제 조건](../Design/02_GoHome_기술분석서.md#전제-조건)에서 팀 결정) — Blueprint는 다음 용도로만 제한한다:
 
 - 데이터 애셋 인스턴스(아이템 종별 무게/가치/파손·소음 플래그 등 수치 데이터)
 - AI 상태 머신의 비주얼 구성 (`BP_Monster` — 02문서가 이미 BP 기반으로 명시)
@@ -79,7 +80,7 @@ AI 컨트롤러(`AIC_`), 파티클 시스템(`PS_`) 등 위 표에 없는 타입
 
 AI는 워크플로 선택으로 다른 시스템보다 BP 비중이 크지만, 필요하면 AI 담당도 C++ 쪽을 직접 고칠 수 있다.
 
-- `AMonsterBase`(C++)가 경계 인터페이스([ARCHITECTURE.md "AI (경계만)"](ARCHITECTURE.md#ai-경계만))를 `BlueprintNativeEvent`로 노출하고, `BP_Monster`(`AMonsterBase` 자식 BP)에서 상태 머신·Steering Behaviors를 구현한다.
+- `AUnderwaterEnemyBase`(C++, 몬스터 베이스)가 경계 인터페이스([ARCHITECTURE.md "AI (경계만)"](ARCHITECTURE.md#ai-경계만))를 `BlueprintNativeEvent`로 노출하고, `BP_Monster`(`AUnderwaterEnemyBase` 자식 BP)에서 상태 머신·Steering Behaviors를 구현한다.
 - 데미지 적용·소음 판정·상태 브로드캐스트처럼 서버 권위가 걸린 처리는 BP가 직접 구현하지 않고 C++ 함수 호출로 끝낸다 — 위 "C++ / Blueprint 경계" 원칙이 AI에도 동일 적용.
 - 상태 머신을 Behavior Tree + Blackboard로 구성해도 무방하다(권장일 뿐, 02문서의 "Enum 상태 머신 + Steering Behaviors" 결정을 대체하는 게 아니라 병행 가능한 구현 수단).
 - 경계 인터페이스 시그니처 변경이 필요하면 C++ 담당과 사전 협의한다 — 소유권 규칙은 [ARCHITECTURE.md "소유권 규칙"](ARCHITECTURE.md#헤더-소유권) 참고.
@@ -89,7 +90,7 @@ AI는 워크플로 선택으로 다른 시스템보다 BP 비중이 크지만, �
 위 경계에서 BP가 실제로 맡는 범위(데이터 애셋, `BP_Monster` 상태 머신, 레벨 BP, 이펙트/애니메이션 BP)에 한해 적용한다.
 
 - `PascalCase`, 서술적 명사 사용
-- `bool`은 `b` + 형용사만 (C++와 동일 규칙, `Is` 생략 — 예: `bReloading`)
+- `bool`은 [C++ 표준](#c-표준)과 동일 (예: `bReloading`)
 - 배열은 복수형 명사 (`Targets`, `TargetArray` 금지)
 - 상태가 3개 이상이면 bool 여러 개 대신 Enum 하나로 표현 (`BP_Monster` 상태 머신이 대표 사례)
 - Editable(에디터에 노출) 변수는 Tooltip 필수, 값 범위가 있으면 Slider/Value Range 설정
