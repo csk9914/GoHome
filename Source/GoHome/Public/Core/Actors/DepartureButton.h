@@ -17,4 +17,5 @@ public:
 
 	virtual bool CanInteract(APawn* InstigatorPawn) const override;
 	virtual void OnInteract(APawn* InstigatorPawn) override;
+	
 };

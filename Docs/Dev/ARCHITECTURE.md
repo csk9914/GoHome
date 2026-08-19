@@ -65,13 +65,17 @@ decisions:
       단일 클래스 ASubmarine(허브 메시, 문 메시, InteriorVolume 트리거 슬롯만 정의, 에셋은 BP에서 배정)을
       로비/탐사 맵에 동일하게 배치한다. 두 맵의 잠수정 내부는 외피 크기 제약상 작아 서브레벨 분리 없이
       ZoneSelectMonitor·ADepartureButton을 Child Actor Component로 붙여 하나의 BP_Submarine으로 관리한다.
-      기능 차이는 서브클래스가 아니라 인스턴스별 오버라이드로 처리한다(외형은 두 맵에서 반드시 동일해야
-      하는데, 서브클래스로 나누면 각 BP가 외형을 따로 들고 있어 드리프트 위험이 생기므로 기각):
-        - ZoneSelectMonitor: CanInteract()에 EditInstanceOnly bool 게이트 — 로비 배치 인스턴스만 true
-        - ADepartureButton: EditInstanceOnly 모드(Departure/Return) — Return 모드는 상호작용 시
-          DockingDoorComponent->SetOpen(false) 호출 후 AGoHomeGameMode::ServerTravelViaLoadingScreen(로비 맵 경로)
-          호출(실제 경유 방식: `ServerTravelViaLoadingScreen`이 `UExpeditionTravelSubsystem::PendingDestinationMap`에
-          최종 목적지를 저장한 뒤 `LoadingMapPath`로 먼저 트래블 — `LobbyMapPath`라는 필드는 없음)
+      기능 차이는 서브클래스가 아니라 런타임 GameState 타입 판별로 처리한다(외형은 두 맵에서 반드시 동일해야
+      하는데, 서브클래스로 나누면 각 BP가 외형을 따로 들고 있어 드리프트 위험이 생기므로 기각). 각 맵은
+      서로 다른 GameState 서브클래스를 쓰도록 이미 고정돼 있으므로, `GetWorld()->GetGameState<ALobbyGameState>()`
+      유효 여부로 로비/탐사 컨텍스트를 자동 판별한다(EditInstanceOnly 플래그를 인스턴스마다 수동 지정하는
+      방식은 새 인스턴스에서 값 설정을 빠뜨리면 조용히 오동작하는 실수 유형이 있어 기각):
+        - ZoneSelectMonitor: CanInteract()가 `ALobbyGameState` 유효할 때만 true
+        - ADepartureButton: `ALobbyGameState` 유효하면 Departure 동작(현재 구현), 아니면 Return 동작 —
+          Return 동작은 DockingDoorComponent->SetOpen(false) 호출 후
+          AGoHomeGameMode::ServerTravelViaLoadingScreen(로비 맵 경로) 호출(실제 경유 방식:
+          `ServerTravelViaLoadingScreen`이 `UExpeditionTravelSubsystem::PendingDestinationMap`에 최종
+          목적지를 저장한 뒤 `LoadingMapPath`로 먼저 트래블 — `LobbyMapPath`라는 필드는 없음)
   - name: 도킹 문 밖 생존자 처리
     detail: |
       문이 닫히는 순간(bOpen: true → false) ASubmarine이 InteriorVolume 밖에 있는 플레이어를 즉시 사망

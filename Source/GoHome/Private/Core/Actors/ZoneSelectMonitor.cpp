@@ -4,6 +4,7 @@
 #include "Core/Actors/ZoneSelectMonitor.h"
 #include "Core/GoHomePlayerController.h"
 #include "GameFramework/Pawn.h"
+#include "Core/LobbyGameState.h"
 
 AZoneSelectMonitor::AZoneSelectMonitor()
 {
@@ -11,8 +12,8 @@ AZoneSelectMonitor::AZoneSelectMonitor()
 
 bool AZoneSelectMonitor::CanInteract(APawn* InstigatorPawn) const
 {
-	// 지금은 조건이 없어서 true만 반환 
-	return true;
+	// 현재 로비 맵일 경우에만 활성화
+	return GetWorld()->GetGameState<ALobbyGameState>() != nullptr;
 }
 
 void AZoneSelectMonitor::OnInteract(APawn* InstigatorPawn)

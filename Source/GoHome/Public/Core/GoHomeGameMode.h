@@ -1,5 +1,3 @@
-
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -21,14 +19,24 @@ class GOHOME_API AGoHomeGameMode : public AGameMode
 public:
 	AGoHomeGameMode();
 	virtual void Logout(AController* Exiting) override;
-	
+
 	UFUNCTION(BlueprintCallable, Category = "Expedition")
 	void ServerTravelToMap(const FString& MapPath);
-	
+
 	UFUNCTION(BlueprintCallable, Category = "Expedition")
 	void ServerTravelViaLoadingScreen(const FString& FinalMapPath);
+
+public:
+	UFUNCTION(BlueprintPure, Category = "Expedition")
+	const FString& GetLoadingMapPath() const { return LoadingMapPath; }
 	
+	UFUNCTION(BlueprintPure, Category = "Expedition")
+	const FString& GetLobbyMapPath() const { return LobbyMapPath; }
+
 protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
 	FString LoadingMapPath = TEXT("/Game/GoHome/Maps/LV_Loading");
+
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
+	FString LobbyMapPath = TEXT("/Game/GoHome/Maps/LV_Lobby");
 };

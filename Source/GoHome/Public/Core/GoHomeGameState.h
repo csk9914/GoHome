@@ -1,5 +1,3 @@
-
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -24,7 +22,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Expedition")
 	void SetState(EExpeditionState NewState);
-	
+
 	UFUNCTION(BlueprintCallable, Category = "Expedition")
 	void AddDeliveredValue(int32 Value);
 
@@ -32,6 +30,9 @@ public:
 	void Fail(EFailReason Reason);
 
 	void OnPlayerRemovedFromParty(APlayerState* PlayerState);
+
+	UFUNCTION(BlueprintPure, Category="Docking Door")
+	UDockingDoorComponent* GetDockingDoorComponent() const { return DockingDoorComponent; }
 
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -48,7 +49,7 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Docking Door")
 	TObjectPtr<UDockingDoorComponent> DockingDoorComponent;
-	
+
 private:
 	UPROPERTY()
 	TSet<TObjectPtr<APlayerState>> RemovedFromParty;

@@ -6,6 +6,7 @@
 #include "Core/ExpeditionZoneDataAsset.h"
 #include "Core/GoHomeGameMode.h"
 #include "Core/LobbyGameState.h"
+#include "Core/DockingDoorComponent.h"
 
 
 ADepartureButton::ADepartureButton()
@@ -19,21 +20,28 @@ bool ADepartureButton::CanInteract(APawn* InstigatorPawn) const
 
 void ADepartureButton::OnInteract(APawn* InstigatorPawn)
 {
-	ALobbyGameState* LobbyGameState = GetWorld()->GetGameState<ALobbyGameState>();
-	if (!LobbyGameState) return;
-	
-	const UExpeditionZoneDataAsset* SelectedZone = LobbyGameState->GetSelectedZone();
-	if (!SelectedZone) return;
-	
-	if (AGoHomeGameMode* GoHomeGameMode = GetWorld()->GetAuthGameMode<AGoHomeGameMode>())
-	{
-		// GoHomeGameMode->ServerTravelToMap(SelectedZone->MapPath.ToSoftObjectPath().ToString());
-		
-		// GetLongPackageName()은 오브젝트 이름 부분을 떼고 패키지 경로만 반환
-		//GoHomeGameMode->ServerTravelToMap(SelectedZone->MapPath.ToSoftObjectPath().GetLongPackageName());
-		GoHomeGameMode->ServerTravelViaLoadingScreen(SelectedZone->MapPath.ToSoftObjectPath().GetLongPackageName());
-	}
-	
-	
-}
+	AGoHomeGameMode* GoHomeGameMode = GetWorld()->GetAuthGameMode<AGoHomeGameMode>();
+	if (!GoHomeGameMode) return;
 
+	FString TravelPath = "";
+
+	//  현재 로비 맵일 때
+	if (ALobbyGameState* LobbyGameState = GetWorld()->GetGameState<ALobbyGameState>())
+	{
+		// 탐사 맵으롷 이동
+		const UExpeditionZoneDataAsset* SelectedZone = LobbyGameState->GetSelectedZone();
+		if (!SelectedZone) return;
+
+		TravelPath = SelectedZone->MapPath.ToSoftObjectPath().GetLongPackageName();
+	}
+	else if (AGoHomeGameState* GoHomeGameState = GetWorld()->GetGameState<AGoHomeGameState>())
+	{
+		if (UDockingDoorComponent* DoorComponent = GoHomeGameState->GetDockingDoorComponent())
+		{
+			DoorComponent->SetOpen(false);
+		}
+		TravelPath = GoHomeGameMode->GetLobbyMapPath();
+	}
+
+	GoHomeGameMode->ServerTravelViaLoadingScreen(TravelPath);
+}
