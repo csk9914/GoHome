@@ -65,7 +65,7 @@ protected:
 
 	// 산소가 가득 찬 상태에서 기본적으로 버티는 시간. 600초 = 10분.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Oxygen", meta = (ClampMin = "0.01", UIMin = "1.0"))
-	float TargetOxygenDuration = 600.f;
+	float TargetOxygenDuration = 300.f;
 
 	// 초과 무게를 산소 소모 배율로 바꾸는 곡선.
 	// X축은 초과 무게, Y축은 기본 산소 소모량에 곱할 배율이다 (0 -> 1 권장).
