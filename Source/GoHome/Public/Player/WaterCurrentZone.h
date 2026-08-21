@@ -13,7 +13,7 @@ class ACharacter;
 class UNiagaraComponent;
 class UNiagaraSystem;
 
-// ¼ö·ù ±¸¿ªÀÇ µ¿ÀÛ ¹æ½Ä
+// êµ¬ì—­ íƒ€ì… - ë¬¼ì‚´(Current)ì¸ì§€ ì†Œìš©ëŒì´(Whirlpool)ì¸ì§€ êµ¬ë¶„
 UENUM(BlueprintType)
 enum class EWaterCurrentZoneType : uint8
 {
@@ -25,8 +25,8 @@ UCLASS()
 class GOHOME_API AWaterCurrentZone : public AActor
 {
 	GENERATED_BODY()
-	
-public:	
+
+public:
 	AWaterCurrentZone();
 
 protected:
@@ -50,17 +50,17 @@ protected:
 		UPrimitiveComponent* OtherComp,
 		int32 OtherBodyIndex);
 
-	// Áö±İ ±¸¿ª ¾È¿¡ ÀÖ´Â Ä³¸¯ÅÍµé¿¡°Ô ÈûÀ» °è»êÇØ¼­ ´õÇÔ(¼­¹ö¿¡¼­¸¸ È£Ãâ)
+	// ì¡´ ì•ˆì— ìˆëŠ” ìºë¦­í„°ë“¤ì—ê²Œ ë§¤ í”„ë ˆì„ í˜ì„ ê³„ì‚°í•´ì„œ ì ìš© (ì„œë²„ì´ê±°ë‚˜ ë¡œì»¬ë¡œ ì¡°ì‘ ì¤‘ì¸ ìºë¦­í„°ë§Œ í•´ë‹¹)
 	void ApplyForceToOverlappingCharacters(float DeltaTime);
 
-	// ¹°»ì(Current) ¸ğµåÀÏ ¶§ ÇÑ Ä³¸¯ÅÍ¿¡°Ô °¡ÇÒ Èû
+	// ë¬¼ì‚´(Current) íƒ€ì…ì¼ ë•Œ ìºë¦­í„°ì—ê²Œ ì¤„ í˜ ê³„ì‚°
 	FVector CalculateCurrentForce(const ACharacter* Character) const;
 
-	// ¼Ò¿ëµ¹ÀÌ(Whirlpool) ¸ğµåÀÏ ¶§ ÇÑ Ä³¸¯ÅÍ¿¡°Ô °¡ÇÒ Èû
+	// ì†Œìš©ëŒì´(Whirlpool) íƒ€ì…ì¼ ë•Œ ìºë¦­í„°ì—ê²Œ ì¤„ í˜ ê³„ì‚°
 	FVector CalculateWhirlpoolForce(const ACharacter* Character) const;
 
-	// bScaleForceByWeight°¡ ²¨Á® ÀÖÀ¸¸é Ç×»ó 1À» ¹İÈ¯
-	// ÄÑÁ® ÀÖÀ¸¸é OtherActor¿¡¼­ ICarryWeightProvider¸¦ Ã£¾Æ ÇöÀç ¿î¹İ ¹«°Ô ±âÁØ ¹èÀ²À» °è»ê
+	// bScaleForceByWeightê°€ êº¼ì ¸ ìˆìœ¼ë©´ í•­ìƒ 1ì„ ë°˜í™˜
+	// ì¼œì ¸ ìˆìœ¼ë©´ OtherActorì—ì„œ ICarryWeightProviderë¥¼ ì°¾ì•„ ë¬´ê²Œì— ë”°ë¥¸ ë°°ìœ¨ì„ ê³„ì‚°
 	float GetWeightMultiplier(const AActor* OtherActor) const;
 
 	void UpdateFlowIndicator();
@@ -71,75 +71,75 @@ protected:
 
 	void DrawWhirlpoolDebugVisual() const;
 
-	// È¿°ú°¡ ¹ÌÄ¡´Â ¹üÀ§. ÀÌ ±¸ ¾È¿¡ µé¾î¿Â Ä³¸¯ÅÍ¸¸ ÈûÀ» ¹ŞÀ½
-	// ¼Ò¿ëµ¹ÀÌ´Â ÀÌ ¹İ°æÀÌ °ğ ¼Ò¿ëµ¹ÀÌ Å©±â, ¹°»ìÀº Åë·Î Æø¿¡ ¸ÂÃç Á¶ÀıÇÏ¸é µÊ
+	// íš¨ê³¼ê°€ ì ìš©ë˜ëŠ” ë²”ìœ„. ì´ êµ¬ì²´ ì•ˆì— ìˆëŠ” ìºë¦­í„°ì—ê²Œ í˜ì„ ì ìš©
+	// ì†Œìš©ëŒì´ì¼ ë•ŒëŠ” ì´ ë°˜ì§€ë¦„ì´ ê³§ ì†Œìš©ëŒì´ í¬ê¸°, ë””ë²„ê·¸ ì‹œê°í™” ë²”ìœ„ ê³„ì‚°ì—ë„ ì‚¬ìš©ë¨
 	UPROPERTY(VisibleAnywhere, Category = "Water Current")
 	TObjectPtr<USphereComponent> EffectArea;
 
-	// Current Å¸ÀÔÀÏ ¶§ FlowDirection ¹æÇâÀ» È­»ìÇ¥·Î Ç¥½Ã. °ÔÀÓ Áß¿£ ¾È º¸ÀÌ°í ¿¡µğÅÍ¿¡¼­¸¸ º¸ÀÓ
+	// Current íƒ€ì…ì¼ ë•Œ FlowDirection ë°©í–¥ì„ í™”ì‚´í‘œë¡œ í‘œì‹œ. ì—ë””í„° ë·°í¬íŠ¸ì—ì„œë§Œ ë³´ì„
 	UPROPERTY(VisibleAnywhere, Category = "Water Current")
 	TObjectPtr<UArrowComponent> FlowIndicator;
 
-	// Current Å¸ÀÔÀÏ ¶§ Àç»ıÇÒ ³ªÀÌ¾Æ°¡¶ó ÀÌÆåÆ®. ¿¡µğÅÍ¿¡¼­ ¸¸µç NS_WaterFlow °°Àº °É ¿©±â¿¡ ÁöÁ¤
+	// Current íƒ€ì…ì¼ ë•Œ ì¬ìƒí•  ë‚˜ì´ì•„ê°€ë¼ ì´í™íŠ¸. ì—ë””í„°ì—ì„œ ë§Œë“  NS_WaterFlow ê°™ì€ ê±¸ ì—¬ê¸°ì— ì—°ê²°
 	UPROPERTY(EditAnywhere, Category = "Water Current")
 	TObjectPtr<UNiagaraSystem> CurrentFlowVFXAsset;
 
 	UPROPERTY(EditAnywhere, Category = "Water Current")
 	TObjectPtr<UNiagaraSystem> WhirlpoolVFXAsset;
 
-	// À§ ¿¡¼ÂÀ» ½ÇÁ¦·Î Àç»ıÇÏ´Â ÄÄÆ÷³ÍÆ®. FlowDirection¿¡ ¸ÂÃç ÀÚµ¿À¸·Î È¸ÀüÇÔ
+	// ì¡´ ì¢…ë¥˜ì— ë§ëŠ” ì´í™íŠ¸ë¥¼ ì¬ìƒí•˜ëŠ” ì»´í¬ë„ŒíŠ¸. FlowDirectionì— ë”°ë¼ ìë™ìœ¼ë¡œ íšŒì „ë¨
 	UPROPERTY(VisibleAnywhere, Category = "Water Current")
 	TObjectPtr<UNiagaraComponent> FlowVFX;
 
-	// ÀÌ ±¸¿ªÀÌ ¹°»ìÀÎÁö ¼Ò¿ëµ¹ÀÌÀÎÁö ÆÄ¾Ç
+	// ì´ ì¡´ì´ ë¬¼ì‚´ì¸ì§€ ì†Œìš©ëŒì´ì¸ì§€ ê²°ì •
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Water Current")
 	EWaterCurrentZoneType ZoneType = EWaterCurrentZoneType::Current;
 
-	// [¹°»ì Àü¿ë] ¹Ğ·Á³ª´Â ¹æÇâ(¿ùµå ±âÁØ, ÀÚµ¿ Á¤±ÔÈ­). ±âº»°ªÀº ¾×ÅÍÀÇ Àü¹æ(»¡°£ È­»ìÇ¥, XÃà)
+	// [ë¬¼ì‚´ ì „ìš©] ë°€ë ¤ë‚˜ëŠ” ë°©í–¥(ë¡œì»¬ ê¸°ì¤€, ìë™ ì •ê·œí™”). ê¸°ë³¸ê°’ì€ ì •ë©´ ë°©í–¥(íŒŒë€ í™”ì‚´í‘œ, Xì¶•)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Water Current|Current", meta = (EditCondition = "ZoneType == EWaterCurrentZoneType::Current"))
 	FVector FlowDirection = FVector::ForwardVector;
 
-	// [¹°»ì Àü¿ë] ÃÊ´ç °¡ÇØÁö´Â ÈûÀÇ Å©±â.
+	// [ë¬¼ì‚´ ì „ìš©] ì´ˆë‹¹ ë°€ë ¤ë‚˜ëŠ” í˜ì˜ í¬ê¸°
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Water Current|Current", meta = (ClampMin = "0.0", UIMin = "0.0", EditCondition = "ZoneType == EWaterCurrentZoneType::Current"))
 	float FlowStrength = 400.f;
 
-	// [¼Ò¿ëµ¹ÀÌ Àü¿ë] Áß½ÉÀ¸·Î ²ø¾î´ç±â´Â ÈûÀÇ Å©±â.
+	// [ì†Œìš©ëŒì´ ì „ìš©] ì¤‘ì‹¬ìœ¼ë¡œ ëŒë ¤ê°€ëŠ” í˜ì˜ í¬ê¸°
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Water Current|Whirlpool", meta = (ClampMin = "0.0", UIMin = "0.0", EditCondition = "ZoneType == EWaterCurrentZoneType::Whirlpool"))
 	float PullStrength = 250.f;
 
-	// [¼Ò¿ëµ¹ÀÌ Àü¿ë] Áß½É ÃàÀ» ±âÁØÀ¸·Î È¸Àü½ÃÅ°´Â ÈûÀÇ Å©±â ("ºù±Ûºù±Û µµ´Â" ´À³¦).
+	// [ì†Œìš©ëŒì´ ì „ìš©] ì¤‘ì‹¬ ê¸°ì¤€ ì ‘ì„  ë°©í–¥ìœ¼ë¡œ íšŒì „ì‹œí‚¤ëŠ” í˜ì˜ í¬ê¸° (ëŒì•„ê°€ëŠ” ì†ë„ë¥¼ ê²°ì •)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Water Current|Whirlpool", meta = (ClampMin = "0.0", UIMin = "0.0", EditCondition = "ZoneType == EWaterCurrentZoneType::Whirlpool"))
 	float SpinStrength = 350.f;
 
-	// ÄÑ¸é ÇÃ·¹ÀÌ¾î°¡ µé°í ÀÖ´Â ¹«°Ô(ICarryWeightProvider)¿¡ ºñ·ÊÇØ ÈûÀÌ ¼¼Áø´Ù.
-	// ±âº»Àº ²¨Á® ÀÖÀ½ - ³ªÁß¿¡ Ã¼Å©¹Ú½º¸¸ ÄÑ¸é ¹«°Ô ¿¬µ¿ÀÌ ¹Ù·Î µ¿ÀÛÇÑ´Ù.
+	// ë¬´ê±°ìš´ ì•„ì´í…œì„ ë“¤ê³  ìˆëŠ” ìºë¦­í„°(ICarryWeightProvider)ì¼ìˆ˜ë¡ í˜ì„ ì„¸ê²Œ ì ìš©
+	// ê¸°ë³¸ì€ êº¼ì§„ ìƒíƒœ - ë‚˜ì¤‘ì— ì²´í¬ë°•ìŠ¤ë§Œ ì¼œë©´ ë°”ë¡œ ì ìš©ëœë‹¤
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Water Current|Weight")
 	bool bScaleForceByWeight = false;
 
-	// ¹«°Ô 1´ç Èû ¹èÀ²ÀÌ ´Ã¾î³ª´Â ºñÀ². ¿¹: 0.01ÀÌ¸é ¹«°Ô 100´ç ¹èÀ²ÀÌ +1.
+	// ë¬´ê²Œ 1ë‹¹ ë°°ìœ¨ì´ ëŠ˜ì–´ë‚˜ëŠ” ì •ë„. ì˜ˆ: 0.01ì´ë©´ ë¬´ê²Œ 100ë‹¹ ë°°ìœ¨ +1
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Water Current|Weight", meta = (ClampMin = "0.0", UIMin = "0.0", EditCondition = "bScaleForceByWeight"))
 	float WeightForceScale = 0.01f;
 
-	// ¹«°Ô ¹èÀ²ÀÇ »óÇÑ. ¾ÆÀÌÅÛÀ» ¾ÆÁÖ ¸¹ÀÌ/¹«°Ì°Ô µé¾îµµ ÈûÀÌ ºñÁ¤»óÀûÀ¸·Î Ä¿ÁöÁö ¾Ê°Ô ¸·´Â´Ù.
+	// ë°°ìœ¨ì˜ ìƒí•œì„ . ë¬´ê±°ìš´ ì•„ì´í…œì„ ë“¤ì–´ë„ ì´ ë°°ìœ¨ ì´ìƒìœ¼ë¡œëŠ” ì»¤ì§€ì§€ ì•ŠëŠ”ë‹¤
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Water Current|Weight", meta = (ClampMin = "1.0", UIMin = "1.0", EditCondition = "bScaleForceByWeight"))
 	float MaxWeightMultiplier = 3.f;
 
-	// ÀÌ ±¸¿ª ¾È¿¡ ÀÖ´Â µ¿¾È Ä³¸¯ÅÍÀÇ ¼ö¿µ Á¦µ¿·ÂÀ» ÀÌ °ªÀ¸·Î ³·Ãç ÀÌµ¿ ÀÔ·ÂÀÌ ¾ø¾îµµ ¹°»ìÀÌ °è¼Ó À¯ÁöµÇ°Ô
+	// ì´ ì¡´ ì•ˆì— ìˆëŠ” ë™ì•ˆ ìºë¦­í„°ì—ê²Œ ì ìš©í•  ìˆ˜ì˜ ê°ì†ê°’. ë‚®ì„ìˆ˜ë¡ ì…ë ¥ì„ ë†“ì•„ë„ í˜ì´ ê³„ì† ìœ ì§€ëœë‹¤
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Water Current")
 	float ZoneBrakingDeceleration = 0.f;
 
 protected:
-	// Áö±İ ±¸¿ª ¾È¿¡ µé¾î¿Í ÀÖ´Â Ä³¸¯ÅÍµé.
+	// í˜„ì¬ ì¡´ ì•ˆì— ê²¹ì³ ìˆëŠ” ìºë¦­í„°ë“¤
 	UPROPERTY()
 	TArray<TObjectPtr<ACharacter>> OverlappingCharacters;
 
-	// °¢ Ä³¸¯ÅÍÀÇ ¿ø·¡ BrakingDecelerationSwimming °ªÀ» ÀúÀåÇØµ×´Ù°¡ ³ª°¥ ¶§ º¹¿ø
-	TMap<TObjectPtr<ACharacter>, float> OriginalBrakingDeceleration;
+	static TMap<TWeakObjectPtr<ACharacter>, float> GlobalOriginalBraking;
+	static TMap<TWeakObjectPtr<ACharacter>, int32> GlobalOverlapCount;
 
 public:
-	// ÇÃ·¹ÀÌ¾î°¡ ±¸¿ª¿¡ µé¾î¿À°í ³ª°¥ ¶§ - Ä«¸Ş¶ó Èçµé¸²/»ç¿îµå/È­¸é ÀÌÆåÆ® µî ¿¬ÃâÀº
-	// ÀÌ ¾×ÅÍÀÇ ºí·çÇÁ¸°Æ® ÀÚ½Ä Å¬·¡½º³ª ·¹º§ ºí·çÇÁ¸°Æ®¿¡¼­ ÀÌ ÀÌº¥Æ®¸¦ ¹Ş¾Æ ºÙÀÌ¸é µÈ´Ù
-	// (Docs/Dev/CODING_CONVENTIONS.md "C++ / Blueprint °æ°è" - ¿¬ÃâÀº BP ´ã´ç).
+	// í”Œë ˆì´ì–´ê°€ ì¡´ì— ë“¤ì–´ì˜¤ê³  ë‚˜ê°ˆ ë•Œ í›… - ì¹´ë©”ë¼ í”ë“¤ë¦¼/ì‚¬ìš´ë“œ/í™”ë©´ ì´í™íŠ¸ ë“± ì—°ì¶œìš©
+	// ì´ ì•¡í„°ë¥¼ ë¸”ë£¨í”„ë¦°íŠ¸ ìì‹ í´ë˜ìŠ¤ë¡œ ë§Œë“¤ì–´ì„œ ë¸”ë£¨í”„ë¦°íŠ¸ì—ì„œ ì´ ì´ë²¤íŠ¸ë¥¼ ë°›ì•„ ì´ìœ¼ë©´ ëœë‹¤
+	// (Docs/Dev/CODING_CONVENTIONS.md "C++ / Blueprint ê²½ê³„" - ì—°ì¶œì€ BP ë‹´ë‹¹)
 	UFUNCTION(BlueprintImplementableEvent, Category = "Water Current")
 	void OnCharacterEnteredZone(ACharacter* Character);
 

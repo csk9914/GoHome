@@ -9,6 +9,9 @@
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 
+TMap<TWeakObjectPtr<ACharacter>, float> AWaterCurrentZone::GlobalOriginalBraking;
+TMap<TWeakObjectPtr<ACharacter>, int32> AWaterCurrentZone::GlobalOverlapCount;
+
 AWaterCurrentZone::AWaterCurrentZone()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -78,7 +81,12 @@ void AWaterCurrentZone::OnEffectAreaBeginOverlap(UPrimitiveComponent* Overlapped
 
 	if (UCharacterMovementComponent* Movement = OtherCharacter->GetCharacterMovement())
 	{
-		OriginalBrakingDeceleration.Add(OtherCharacter, Movement->BrakingDecelerationSwimming);
+		int32& Count = GlobalOverlapCount.FindOrAdd(OtherCharacter);
+		if (Count == 0)
+		{
+			GlobalOriginalBraking.Add(OtherCharacter, Movement->BrakingDecelerationSwimming);
+		}
+		Count++;
 		Movement->BrakingDecelerationSwimming = ZoneBrakingDeceleration;
 	}
 
@@ -102,10 +110,19 @@ void AWaterCurrentZone::OnEffectAreaEndOverlap(UPrimitiveComponent* OverlappedCo
 
 	if (UCharacterMovementComponent* Movement = OtherCharacter->GetCharacterMovement())
 	{
-		if (const float* Original = OriginalBrakingDeceleration.Find(OtherCharacter))
+		int32* Count = GlobalOverlapCount.Find(OtherCharacter);
+		if (Count)
 		{
-			Movement->BrakingDecelerationSwimming = *Original;
-			OriginalBrakingDeceleration.Remove(OtherCharacter);
+			(*Count)--;
+			if (*Count <= 0)
+			{
+				if (const float* Original = GlobalOriginalBraking.Find(OtherCharacter))
+				{
+					Movement->BrakingDecelerationSwimming = *Original;
+					GlobalOriginalBraking.Remove(OtherCharacter);
+				}
+				GlobalOverlapCount.Remove(OtherCharacter);
+			}
 		}
 	}
 
@@ -145,7 +162,7 @@ FVector AWaterCurrentZone::CalculateCurrentForce(const ACharacter* Character) co
 	FVector Direction = FlowDirection.GetSafeNormal();
 	if (Direction.IsNearlyZero())
 	{
-		// ¹æÇâÀ» ¾È Á¤ÇßÀ¸¸é ¾×ÅÍ°¡ ¹Ù¶óº¸´Â ¹æÇâÀ¸·Î Èê·Áº¸³¿
+		// ë°©í–¥ì´ ë‹¤ 0ë²¡í„°ë©´ ì•¡í„°ê°€ ë°”ë¼ë³´ëŠ” ë°©í–¥ì„ ê¸°ë³¸ê°’ìœ¼ë¡œ ì‚¬ìš©
 		Direction = GetActorForwardVector();
 	}
 
@@ -162,7 +179,7 @@ FVector AWaterCurrentZone::CalculateWhirlpoolForce(const ACharacter* Character) 
 	const FVector ToCenter = GetActorLocation() - Character->GetActorLocation();
 	const FVector PullDirection = ToCenter.GetSafeNormal();
 
-	// À§ÂÊ º¤ÅÍ¿Í Áß½ÉÀ¸·Î ÇâÇÏ´Â ¹æÇâÀ» ¿ÜÀûÇÏ¸é Áß½ÉÀ» ÃàÀ¸·Î µµ´Â Á¢¼± ¹æÇâÀÌ ³ª¿È
+	// ìœ„ ë²¡í„°ì™€ ì¤‘ì‹¬ìœ¼ë¡œ í–¥í•˜ëŠ” ë°©í–¥ì„ ì™¸ì í•˜ë©´ ì¤‘ì‹¬ì„ ê¸°ì¤€ìœ¼ë¡œ ë„ëŠ” ì ‘ì„  ë°©í–¥ì´ ë‚˜ì˜´
 	const FVector SpinDirection = FVector::CrossProduct(FVector::UpVector, PullDirection).GetSafeNormal();
 
 	const float WeightMultiplier = GetWeightMultiplier(Character);
@@ -179,7 +196,7 @@ float AWaterCurrentZone::GetWeightMultiplier(const AActor* OtherActor) const
 		return 1.f;
 	}
 
-	// ICarryWeightProvider °è¾àÀ¸·Î¸¸ ÇöÀç ¹«°Ô¸¦ ÀÐÀ½
+	// ICarryWeightProvider ì¸í„°íŽ˜ì´ìŠ¤ë¥¼ ê°€ì§„ ì»´í¬ë„ŒíŠ¸ë¥¼ ì°¾ì•„ ë¬´ê²Œë¥¼ ì¡°íšŒ
 	for (UActorComponent* Component : OtherActor->GetComponents())
 	{
 		const ICarryWeightProvider* WeightProvider = Cast<ICarryWeightProvider>(Component);
@@ -314,4 +331,3 @@ void AWaterCurrentZone::DrawWhirlpoolDebugVisual() const
 		}
 	}
 }
-
