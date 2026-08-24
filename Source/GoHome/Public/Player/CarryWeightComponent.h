@@ -41,7 +41,7 @@ protected:
 	// 캐릭터가 기본으로 버틸 수 있는 최대 무게.
 	// 업그레이드가 없는 상태의 기준값이며, 캐릭터/BP별로 조정할 수 있다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Carry Weight", meta = (ClampMin = "0.0", UIMin = "0.0"))
-	float BaseMaxCarryWeight = 100.f;
+	float BaseMaxCarryWeight = 7.f;
 
 	// 업그레이드 시스템이 더해주는 최대 무게 보너스.
 	// 외부 시스템은 값에 직접 접근하지 않고 Set 함수로만 변경한다.
