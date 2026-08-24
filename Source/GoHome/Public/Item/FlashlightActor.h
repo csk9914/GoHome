@@ -32,6 +32,10 @@ public:
 	
 	virtual bool IsDeliverable() const override { return false; }
 
+	// 인벤토리 무게는 0이지만, 실제 손전등은 고체 장비라 물속에서 가라앉음.
+	virtual float GetBuoyancyWeight() const override { return 2.f; };
+
+
 protected:
 
 	virtual void BeginPlay() override;
