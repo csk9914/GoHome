@@ -11,7 +11,9 @@
 
 AItemActorBase::AItemActorBase()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	// Tick 은 가능하지만, 시작할 때는 꺼진 상태.
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 	bReplicates = true;
 
 	SetReplicateMovement(true);
@@ -21,6 +23,16 @@ AItemActorBase::AItemActorBase()
 	MeshComponent->SetIsReplicated(false);
 	MeshComponent->SetNotifyRigidBodyCollision(true);
 	MeshComponent->SetMobility(EComponentMobility::Movable);
+
+	// 물속 부유 컨셉 : 중력 off + 감쇠
+	// 물리가 켜진 경우(드롭 및 사망) 바닥으로 가라앉는 대신 던진 방향으로 나아가다 서서히 멈춰 그자리에 떠있게 만듬.
+	MeshComponent->SetEnableGravity(false);
+	MeshComponent->BodyInstance.LinearDamping = 3.0f;
+	MeshComponent->BodyInstance.AngularDamping = 3.0f;
+	MeshComponent->BodyInstance.MassScale = 3.0f; // 무게 -> 플레이어와 부딪힌 경우, 멀리 팅겨나가는 것 방지.
+
+	// 아이템 흔들림.
+	DriftPhaseOffset = FMath::FRandRange(0.f, 100.f);
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> DefaultMeshAsset(TEXT("/Engine/BasicShapes/Cube.Cube"));
 	if (DefaultMeshAsset.Succeeded())
@@ -35,8 +47,78 @@ void AItemActorBase::BeginPlay()
 
 	SyncVisualsFromItemData();
 
-	MeshComponent->SetSimulatePhysics(HasAuthority());
+	if (HasAuthority())
+	{
+		SnapToGround();
+	}
+
+	// 스포너로 배치된 아이템은 물리를 켜지 않음 -> 그 자리에 정지.
+	// 실제 물리는 최초 드랍될 때 시작.
 }
+
+void AItemActorBase::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if (!HasAuthority() || !MeshComponent->IsSimulatingPhysics())
+	{
+		SetActorTickEnabled(false);
+		return;
+	}
+
+	const  float Weight = GetBuoyancyWeight();
+	const float VerticalAccel = (NeutralWeight - Weight) * BuoyancyAccelFactor;
+
+	// 가라앉는(무거운) 아이템이 바닥 등에 부딪혀 거의 멈추면 완전히 정지시킴.
+	// 떠오르는(가벼운) 아이템은 수면 근처에서도 계속 흔들려야 하니 이 정지 처리를 적용하지 않는다.
+	// 막 가라앉기 시작해 아직 한 번도 SettleVelocityThreshold를 못 넘긴 경우는 "멈춘 것"이 아님.
+	// "아직 안 움직인 것"으로 , 한 번은 그 속도를 넘긴 뒤에만 정지 판정을 허용함.
+	const bool bIsSinking = bIsSinkingOrRising && VerticalAccel < 0.f;
+	const bool bAboveSettleSpeed = MeshComponent->GetPhysicsLinearVelocity().SizeSquared() >= FMath::Square(SettleVelocityThreshold);
+
+	if (bIsSinking)
+	{
+		if (bAboveSettleSpeed)
+		{
+			bHasReachedSinkSpeed = true;
+		}
+		else if (bHasReachedSinkSpeed)
+		{
+			SetActorTickEnabled(false);
+			return;
+		}
+	}
+
+	// 부유 중 조금씩 흔들리는 느낌(가라앉거나 떠오르는 동안에도 유지).
+	const float Time = GetGameTimeSinceCreation() + DriftPhaseOffset;
+	const FVector DriftForce = FVector(
+		FMath::Sin(Time * 0.6f), 
+		FMath::Cos(Time * 0.5f), 
+		FMath::Sin(Time * 0.8f) * 0.5f) * DriftForceStrength;
+	MeshComponent->AddForce(DriftForce, NAME_None, true);
+
+	if (bIsSinkingOrRising)
+	{
+		MeshComponent->AddForce(FVector(0.f, 0.f, VerticalAccel), NAME_None, true);
+	}
+}
+
+void AItemActorBase::SnapToGround()
+{
+	FHitResult Hit;
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+
+	const FVector Start = GetActorLocation();
+	const FVector End = Start - FVector::UpVector * 500.f;
+
+	if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+	{
+		const float HalfHeight = MeshComponent->Bounds.BoxExtent.Z;
+		SetActorLocation(Hit.Location + FVector::UpVector * HalfHeight);
+	}
+}
+
 
 void AItemActorBase::OnRep_ReplicatedMovement()
 {
@@ -110,6 +192,7 @@ void AItemActorBase::UpdateAttachment(APawn* OldHoldingPawn)
 		if (HasAuthority())
 		{
 			MeshComponent->SetSimulatePhysics(false);
+			CancelFloatCycle();
 		}
 
 		if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(HoldingPawn))
@@ -117,6 +200,7 @@ void AItemActorBase::UpdateAttachment(APawn* OldHoldingPawn)
 			Character->AttachItemToRightHand(MeshComponent);
 		}
 	}
+
 	else if (HoldingPawn && !bIsActiveHeld)
 	{
 		// 인벤토리엔 있지만 비활성 슬롯: 숨기고 부착 해제.
@@ -127,6 +211,7 @@ void AItemActorBase::UpdateAttachment(APawn* OldHoldingPawn)
 		if (HasAuthority())
 		{
 			MeshComponent->SetSimulatePhysics(false);
+			CancelFloatCycle();
 		}
 
 		if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(HoldingPawn))
@@ -144,6 +229,7 @@ void AItemActorBase::UpdateAttachment(APawn* OldHoldingPawn)
 		if (HasAuthority())
 		{
 			MeshComponent->SetSimulatePhysics(true);
+			BeginFloatCycle();
 		}
 
 		if (AGoHomeCharacter* PrevCharacter = Cast<AGoHomeCharacter>(OldHoldingPawn))
@@ -153,10 +239,40 @@ void AItemActorBase::UpdateAttachment(APawn* OldHoldingPawn)
 	}
 }
 
+void AItemActorBase::BeginSinkOrRise()
+{
+	if (!HasAuthority() || !MeshComponent->IsSimulatingPhysics()) return;
+
+	bIsSinkingOrRising = true;
+	bHasReachedSinkSpeed = false; // 새로 가라앉기/떠오르기 시작 -> 정지 판정 초기화.
+}
+
+void AItemActorBase::BeginFloatCycle()
+{
+	bIsSinkingOrRising = false;
+	SetActorTickEnabled(true); // 부유 단계부터 흔들림 시작.
+
+	GetWorldTimerManager().SetTimer(SinkOrRiseTimerHandle, this,
+		&AItemActorBase::BeginSinkOrRise, FloatDuration, false);
+}
+
+void AItemActorBase::CancelFloatCycle()
+{
+	GetWorldTimerManager().ClearTimer(SinkOrRiseTimerHandle);
+	SetActorTickEnabled(false);
+	bIsSinkingOrRising = false;
+}
+
 float AItemActorBase::GetTotalWeight() const
 {
 	return ItemData ? ItemData->Weight : 0.f;
 }
+
+float AItemActorBase::GetBuoyancyWeight() const
+{
+	return ItemData ? ItemData->Weight : 1.f;
+}
+
 
 float AItemActorBase::GetCurrentValue() const
 {
@@ -189,6 +305,13 @@ void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp,
 	const FHitResult& Hit)
 {
 	Super::NotifyHit(MyComp, Other, OtherComp, bSelfMoved, HitLocation, HitNormal, NormalImpulse, Hit);
+
+	// 가라앉아서 멈춘(Tick off) 아이템이 플레이어 등과 다시 충동할 경우.
+	// 중력이 꺼져 있어 스스로 못내려오기 때문에 Tick을 다시 on 하여 가라앉는 힘을 재 적용 시킴.
+	if (HasAuthority() && bIsSinkingOrRising && MeshComponent->IsSimulatingPhysics() && !IsActorTickEnabled())
+	{
+		SetActorTickEnabled(true);
+	}
 
 	if (!HasAuthority() || !ItemData || !ItemData->bCanBreak) return;
 	if (BreakCount >= ItemData->MaxBreakCount) return;
