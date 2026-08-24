@@ -128,6 +128,11 @@ void AItemActorBase::OnRep_ReplicatedMovement()
 	// 월드에 놓여있는(부착 안 된) 경우에만 우리가 직접 이동시킨다.
 	if (MeshComponent->GetAttachParent() != nullptr) return;
 
+	// 물리 시뮬레이션 중(드롭/부유 중)이면 Super가 이미 물리 리플리케이션 보간(속도 기반 부드러운 추적)을 처리.
+	// 여기서 매번 텔레포트로 덮어쓰면 그 보간이 무시되고 리플리케이션 패킷 마다
+	// 위치가 툭툭 튀어서(클라에서 뚝뚝 끊기는 것 처럼) 보임. 물리가 꺼진(정적 배치) 경우에만 보정.
+	if (MeshComponent->IsSimulatingPhysics()) return;	
+
 	// Super 내부의 SetActorLocationAndRotation이 물리 바디를 가졌지만 시뮬레이션은 꺼진(클라)
 	// 이 컴포넌트를 실제로 못 옮기는 것으로 확인되어, 리플리케이트된 원본 값으로 직접 이동시켜 우회.
 	const FRepMovement& Rep = GetReplicatedMovement();
@@ -203,8 +208,13 @@ void AItemActorBase::UpdateAttachment(APawn* OldHoldingPawn)
 
 	else if (HoldingPawn && !bIsActiveHeld)
 	{
-		// 인벤토리엔 있지만 비활성 슬롯: 숨기고 부착 해제.
-		MeshComponent->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
+		// 인벤토리엔 있지만 비활성 슬롯: 숨기고 -> 완전히 Detach하지 않고 캐릭터 루트에 재부착 -> 캐릭터 따라다님.
+		// (KeepWorldTransform으로 Detach하여 그 순간 월드 좌표에 고정 시켰었으나,
+		// 이후 플레이어가 이동한 만큼 나중에 드롭될 때 "Detach 되었던 예전 자리"에서 나타남.
+		// 사망/드롭 지점과 동떨어지는 버그 확인되어 수정.
+
+		MeshComponent->AttachToComponent(HoldingPawn->GetRootComponent(), 
+			FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 		MeshComponent->SetVisibility(false, true);
 		MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
