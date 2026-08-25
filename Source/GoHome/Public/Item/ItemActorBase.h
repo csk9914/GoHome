@@ -42,6 +42,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Item")
 	virtual bool IsDeliverable() const { return true; }
 
+	// 부력 계산 전용 무게. 기본은 ItemData->Weight(인벤토리/운반 무게) 그대로 사용.
+	// 손전등처럼 인벤토리 무게는 0(운반 부담 없음)이어도 실제로는 가라앉아야 하는 장비류는
+	// 오버라이드해서 물리적 무게를 따로 지정함.
+	UFUNCTION(BlueprintPure, Category = "Item")
+	virtual float GetBuoyancyWeight() const;
+
 	// 인벤토리에 담길 때 Interaction이 호출한다(소음 유발형이면 반경 증가 타이머 시작).
 	void NotifyPickedUp();
 
@@ -79,6 +85,8 @@ protected:
 
 	virtual void BeginPlay() override;
 
+	virtual void Tick(float DeltaTime) override;
+
 	UPROPERTY(ReplicatedUsing = OnRep_HoldingPawn)
 	TObjectPtr<APawn> HoldingPawn = nullptr;
 
@@ -88,6 +96,14 @@ protected:
 	void OnRep_HoldingPawn(APawn* OldHoldingPawn);
 
 	virtual void UpdateAttachment(APawn* OldHoldingPawn = nullptr);
+
+	// 드롭 등으로 물리가 다시 켜질 때 호출 : 부유 사이클 시작(Tick 켜기 + FloatDuration 후 가라앉기 떠오르기 시작 타이머).
+	// SetSimulatePhysics(true) 직후에 호출할 것.
+	// 자식 클래스(예: 손전등)가 자기만의 UpdateAttachment를 쓰더라도 이 사이클을 재사용할 수 있게 protected로 노출.
+	void BeginFloatCycle();
+
+	// 다시 손에 들렸을 때 호출 : 부유 사이클 정지(타이머 취소 + Tick 끄기).
+	void CancelFloatCycle();
 
 	UFUNCTION()
 	virtual void OnRep_ItemData();
@@ -122,6 +138,38 @@ private:
 
 	// Item Data 헬퍼 함수.
 	void SyncVisualsFromItemData();
+
+	// 스폰시 바닥 위치.
+	void SnapToGround();
+
+	void BeginSinkOrRise();
+	FTimerHandle SinkOrRiseTimerHandle;
+
+	// 드롭 후 이 시간(초) 동안은 부유 상태 유지, 이후 무게 기반으로 가라앉거나 떠오름.
+	UPROPERTY(EditAnywhere, Category = "Item")
+	float FloatDuration = 4.0f;
+
+	// 이 무게보다 무거우면 가라앉고, 가벼우면 떠오름.
+	UPROPERTY(EditAnywhere, Category = "Item")
+	float NeutralWeight = 1.5f;
+
+	// 가라앉거나 떠오를 경우 수치 조정.
+	UPROPERTY(EditAnywhere, Category = "Item")
+	float BuoyancyAccelFactor = 180.0f;
+
+	// 부유 단계에서의 흔드림.
+	UPROPERTY(EditAnywhere, Category = "Item")
+	float DriftForceStrength = 60.0f;
+
+	float DriftPhaseOffset = 0.f;
+	bool bIsSinkingOrRising = false;
+
+	// 가라앉는 도중 한 번이라도 SettleVelocityThreshold를 넘긴 적 있는지.
+	// (막 가라앉기 시작해서 아직 속도가 안 붙은 상태를 "바닥에 닿아 멈춤"으로 오판하지 않기 위함.)
+	bool bHasReachedSinkSpeed = false;
+
+	UPROPERTY(EditAnywhere, Category = "Item")
+	float SettleVelocityThreshold = 5.0f;
 
 	FTimerHandle NoiseGrowthTimerHandle;
 

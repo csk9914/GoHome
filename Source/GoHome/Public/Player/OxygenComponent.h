@@ -106,4 +106,6 @@ private:
 	float CalculateOxygenDrainRate() const;
 	float CalculateOverweightDrainMultiplier() const;
 	float GetCachedOverweightAmount() const;
+	// 죽으면 산소 Tick 끄기
+	void HandleOwnerDeath();
 };

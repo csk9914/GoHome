@@ -74,6 +74,7 @@ void AFlashlightActor::UpdateAttachment(APawn* OldHoldinPawn)
 		if (HasAuthority())
 		{
 			MeshComponent->SetSimulatePhysics(false);
+			CancelFloatCycle();
 		}
 
 		if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(HoldingPawn))
@@ -93,6 +94,7 @@ void AFlashlightActor::UpdateAttachment(APawn* OldHoldinPawn)
 			MeshComponent->SetSimulatePhysics(true);
 			bIsOn = false; // 내려놓으면 자동 꺼짐.
 			UpdateLightVisual();
+			BeginFloatCycle();
 		}
 
 		if (AGoHomeCharacter* PrevCharacter = Cast<AGoHomeCharacter>(OldHoldinPawn))

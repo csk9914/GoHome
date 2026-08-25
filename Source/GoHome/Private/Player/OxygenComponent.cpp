@@ -3,6 +3,7 @@
 #include "Net/UnrealNetwork.h"
 #include "Player/CarryWeightProvider.h"
 #include "Player/Damageable.h"
+#include "Player/DeathNotifier.h"
 
 UOxygenComponent::UOxygenComponent()
 {
@@ -69,6 +70,14 @@ void UOxygenComponent::BeginPlay()
 
 	FindCarryWeightProviderComponent();
 	SetOxygen(MaxOxygen);
+
+	if (UActorComponent* DeathNotifierComponent = GetOwner()->FindComponentByInterface(UDeathNotifier::StaticClass()))
+	{
+		if (IDeathNotifier* DeathNotifier = Cast<IDeathNotifier>(DeathNotifierComponent))
+		{
+			DeathNotifier->GetOnDeathDelegate().AddUObject(this, &ThisClass::HandleOwnerDeath);
+		}
+	}
 }
 
 void UOxygenComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -177,6 +186,11 @@ void UOxygenComponent::ApplySuffocationDamage(float DeltaTime)
 	{
 		IDamageable::Execute_ApplyDamage(DamageableComponent, DamageAmount, GetOwner(), FName(TEXT("Suffocation")));
 	}
+}
+
+void UOxygenComponent::HandleOwnerDeath()
+{
+	SetComponentTickEnabled(false);
 }
 
 void UOxygenComponent::SetOxygen(float NewOxygen)
