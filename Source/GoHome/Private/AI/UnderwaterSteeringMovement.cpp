@@ -69,7 +69,7 @@ void UUnderwaterSteeringMovement::TickComponent(float DeltaTime, ELevelTick Tick
 void UUnderwaterSteeringMovement::Steering_MoveToLocation(FVector TargetLocation, float MoveSpeed, float DeltaTime)
 {
 	AActor* Owner = GetOwner();
-	if (!Owner||!Owner->HasAuthority())
+	if (!Owner || !Owner->HasAuthority())
 	{
 		return;
 	}
@@ -78,6 +78,7 @@ void UUnderwaterSteeringMovement::Steering_MoveToLocation(FVector TargetLocation
 	{
 		GEngine->AddOnScreenDebugMessage(-1, 0.0f, FColor::Cyan, TEXT("Steering_MoveToLocation"));
 	}
+
 
 	const FVector OwnerLocation = Owner->GetActorLocation();
 	const FVector ToTarget = TargetLocation - OwnerLocation;

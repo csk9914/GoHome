@@ -7,7 +7,7 @@
 AUnderwaterEnemyBase::AUnderwaterEnemyBase()
 {
  	// Set this pawn to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
 	bReplicates = true;
 	SetReplicateMovement(true);
@@ -32,49 +32,4 @@ AUnderwaterEnemyBase::AUnderwaterEnemyBase()
 
 }
 
-// Called when the game starts or when spawned
-void AUnderwaterEnemyBase::BeginPlay()
-{
-	Super::BeginPlay();
-
-	CurrentHealth = MaxHealth;
-	
-}
-
-// Called every frame
-void AUnderwaterEnemyBase::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-}
-
-void AUnderwaterEnemyBase::ReceiveDamage(float DamageAmount)
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-	CurrentHealth -= DamageAmount;
-	if (CurrentHealth <= 0.0f)
-	{
-		CurrentHealth = 0.0f;
-		Die();
-	}
-}
-
-void AUnderwaterEnemyBase::Die()
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-	Destroy();
-}
-
-// Called to bind functionality to input
-void AUnderwaterEnemyBase::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
-{
-	Super::SetupPlayerInputComponent(PlayerInputComponent);
-
-}
 
