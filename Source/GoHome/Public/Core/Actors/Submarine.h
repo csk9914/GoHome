@@ -22,6 +22,13 @@ class GOHOME_API ASubmarine : public AActor
 public:
 	ASubmarine();
 
+protected:
+	virtual void BeginPlay() override;
+
+	UFUNCTION()
+	void HandleDoorStateChanged(bool bOpen); 
+	
+public:
 	// 레벨/BP에서 위치·크기를 눈으로 맞추도록 EditAnywhere.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Docking Door")
 	TObjectPtr<UBoxComponent> InteriorVolume;
