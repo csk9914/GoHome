@@ -19,13 +19,10 @@ public:
 	// Sets default values for this pawn's properties
 	AUnderwaterEnemyBase();
 
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
 
 public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+	
+	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USphereComponent> BodyCollision;
 
@@ -35,19 +32,5 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USkeletalMeshComponent> SkeletalMesh;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Enemy")
-	float MaxHealth = 100.0f;
-	UPROPERTY(BlueprintReadOnly,Category ="Enemy")
-	float CurrentHealth = 100.0f;
-	 UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Enemy")
-	 AActor* TargetActor = nullptr;
-	 UFUNCTION(BlueprintCallable, Category ="Enemy")
-	 virtual void ReceiveDamage(float DamageAmount);
-
-	 UFUNCTION(BlueprintCallable, Category ="Enemy")
-	 virtual void Die();
-
-	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 };
