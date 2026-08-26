@@ -29,7 +29,9 @@ protected:
 
 	void Move(const FInputActionValue& Value);
 	void Look(const FInputActionValue& Value);
-
+	void StartTalking();
+	void StopTalking();
+	
 private:
 	UPROPERTY(VisibleAnywhere, Category = "Mesh")
 	TObjectPtr<USkeletalMeshComponent> FirstPersonArmsMesh;
@@ -46,13 +48,14 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> LookAction;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> PushToTalkAction;
+	
 public:	
-
 	UPROPERTY(BlueprintReadOnly, Category = "Animation")
 	float CurrentPitch = 0.f;
 	
 	// 핸들 소켓 선언.
-
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
 	FName RightHandSocketName = "Hand_R";
 
@@ -87,37 +90,37 @@ public:
 	bool IsHoldingItem() const { return bIsHoldingItem; }
 
 protected:
-	UPROPERTY(ReplicatedUsing = OnRep_IsHoldingItem, BlueprintReadOnly, Category = "Interaction")
-	bool bIsHoldingItem = false;
-
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	
+	UFUNCTION(Server, Unreliable)
+	void ServerUpdatePitch(float NewPitch);
+	
 	UFUNCTION()
 	void OnRep_IsHoldingItem();
 
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
-	UPROPERTY(ReplicatedUsing = OnRep_ReplicatedPitch)
-	float ReplicatedPitch = 0.f;
-
-	UFUNCTION()
-	void OnRep_ReplicatedPitch();
-
-	UFUNCTION(Server, Unreliable)
-	void ServerUpdatePitch(float NewPitch);
-
-	UPROPERTY(ReplicatedUsing = OnRep_IsHoldingFlashlight, BlueprintReadOnly, Category = "Interaction")
-	bool bIsHoldingFlashlight = false;
-
 	UFUNCTION()
 	void OnRep_IsHoldingFlashlight();
-
-	// 수영, 소음 반경
-	UPROPERTY(EditDefaultsOnly, Category = "Noise")
-	float SwimNoiseRadius = 800.f;
-
+	
+	UFUNCTION()
+	void OnRep_ReplicatedPitch();
+	
+	UPROPERTY(ReplicatedUsing = OnRep_IsHoldingItem, BlueprintReadOnly, Category = "Interaction")
+	bool bIsHoldingItem = false;
+	
+	UPROPERTY(ReplicatedUsing = OnRep_IsHoldingFlashlight, BlueprintReadOnly, Category = "Interaction")
+	bool bIsHoldingFlashlight = false;
+	
+	UPROPERTY(ReplicatedUsing = OnRep_ReplicatedPitch)
+	float ReplicatedPitch = 0.f;
+	
 	// 수영, 소음 등급
 	UPROPERTY(EditDefaultsOnly, Category = "Noise")
 	ENoiseType SwimNoiseType = ENoiseType::Small;
-
+	
+	// 수영, 소음 반경
+	UPROPERTY(EditDefaultsOnly, Category = "Noise")
+	float SwimNoiseRadius = 800.f;
+	
 	// 소음 몇 초 간격으로 쏠 지
 	UPROPERTY(EditDefaultsOnly, Category = "Noise")
 	float SwimNoiseInterval = 1.5f;

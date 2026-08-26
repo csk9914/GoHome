@@ -141,6 +141,9 @@ void AGoHomeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	{
 		EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ThisClass::Move);
 		EIC->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Look);
+		EIC->BindAction(PushToTalkAction, ETriggerEvent::Started, this, &ThisClass::StartTalking);
+		EIC->BindAction(PushToTalkAction, ETriggerEvent::Completed, this, &ThisClass::StopTalking);
+		
 	}
 }
 
@@ -161,6 +164,22 @@ void AGoHomeCharacter::Look(const FInputActionValue& Value)
 	const FVector2D LookVector = Value.Get<FVector2D>();
 	AddControllerYawInput(LookVector.X);
 	AddControllerPitchInput(LookVector.Y);
+}
+
+void AGoHomeCharacter::StartTalking()
+{
+	if (APlayerController* PlayerController = GetController<APlayerController>())
+	{
+		PlayerController->ToggleSpeaking(true);
+	}
+}
+
+void AGoHomeCharacter::StopTalking()
+{
+	if (APlayerController* PlayerController = GetController<APlayerController>())
+	{
+		PlayerController->ToggleSpeaking(false);
+	}
 }
 
 void AGoHomeCharacter::AttachItemToRightHand(UStaticMeshComponent* ItemMeshComponent)

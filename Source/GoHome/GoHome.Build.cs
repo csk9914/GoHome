@@ -10,11 +10,14 @@ public class GoHome : ModuleRules
 	
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "Niagara" });
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "OnlineSubsystem", "OnlineSubsystemSteam", "SteamSockets", "CinematicCamera" });
-
-		// Uncomment if you are using Slate UI
-		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
-
-		// OnlineSubsystemSteam/SteamSockets are enabled via the Plugins section of GoHome.uproject.
+		PrivateDependencyModuleNames.AddRange(new string[]
+		{
+			"OnlineSubsystem", 
+			"OnlineSubsystemUtils",
+			"OnlineSubsystemSteam", 
+			"SteamSockets", 
+			"CinematicCamera",
+			"AIModule"
+		});
 	}
 }
