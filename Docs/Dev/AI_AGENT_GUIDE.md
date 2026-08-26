@@ -20,9 +20,9 @@
 | 어떤 클래스/인터페이스를 만들어야 해? 다른 시스템과 어떻게 연결돼? (**메인 개발 루프에서 가장 흔한 질문**) | 클래스 자체는 `Source/GoHome/<담당 폴더>/`가 출처. 경계 규칙·이유는 [시스템별 결정과 경계](ARCHITECTURE.md#시스템별-결정과-경계) + [시스템 간 인터페이스 계약](ARCHITECTURE.md#시스템-간-인터페이스-계약) — 안 풀리면 그때만 아래 "기획 의도/수치 근거" 행 참고 |
 | 내 시스템의 기획 의도·밸런스 수치·유저 경험 흐름이 뭐야? (ARCHITECTURE.md에 없는 서사적 스펙) | [../Design/02_GoHome_기술분석서.md](../Design/02_GoHome_기술분석서.md) 해당 시스템 절 |
 | 이 시스템 지금 뭐가 이미 구현됐고 뭐가 남았어? | 문서가 아니라 `Source/GoHome/Public|Private/<담당 폴더>/`를 직접 읽고 위 두 문서와 대조 — 진행 상태의 단일 출처는 코드 자체이며 별도 문서는 두지 않는다 |
-| 이거 팀이 이미 결정한 거야, 아직 미정이야? | [진짜 남은 미결정 항목](../Design/03_GoHome_리스크_미결정사항.md#1-진짜-남은-미결정-항목) / [결정 완료 색인](../Design/03_GoHome_리스크_미결정사항.md#2-결정-완료-색인) |
+| 이거 팀이 이미 결정한 거야, 아직 미정이야? | 결정된 사항은 [../Design/01_GoHome_기획서.md](../Design/01_GoHome_기획서.md)·[02_GoHome_기술분석서.md](../Design/02_GoHome_기술분석서.md)의 해당 절(라벨: 팀 결정/기획 수정/검증 추가). 아직 미정인 사안은 Notion "GoHome 착수 로드맵" — 에이전트가 못 보므로 사람이 확인해 전달 |
 | 코딩 규칙/폴더 규칙/네이밍이 뭐야? | [CODING_CONVENTIONS.md](CODING_CONVENTIONS.md) |
-| 이 값(수치)이 어디서 온 결정인지 근거가 궁금해 | [../Design/05_GoHome_참고문서_교차매핑.md](../Design/05_GoHome_참고문서_교차매핑.md) |
+| 이 값(수치)이 어디서 온 결정인지 근거가 궁금해 | [../Design/01_GoHome_기획서.md](../Design/01_GoHome_기획서.md)·[02_GoHome_기술분석서.md](../Design/02_GoHome_기술분석서.md)의 해당 절 (수치 옆 "검증 추가/팀 결정" 라벨과 서술) |
 | 담당자/목표 기간/DoD가 뭐야? | Notion("GoHome 담당자 배정" DB, "GoHome 착수 로드맵") — 에이전트가 못 보므로 사람이 직접 확인해서 프롬프트에 전달 |
 | 브랜치 어떻게 만들어/머지해? PR은 언제부터 써? | [GIT_WORKFLOW.md](GIT_WORKFLOW.md) |
 | Blueprint 노드 그래프 어떻게 만들어? 코드랑 같이 BP 가이드도 줘 | [NODECASTER_GUIDE.md](NODECASTER_GUIDE.md) — 설치 안 돼 있으면 "2. 사용 절차"는 읽지 않고 기존 방식(텍스트 설명)으로 안내 |

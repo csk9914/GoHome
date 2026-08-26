@@ -145,11 +145,7 @@ boundary_interfaces:
 
 decisions:
   - name: GenerateNoise 호출 방식 (02문서 5절 근거)
-    detail: GenerateNoise는 동기 함수로 반경 내 각 몬스터의 IMonsterNoiseListener::OnNoiseHeard를 호출까지만 책임진다. 전이 로직은 각 몬스터의 내부 구현(경계 밖)이 정한다.
-
-known_gaps:
-  - name: IMonsterNoiseListener 미연결
-    detail: "실제 활성 몬스터 베이스인 `AUnderwaterEnemyBase`(BodyCollision/EyePoint/SkeletalMesh, `ReceiveDamage(float)`/`Die()` 보유)는 `IMonsterNoiseListener`를 구현하지 않는다 — 경계 인터페이스 미연결(코드 존재 자체는 미구현이 아님). **실사용 영향**: 이 인터페이스를 구현하는 액터가 현재 하나도 없어서, Item/Player가 호출하는 `GenerateNoise`(아이템 파손 소음, 플레이어 수영 소음 등)는 반경 내 몬스터가 있어도 아무 반응을 일으키지 않는다 — 호출부는 이미 구현돼 있지만(Player 쪽에서 실제로 사용 중) 몬스터 쪽 구독이 없어 지금은 사실상 no-op이다. `ReceiveDamage`→`IDamageable::ApplyDamage` 전환과 함께 `IMonsterNoiseListener` 구현이 필요."
+    detail: GenerateNoise는 동기 함수로 반경 내 각 몬스터의 IMonsterNoiseListener::OnNoiseHeard를 호출까지만 책임진다. 전이 로직은 각 몬스터의 내부 구현(경계 밖)이 정한다. IMonsterNoiseListener는 C++ 베이스가 아니라 몬스터 BP 서브클래스(BP_UnderwaterMonster, BP_WormBase) 단에서 구현한다 — AI는 경계만 정의하고 실제 구현은 BP 쪽 팀원 재량이므로 C++만 봐서는 연결 여부가 안 보인다.
 ```
 
 ### Item

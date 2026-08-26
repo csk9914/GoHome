@@ -1,12 +1,12 @@
 # GoHome Documentation Guide
 
-This repo is GoHome (a deep-sea Lethal Company-like co-op survival game), UE5.7. All docs/tools live under `Docs/`, split into **three systems**: `Docs/Design/` (md/git, files 01·02·03·05 — low change frequency, cross-indexing matters), Notion (high-change-frequency items like owners/schedule/DoD that fit checkboxes/DBs), `Docs/Dev/` (md/git, developer docs that change with the code — architecture/coding conventions/AI agent guide/git workflow).
+This repo is GoHome (a deep-sea Lethal Company-like co-op survival game), UE5.7. All docs/tools live under `Docs/`, split into **three systems**: `Docs/Design/` (md/git, files 01·02 — low change frequency, cross-indexing matters), Notion (high-change-frequency items like owners/schedule/DoD/open decisions that fit checkboxes/DBs), `Docs/Dev/` (md/git, developer docs that change with the code — architecture/coding conventions/AI agent guide/git workflow).
 
 Content rules specific to `Docs/Design/` (single-source-of-truth, editing procedure, notation labels, md↔Notion linking) live in [Docs/Design/DOC_MANAGEMENT.md](Docs/Design/DOC_MANAGEMENT.md) — read that file when editing a Design doc. This file only covers what's needed in every session: the doc map and link validation.
 
 ## Document Lifecycle
 
-- **Now (design phase)**: `Docs/Dev/` (`ARCHITECTURE.md`/`CODING_CONVENTIONS.md`) is the primary reference for the main dev loop — `Docs/Design/` (01/02/03/05) is opened only when Dev docs don't cover the question (e.g. tracing a decision's original rationale), and edited only on the user's explicit request, never as a side effect of other work. When editing, `DOC_MANAGEMENT.md` rules apply in full.
+- **Now (design phase)**: `Docs/Dev/` (`ARCHITECTURE.md`/`CODING_CONVENTIONS.md`) is the primary reference for the main dev loop — `Docs/Design/` (01/02) is opened only when Dev docs don't cover the question (e.g. tracing a decision's original rationale), and edited only on the user's explicit request, never as a side effect of other work. When editing, `DOC_MANAGEMENT.md` rules apply in full.
 - **After prototype kickoff**: tag that commit and treat `Docs/Design/` as a frozen reference — this changes nothing about the rule above, since Design was already read-mostly. New Design decisions after the freeze still go through `DOC_MANAGEMENT.md`'s single-source-of-truth rules, but should be rare.
 - **Documented decisions are a baseline, not gospel**: if development surfaces a better design, don't silently follow a stale decision — use judgment, propose the improvement, and reflect it in the doc. Keep an "old decision X, rejected because Y" trail only when a different approach was actually considered and turned down (so it isn't proposed again later); a plain status update (not started → done, planned → implemented) just overwrites — no legacy trail needed. Implementation-status tags themselves ("design confirmed, not built yet", "unimplemented") shouldn't linger once code catches up — code is the single source of truth for what's built (see Document Map's `Docs/Dev/*.md` role), so drop the tag rather than flip it to "done". Keep the tag only while it flags something non-obvious (e.g. "half-wired — one path implemented, the other still a stub" traps a reader would otherwise miss); a plain "not started yet" tag on work that hasn't begun adds no information a `grep`/file-existence check wouldn't give faster. See `ARCHITECTURE.md`'s own note on this.
 
@@ -18,10 +18,8 @@ Content rules specific to `Docs/Design/` (single-source-of-truth, editing proced
 |---|---|---|
 | `Docs/Design/01_GoHome_기획서.md` | md/git | Core game design (core loop, system specs, phase 1/2 scope, map plan) |
 | `Docs/Design/02_GoHome_기술분석서.md` | md/git | Per-system technical approach, complexity/person-day estimates |
-| `Docs/Design/03_GoHome_리스크_미결정사항.md` | md/git | ① Actually-open decisions, ② index of decisions already made |
-| GoHome 착수 로드맵 | **Notion** (search workspace by name) | Pre-kickoff checklist, DoD, dependencies, submission prep |
+| GoHome 착수 로드맵 | **Notion** (search workspace by name) | Pre-kickoff checklist, open decisions, DoD, dependencies, submission prep |
 | GoHome 담당자 배정 | **Notion DB** (search workspace by name) | Owner/target period/start conditions/status per system |
-| `Docs/Design/05_GoHome_참고문서_교차매핑.md` | md/git | Which source (teammate draft/mission guide) each design decision traces to; gap-check vs. mission guide |
 | `Docs/Design/DOC_MANAGEMENT.md` | md/git | Content-integrity rules for `Docs/Design/` (single source of truth, editing procedure, notation labels) |
 | `Docs/Dev/ARCHITECTURE.md` | md/git (dev) | Maps design-doc systems to UE classes/components/`Source/GoHome/` folders |
 | `Docs/Dev/CODING_CONVENTIONS.md` | md/git (dev) | C++ coding standards, folder rules, C++/Blueprint boundary |
