@@ -61,6 +61,12 @@ void AGoHomeCharacter::BeginPlay()
 				Subsystem->AddMappingContext(DefaultMappingContext, 0);
 			}
 		}
+		
+		if (PC->IsLocalController())
+		{
+			PC->SetInputMode(FInputModeGameOnly());
+			PC->bShowMouseCursor = false;
+		}
 	}
 }
 
