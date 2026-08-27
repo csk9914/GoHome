@@ -1,4 +1,5 @@
 #include "Player/CarryWeightComponent.h"
+#include "Net/UnrealNetwork.h"
 
 UCarryWeightComponent::UCarryWeightComponent()
 {
@@ -14,6 +15,7 @@ void UCarryWeightComponent::BeginPlay()
 	Super::BeginPlay();
 	FindWeightProviderComponents();
 	RefreshCurrentCarryWeight();
+	BroadcastCarryWeightChanged();
 
 }
 
@@ -43,7 +45,15 @@ float UCarryWeightComponent::GetOverweightAmount() const
 
 void UCarryWeightComponent::SetMaxCarryWeightBonus(float NewBonus)
 {
-	MaxCarryWeightBonus = FMath::Max(0.f, NewBonus);
+	const float ClampedBonus = FMath::Max(0.f, NewBonus);
+
+	if (FMath::IsNearlyEqual(MaxCarryWeightBonus, ClampedBonus))
+	{
+		return;
+	}
+
+	MaxCarryWeightBonus = ClampedBonus;
+	BroadcastCarryWeightChanged();
 }
 
 void UCarryWeightComponent::SetTemporaryMaxCarryWeightModifier(float NewModifier)
@@ -132,4 +142,27 @@ void UCarryWeightComponent::RefreshCurrentCarryWeight()
 	}
 
 	CurrentCarryWeight = NewCarryWeight;
+	BroadcastCarryWeightChanged();
+}
+
+// UI 관련
+void UCarryWeightComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(UCarryWeightComponent, MaxCarryWeightBonus);
+}
+
+void UCarryWeightComponent::OnRep_MaxCarryWeightBonus()
+{
+	BroadcastCarryWeightChanged();
+}
+
+void UCarryWeightComponent::BroadcastCarryWeightChanged()
+{
+	OnCarryWeightChanged.Broadcast(
+		GetCurrentCarryWeight(),
+		GetMaxCarryWeight(),
+		GetOverweightAmount()
+	);
 }

@@ -1,8 +1,7 @@
 
 
 #include "Player/WaterCurrentZone.h"
-#include "Components/SphereComponent.h"
-#include "Components/ArrowComponent.h"
+#include "Components/BoxComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Player/CarryWeightProvider.h"
@@ -16,17 +15,11 @@ AWaterCurrentZone::AWaterCurrentZone()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	EffectArea = CreateDefaultSubobject<USphereComponent>(TEXT("EffectArea"));
+	EffectArea = CreateDefaultSubobject<UBoxComponent>(TEXT("EffectArea"));
 	SetRootComponent(EffectArea);
-	EffectArea->InitSphereRadius(400.f);
+	EffectArea->SetBoxExtent(FVector(400.f, 400.f, 400.f));
 	EffectArea->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
 	EffectArea->SetGenerateOverlapEvents(true);
-
-	FlowIndicator = CreateDefaultSubobject<UArrowComponent>(TEXT("FlowIndicator"));
-	FlowIndicator->SetupAttachment(EffectArea);
-	FlowIndicator->SetArrowColor(FLinearColor::Blue);
-	FlowIndicator->ArrowSize = 2.f;
-	FlowIndicator->SetHiddenInGame(true);
 
 	FlowVFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("FlowVFX"));
 	FlowVFX->SetupAttachment(EffectArea);
@@ -46,21 +39,11 @@ void AWaterCurrentZone::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	ApplyForceToOverlappingCharacters(DeltaTime);
-
-	if (ZoneType == EWaterCurrentZoneType::Whirlpool)
-	{
-		DrawWhirlpoolDebugVisual();
-	}
-	else
-	{
-		DrawFlowDebugVisual();
-	}
 }
 
 void AWaterCurrentZone::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
-	UpdateFlowIndicator();
 	UpdateFlowVFX();
 }
 
@@ -212,27 +195,6 @@ float AWaterCurrentZone::GetWeightMultiplier(const AActor* OtherActor) const
 	return 1.f;
 }
 
-void AWaterCurrentZone::UpdateFlowIndicator()
-{
-	if (!FlowIndicator)
-	{
-		return;
-	}
-
-	const bool bShouldShow = (ZoneType == EWaterCurrentZoneType::Current);
-	FlowIndicator->SetVisibility(bShouldShow);
-
-	if (bShouldShow)
-	{
-		FVector Direction = FlowDirection.GetSafeNormal();
-		if (Direction.IsNearlyZero())
-		{
-			Direction = FVector::ForwardVector;
-		}
-		FlowIndicator->SetRelativeRotation(Direction.Rotation());
-	}
-}
-
 void AWaterCurrentZone::UpdateFlowVFX()
 {
 	if (!FlowVFX)
@@ -257,6 +219,9 @@ void AWaterCurrentZone::UpdateFlowVFX()
 		FlowVFX->SetAsset(TargetAsset);
 	}
 
+	FlowVFX->SetVariableVec3(FName("User.EffectScale"), EffectArea->GetScaledBoxExtent() / 400.f);
+	FlowVFX->SetVariableFloat(FName("User.Radius"), WhirlpoolRadius);
+
 	if (ZoneType == EWaterCurrentZoneType::Current)
 	{
 		FVector Direction = FlowDirection.GetSafeNormal();
@@ -272,62 +237,3 @@ void AWaterCurrentZone::UpdateFlowVFX()
 	}
 }
 
-void AWaterCurrentZone::DrawFlowDebugVisual() const
-{
-	FVector Direction = FlowDirection.GetSafeNormal();
-	if (Direction.IsNearlyZero())
-	{
-		Direction = GetActorForwardVector();
-	}
-
-	const float Radius = EffectArea->GetScaledSphereRadius();
-	constexpr float ScrollSpeed = 200.f;
-	constexpr float SegmentLength = 150.f;
-	constexpr int32 NumArrows = 4;
-	constexpr float HeightOffset = 80.f;
-
-	const float Time = GetWorld()->GetTimeSeconds();
-	const float ScrollOffset = FMath::Fmod(Time * ScrollSpeed, SegmentLength);
-	const FVector VerticalOffset(0.f, 0.f, HeightOffset);
-
-	for (int32 i = 0; i < NumArrows; ++i)
-	{
-		const float DistanceAlongFlow = (i * SegmentLength) + ScrollOffset - Radius;
-		const FVector Start = GetActorLocation() + Direction * DistanceAlongFlow + VerticalOffset;
-		const FVector End = Start + Direction * (SegmentLength * 0.6f);
-
-		DrawDebugDirectionalArrow(GetWorld(), Start, End, 40.f, FColor::Cyan, false, -1.f, 0, 4.f);
-	}
-}
-
-void AWaterCurrentZone::DrawWhirlpoolDebugVisual() const
-{
-	const FVector Center = GetActorLocation();
-	const float Radius = EffectArea->GetScaledSphereRadius();
-	const float Time = GetWorld()->GetTimeSeconds();
-
-	constexpr int32 NumArms = 3;
-	constexpr int32 PointsPerArm = 6;
-	constexpr float SpinSpeed = 2.f;
-	constexpr float SpiralTwist = 3.f;
-	constexpr float InwardSpeed = 0.4f;
-
-	for (int32 Arm = 0; Arm < NumArms; ++Arm)
-	{
-		const float ArmPhase = (2.f * PI / NumArms) * Arm;
-
-		for (int32 Point = 0; Point < PointsPerArm; ++Point)
-		{
-			const float PointPhase = static_cast<float>(Point) / PointsPerArm;
-			const float Progress = FMath::Fmod(Time * InwardSpeed + PointPhase, 1.f);
-
-			const float CurrentRadius = Radius * (1.f - Progress);
-			const float Angle = ArmPhase - Time * SpinSpeed - Progress * SpiralTwist;
-
-			const FVector Offset(FMath::Cos(Angle) * CurrentRadius, FMath::Sin(Angle) * CurrentRadius, 0.f);
-			const FVector PointLocation = Center + Offset;
-
-			DrawDebugSphere(GetWorld(), PointLocation, 15.f, 8, FColor::Magenta, false, -1.f, 0, 2.f);
-		}
-	}
-}

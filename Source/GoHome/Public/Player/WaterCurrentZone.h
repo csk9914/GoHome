@@ -6,8 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "WaterCurrentZone.generated.h"
 
-class USphereComponent;
-class UArrowComponent;
+class UBoxComponent;
 class UPrimitiveComponent;
 class ACharacter;
 class UNiagaraComponent;
@@ -63,22 +62,12 @@ protected:
 	// 켜져 있으면 OtherActor에서 ICarryWeightProvider를 찾아 무게에 따른 배율을 계산
 	float GetWeightMultiplier(const AActor* OtherActor) const;
 
-	void UpdateFlowIndicator();
-
 	void UpdateFlowVFX();
-
-	void DrawFlowDebugVisual() const;
-
-	void DrawWhirlpoolDebugVisual() const;
 
 	// 효과가 적용되는 범위. 이 구체 안에 있는 캐릭터에게 힘을 적용
 	// 소용돌이일 때는 이 반지름이 곧 소용돌이 크기, 디버그 시각화 범위 계산에도 사용됨
 	UPROPERTY(VisibleAnywhere, Category = "Water Current")
-	TObjectPtr<USphereComponent> EffectArea;
-
-	// Current 타입일 때 FlowDirection 방향을 화살표로 표시. 에디터 뷰포트에서만 보임
-	UPROPERTY(VisibleAnywhere, Category = "Water Current")
-	TObjectPtr<UArrowComponent> FlowIndicator;
+	TObjectPtr<UBoxComponent> EffectArea;
 
 	// Current 타입일 때 재생할 나이아가라 이펙트. 에디터에서 만든 NS_WaterFlow 같은 걸 여기에 연결
 	UPROPERTY(EditAnywhere, Category = "Water Current")
@@ -110,6 +99,9 @@ protected:
 	// [소용돌이 전용] 중심 기준 접선 방향으로 회전시키는 힘의 크기 (돌아가는 속도를 결정)
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Water Current|Whirlpool", meta = (ClampMin = "0.0", UIMin = "0.0", EditCondition = "ZoneType == EWaterCurrentZoneType::Whirlpool"))
 	float SpinStrength = 350.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Water Current|Whirlpool", meta = (ClampMin = "0.0", UIMin = "0.0", EditCondition = "ZoneType == EWaterCurrentZoneType::Whirlpool"))
+	float WhirlpoolRadius = 400.f;
 
 	// 무거운 아이템을 들고 있는 캐릭터(ICarryWeightProvider)일수록 힘을 세게 적용
 	// 기본은 꺼진 상태 - 나중에 체크박스만 켜면 바로 적용된다
