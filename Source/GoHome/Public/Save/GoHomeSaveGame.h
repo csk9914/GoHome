@@ -25,9 +25,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, Category = "Save")
 	int32 CurrentQuotaTarget = 0;
 
-	/** 할당량 연속 미달 횟수. N회(TBD) 도달 시 게임오버로 세이브 전체 초기화(02문서 13-2절). */
+	/** 할당량 누적 미달 횟수(연속 아님, 성공해도 리셋 안 됨). 3회(3스트라이크) 도달 시 게임오버로 세이브 전체 초기화(02문서 13-2절). */
 	UPROPERTY(BlueprintReadWrite, Category = "Save")
-	int32 ConsecutiveQuotaMisses = 0;
+	int32 QuotaMissCount = 0;
 
 	UPROPERTY(BlueprintReadWrite, Category = "Save")
 	TArray<FName> PurchasedUpgrades;
