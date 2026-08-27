@@ -1,30 +1,26 @@
 # GoHome Documentation Guide
 
-This repo is GoHome (a deep-sea Lethal Company-like co-op survival game), UE5.7. All docs/tools live under `Docs/`, split into **three systems**: `Docs/Design/` (md/git, files 01·02 — low change frequency, cross-indexing matters), Notion (high-change-frequency items like owners/schedule/DoD/open decisions that fit checkboxes/DBs), `Docs/Dev/` (md/git, developer docs that change with the code — architecture/coding conventions/AI agent guide/git workflow).
-
-Content rules specific to `Docs/Design/` (single-source-of-truth, editing procedure, notation labels, md↔Notion linking) live in [Docs/Design/DOC_MANAGEMENT.md](Docs/Design/DOC_MANAGEMENT.md) — read that file when editing a Design doc. This file only covers what's needed in every session: the doc map and link validation.
+This repo is GoHome (a deep-sea Lethal Company-like co-op survival game), UE5.7. Docs/tools live under `Docs/`, split into **two systems**: **Notion** (content that's fundamentally for the team, not the agent — game design, tech/estimate breakdown, kickoff roadmap, owner assignment, day-to-day Git branching procedure — high change frequency, checkbox/DB-friendly), `Docs/Dev/` (md/git, developer docs read directly by agents — architecture, coding conventions, the AI-agent routing guide, NodeCaster, BP comment colors, binary-merge-conflict CLI steps). **The goal is that `Docs/Dev/` + the current code are sufficient for normal dev-loop work** — not a rule against reading Notion. Notion isn't part of the agent's default working set simply because well-maintained `Docs/Dev/` shouldn't need it for routine work: if a question genuinely needs Notion content, ask the user for it rather than fetching it yourself, unless the user has explicitly asked you to go read/edit Notion.
 
 ## Document Lifecycle
 
-- **Now (design phase)**: `Docs/Dev/` (`ARCHITECTURE.md`/`CODING_CONVENTIONS.md`) is the primary reference for the main dev loop — `Docs/Design/` (01/02) is opened only when Dev docs don't cover the question (e.g. tracing a decision's original rationale), and edited only on the user's explicit request, never as a side effect of other work. When editing, `DOC_MANAGEMENT.md` rules apply in full.
-- **After prototype kickoff**: tag that commit and treat `Docs/Design/` as a frozen reference — this changes nothing about the rule above, since Design was already read-mostly. New Design decisions after the freeze still go through `DOC_MANAGEMENT.md`'s single-source-of-truth rules, but should be rare.
-- **Documented decisions are a baseline, not gospel**: if development surfaces a better design, don't silently follow a stale decision — use judgment, propose the improvement, and reflect it in the doc. Keep an "old decision X, rejected because Y" trail only when a different approach was actually considered and turned down (so it isn't proposed again later); a plain status update (not started → done, planned → implemented) just overwrites — no legacy trail needed. Implementation-status tags themselves ("design confirmed, not built yet", "unimplemented") shouldn't linger once code catches up — code is the single source of truth for what's built (see Document Map's `Docs/Dev/*.md` role), so drop the tag rather than flip it to "done". Keep the tag only while it flags something non-obvious (e.g. "half-wired — one path implemented, the other still a stub" traps a reader would otherwise miss); a plain "not started yet" tag on work that hasn't begun adds no information a `grep`/file-existence check wouldn't give faster. See `ARCHITECTURE.md`'s own note on this.
+- `Docs/Dev/` (`ARCHITECTURE.md`/`CODING_CONVENTIONS.md`/`AI_AGENT_GUIDE.md`) is the primary reference for the main dev loop and is read directly by agents. Design content (game design, system rationale, person-day estimates) lives in Notion and is opened only when Dev docs don't cover the question — default to asking the user to paste the relevant section rather than fetching it yourself.
+- **Documented decisions are a baseline, not gospel**: if development surfaces a better design, don't silently follow a stale decision — use judgment, propose the improvement, and reflect it in the doc (Dev doc directly; Notion via the user). Keep an "old decision X, rejected because Y" trail only when a different approach was actually considered and turned down (so it isn't proposed again later); a plain status update (not started → done, planned → implemented) just overwrites — no legacy trail needed. Implementation-status tags themselves ("design confirmed, not built yet", "unimplemented") shouldn't linger once code catches up — code is the single source of truth for what's built (see Document Map's `Docs/Dev/*.md` role), so drop the tag rather than flip it to "done". Keep the tag only while it flags something non-obvious (e.g. "half-wired — one path implemented, the other still a stub" traps a reader would otherwise miss); a plain "not started yet" tag on work that hasn't begun adds no information a `grep`/file-existence check wouldn't give faster.
 
 ## Document Map
 
-**Read any `Docs/Dev/*.md` file by section, not whole-file**: these are organized under distinct headers per system/topic. For a normal dev-loop question (e.g. "what class do I need for X", or a routing question answered by `AI_AGENT_GUIDE.md`'s table), `Grep -n "^#"` first to find the right header, then read from that header to the next same-level header — not the whole file. Whole-file reads are fine for meta questions about the docs themselves (e.g. "what's in Docs/Dev overall").
+**Read any `Docs/Dev/*.md` file by section, not whole-file**: `Grep -n "^#"` first to find the right header, then read from that header to the next same-level header.
 
 | Doc | Location | Role |
 |---|---|---|
-| `Docs/Design/01_GoHome_기획서.md` | md/git | Core game design (core loop, system specs, phase 1/2 scope, map plan) |
-| `Docs/Design/02_GoHome_기술분석서.md` | md/git | Per-system technical approach, complexity/person-day estimates |
+| GoHome 기획서 | **Notion** (search workspace by name) | Core game design (core loop, system specs, phase 1/2 scope, map plan) |
+| GoHome 기술분석서 | **Notion** (search workspace by name) | Per-system technical approach, complexity/person-day estimates |
 | GoHome 착수 로드맵 | **Notion** (search workspace by name) | Pre-kickoff checklist, open decisions, DoD, dependencies, submission prep |
 | GoHome 담당자 배정 | **Notion DB** (search workspace by name) | Owner/target period/start conditions/status per system |
-| `Docs/Design/DOC_MANAGEMENT.md` | md/git | Content-integrity rules for `Docs/Design/` (single source of truth, editing procedure, notation labels) |
-| `Docs/Dev/ARCHITECTURE.md` | md/git (dev) | Maps design-doc systems to UE classes/components/`Source/GoHome/` folders |
-| `Docs/Dev/CODING_CONVENTIONS.md` | md/git (dev) | C++ coding standards, folder rules, C++/Blueprint boundary |
-| `Docs/Dev/AI_AGENT_GUIDE.md` | md/git (dev) | Procedure teammates use to ask their AI coding agent about their assigned work |
-| `Docs/Dev/GIT_WORKFLOW.md` | md/git (dev) | GitHub Desktop workflow, branch strategy, when to adopt PRs |
+| GoHome Git 워크플로우 | **Notion** (search workspace by name) | GitHub Desktop branch/commit/PR-timing procedure — the CLI binary-conflict-resolution steps live in `CODING_CONVENTIONS.md` instead (agent needs those live, mid-conflict) |
+| `Docs/Dev/ARCHITECTURE.md` | md/git (dev) | Maps design systems to UE classes/components/`Source/GoHome/` folders — boundary rules and decisions the code doesn't enforce |
+| `Docs/Dev/CODING_CONVENTIONS.md` | md/git (dev) | C++ coding standards, folder rules, C++/Blueprint boundary, binary (`.uasset`/`.umap`) merge-conflict CLI resolution |
+| `Docs/Dev/AI_AGENT_GUIDE.md` | md/git (dev) | Procedure teammates use to ask their AI coding agent about their assigned work, incl. the question → doc routing table |
 | `Docs/Dev/NODECASTER_GUIDE.md` | md/git (dev) | NodeCaster install check + Blueprint graph JSON procedure — only opened for Blueprint node-graph questions |
 | `Docs/Dev/BP_COMMENT_COLORS.md` | md/git (dev) | Blueprint comment-box color semantics (HSV/Hex table) — only opened when adding comment boxes to a BP graph |
 
@@ -34,10 +30,10 @@ Content rules specific to `Docs/Design/` (single-source-of-truth, editing proced
 node Docs/tools/check_doc_links.js
 ```
 
-Reproduces GitHub's anchor-generation rule for every header in this file, `Docs/Design/*.md`, and `Docs/Dev/*.md`, then checks that every markdown cross-link with an anchor (relative path, including Dev → `../Design/...`) resolves to a real header. Run this habitually after any header-text change, in this file or Design/Dev docs alike. Assumes the repo is viewed on GitHub.
+Validates markdown anchor links in this file and `Docs/Dev/*.md`. Run after any header-text change.
 
 ```
 node Docs/tools/check_architecture_symbols.js
 ```
 
-Checks that backtick-quoted UE class/interface/enum names and `.h`/`.cpp` filenames in `ARCHITECTURE.md` actually exist under `Source/GoHome/`. Run this after renaming/deleting a class the doc names, or after editing `ARCHITECTURE.md`'s class references. Items tagged "(신설 제안)" in the doc are expected to be missing — treat those as noise, not failures.
+Checks that backtick-quoted UE class/interface/enum names and `.h`/`.cpp` filenames in `ARCHITECTURE.md` exist under `Source/GoHome/`. Run after renaming/deleting a class the doc names. Items tagged "(신설 제안)" are expected to be missing — treat as noise.

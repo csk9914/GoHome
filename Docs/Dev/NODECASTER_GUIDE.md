@@ -1,6 +1,6 @@
 # NodeCaster 사용 가이드 (Blueprint 시각화)
 
-> `Docs/Dev/` 문서군. [AI_AGENT_GUIDE.md](AI_AGENT_GUIDE.md)의 라우팅표 "Blueprint 노드 그래프 어떻게 만들어?" 행에서 연결된다. Blueprint 노드 그래프를 제안해야 하는 질문이 아니면 이 문서를 열 필요가 없다.
+> `Docs/Dev/` 문서군. [AI_AGENT_GUIDE.md](AI_AGENT_GUIDE.md)의 라우팅표 "Blueprint 노드 그래프 어떻게 만들어?" 행에서 연결된다.
 
 ## 1. 설치 확인
 

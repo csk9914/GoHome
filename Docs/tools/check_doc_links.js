@@ -1,4 +1,4 @@
-// GoHome 문서(Docs/Design/01~05, Docs/Dev/*.md) 상호 링크 검증 스크립트
+// GoHome 문서(저장소 루트 CLAUDE.md + Docs/Dev/*.md) 상호 링크 검증 스크립트
 // 사용법: node Docs/tools/check_doc_links.js  (프로젝트 루트 C:\CSK\Unreal\GoHome 에서 실행)
 //
 // 문서들은 서로를 [텍스트](파일.md#앵커) 형태의 상대경로 링크로 참조한다. 문서 헤더 제목을 바꾸면
@@ -6,34 +6,25 @@
 // 에러가 나지 않으므로 사람이 눈으로 못 찾는다). 이 스크립트가 GitHub의 앵커 생성 규칙을
 // 그대로 재현해 모든 헤더의 앵커를 계산하고, 실제 링크가 그 앵커 목록에 있는지 대조한다.
 //
-// 검사 대상: 저장소 루트 CLAUDE.md + Docs/Design/01,02,03,05·DOC_MANAGEMENT.md (기획 문서) +
-// Docs/Dev/*.md (개발 문서, ARCHITECTURE/CODING_CONVENTIONS/AI_AGENT_GUIDE 등). 링크는 절대경로가
-// 아니라 파일 기준 상대경로로 해석하므로 Docs/Dev/ 문서가 ../Design/...md#앵커 형태로 기획서를
-// 참조하는 링크, CLAUDE.md와 Docs/Design/·Docs/Dev/ 사이를 오가는 링크도 함께 검증된다.
-// Notion 링크(URL)는 md 파일이 아니므로 애초에 이 스크립트의 검사 대상이 아니다 — 깨졌는지는 수동 확인.
+// 검사 대상: 저장소 루트 CLAUDE.md + Docs/Dev/*.md (개발 문서, ARCHITECTURE/CODING_CONVENTIONS 등).
+// 기획 문서(01_GoHome_기획서, 02_GoHome_기술분석서)는 Notion으로 이관되어 이 저장소에 없다 —
+// md 파일이 아니므로 애초에 이 스크립트의 검사 대상이 아니다. Notion 링크(URL)도 마찬가지로
+// 검사 대상 밖 — 깨졌는지는 수동 확인.
 //
 // 문서 내용을 고친 뒤에는 습관적으로 이 스크립트를 돌려서 0 errors를 확인할 것.
 
 const fs = require('fs');
 const path = require('path');
 
-// 04_GoHome_착수로드맵.md는 Notion으로 완전히 이전되어 파일 자체가 저장소에 없다. designFiles
-// 필터가 01/02/03/05·DOC_MANAGEMENT만 골라 검증 대상 헤더 목록에서 자연히 제외한다 —
-// 이렇게 해두면 누군가 실수로 04에 앵커 링크(#...)를 다시 걸어도
-// anchorSets에 그 파일이 없으므로 FILE_NOT_FOUND로 정확히 잡힌다.
 const projectRoot = path.resolve(__dirname, '..');
-const designDir = path.join(projectRoot, 'Design');
 const devDir = path.join(projectRoot, 'Dev');
 
-const designFiles = fs.readdirSync(designDir)
-  .filter(f => f === 'DOC_MANAGEMENT.md' || /^0[1235]_GoHome_.*\.md$/.test(f))
-  .map(f => path.join(designDir, f));
 const devFiles = fs.readdirSync(devDir)
   .filter(f => /\.md$/.test(f))
   .map(f => path.join(devDir, f));
 const rootFiles = [path.join(projectRoot, '..', 'CLAUDE.md')];
 
-const targetFiles = [...designFiles, ...devFiles, ...rootFiles];
+const targetFiles = [...devFiles, ...rootFiles];
 
 function githubAnchor(header) {
   let h = header.toLowerCase();
@@ -49,8 +40,7 @@ function githubAnchor(header) {
   return h;
 }
 
-// 절대경로 기준으로 앵커 집합을 관리한다 — Dev -> ../Design/... 처럼 폴더를 넘나드는
-// 상대경로 링크도 같은 기준으로 정규화해서 대조할 수 있게 하기 위함.
+// 절대경로 기준으로 앵커 집합을 관리한다.
 const anchorSets = {};
 for (const absPath of targetFiles) {
   const content = fs.readFileSync(absPath, 'utf-8');
