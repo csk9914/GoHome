@@ -2,7 +2,7 @@
 
 
 #include "Player/HydrothermalVentZone.h"
-#include "Components/SphereComponent.h"
+#include "Components/BoxComponent.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Player/Damageable.h"
@@ -12,9 +12,9 @@
 AHydrothermalVentZone::AHydrothermalVentZone()
 {
 	PrimaryActorTick.bCanEverTick = true;
-	EffectArea = CreateDefaultSubobject<USphereComponent>(TEXT("EffectArea"));
+	EffectArea = CreateDefaultSubobject<UBoxComponent>(TEXT("EffectArea"));
 	SetRootComponent(EffectArea);
-	EffectArea->InitSphereRadius(400.f);
+	EffectArea->SetBoxExtent(FVector(400.f, 400.f, 400.f));
 	EffectArea->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
 	EffectArea->SetGenerateOverlapEvents(true);
 
@@ -42,8 +42,6 @@ void AHydrothermalVentZone::Tick(float DeltaTime)
 	{
 		ApplyDamageToOverlappingCharacters(DeltaTime);
 	}
-
-	DrawVentDebugVisual();
 }
 
 void AHydrothermalVentZone::OnEffectAreaBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -148,37 +146,6 @@ void AHydrothermalVentZone::ApplyDamageToOverlappingCharacters(float DeltaTime)
 	}
 }
 
-void AHydrothermalVentZone::DrawVentDebugVisual() const
-{
-	const FVector Center = GetActorLocation();
-	const float Radius = EffectArea->GetScaledSphereRadius();
-
-	constexpr int32 NumColumns = 5;
-	constexpr float ScrollSpeed = 300.f;
-	constexpr float SegmentLength = 100.f;
-	constexpr int32 NumArrowsPerColumn = 3;
-
-	const float Time = GetWorld()->GetTimeSeconds();
-	const float ScrollOffset = FMath::Fmod(Time * ScrollSpeed, SegmentLength);
-
-	for (int32 Column = 0; Column < NumColumns; ++Column)
-	{
-		const float Angle = (2.f * PI / NumColumns) * Column;
-		const float ColumnRadius = Radius * 0.3f;
-		const FVector ColumnOffset(FMath::Cos(Angle) * ColumnRadius, FMath::Sin(Angle) * ColumnRadius, 0.f);
-		const FVector ColumnBase = Center + ColumnOffset;
-
-		for (int32 i = 0; i < NumArrowsPerColumn; ++i)
-		{
-			const float HeightOffset = (i * SegmentLength) + ScrollOffset;
-			const FVector Start = ColumnBase + FVector(0.f, 0.f, HeightOffset);
-			const FVector End = Start + FVector(0.f, 0.f, SegmentLength * 0.6f);
-
-			DrawDebugDirectionalArrow(GetWorld(), Start, End, 30.f, FColor::Orange, false, -1.f, 0, 3.f);
-		}
-	}
-}
-
 void AHydrothermalVentZone::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
@@ -198,4 +165,6 @@ void AHydrothermalVentZone::UpdateVentSmokeVFX()
 	{
 		VentSmokeVFX->SetAsset(VentSmokeVFXAsset);
 	}
+
+	VentSmokeVFX->SetVariableVec3(FName("User.EffectScale"), EffectArea->GetScaledBoxExtent() / 400.f);
 }

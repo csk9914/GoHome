@@ -6,7 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "HydrothermalVentZone.generated.h"
 
-class USphereComponent;
+class UBoxComponent;
 class UPrimitiveComponent;
 class ACharacter;
 class UNiagaraComponent;
@@ -36,9 +36,6 @@ protected:
 	// 존 안에 있는 캐릭터들에게 매 프레임 지속 데미지를 적용 (서버 전용 - 데미지 권위 판정은 서버만)
 	void ApplyDamageToOverlappingCharacters(float DeltaTime);
 
-	// 에디터/PIE 뷰포트에서 분출 기둥을 화살표로 시각화 (WaterCurrentZone의 디버그 시각화와 동일한 방식)
-	void DrawVentDebugVisual() const;
-
 	virtual void OnConstruction(const FTransform& Transform) override;
 	
 	// VentSmokeVFXAsset이 바뀌면 컴포넌트에 반영 (에디터에서 바로 미리보기 가능하게)
@@ -46,7 +43,7 @@ protected:
 
 	// 효과가 적용되는 범위. 이 구체 안에 있는 캐릭터에게 상승력과 지속 데미지를 적용
 	UPROPERTY(VisibleAnywhere, Category = "Hydrothermal Vent")
-	TObjectPtr<USphereComponent> EffectArea;
+	TObjectPtr<UBoxComponent> EffectArea;
 
 	// 초당 위로 밀어내는 힘의 크기
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Hydrothermal Vent", meta = (ClampMin = "0.0", UIMin = "0.0"))
