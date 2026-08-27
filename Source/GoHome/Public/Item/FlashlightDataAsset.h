@@ -43,4 +43,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Flashlight")
 	FLinearColor LightColor = FLinearColor::White;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Flashlight", meta = (ToolTip = "Omni 타입 전용 - 총 점등 가능 시간(초). 켜져 있는 동안만 소모, 다 쓰면 재점등 불가능한 1회용 소모품"))
+	float GlowChargeDuration = 15.f;
+
 };
