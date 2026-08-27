@@ -6,6 +6,15 @@
 #include "Interaction/WeightProvider.h"
 #include "CarryWeightComponent.generated.h"
 
+// UI 갱신용
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(
+	FOnCarryWeightChanged,
+	float, CurrentWeight,
+	float, MaxWeight,
+	float, OverweightAmount
+);
+
+
 /**
  * 플레이어의 운반 무게 상태를 계산한다.
  *
@@ -20,6 +29,10 @@ class GOHOME_API UCarryWeightComponent : public UActorComponent, public ICarryWe
 public:
 	UCarryWeightComponent();
 
+	UPROPERTY(BlueprintAssignable, Category = "Carry Weight")
+	FOnCarryWeightChanged OnCarryWeightChanged;
+
+	UFUNCTION(BlueprintPure, Category = "Carry Weight")
 	virtual float GetCurrentCarryWeight() const override;
 	
 	UFUNCTION(BlueprintPure, Category = "Carry Weight")
@@ -45,7 +58,7 @@ protected:
 
 	// 업그레이드 시스템이 더해주는 최대 무게 보너스.
 	// 외부 시스템은 값에 직접 접근하지 않고 Set 함수로만 변경한다.
-	UPROPERTY(BlueprintReadOnly, Category = "Carry Weight")
+	UPROPERTY(ReplicatedUsing = OnRep_MaxCarryWeightBonus, BlueprintReadOnly, Category = "Carry Weight")
 	float MaxCarryWeightBonus = 0.f;
 
 	// 버프/디버프처럼 일시적으로 적용되는 최대 무게 보정값.
@@ -57,6 +70,12 @@ protected:
 	// GetCurrentCarryWeight()는 매번 합산하지 않고 이 저장값을 반환한다.
 	UPROPERTY(BlueprintReadOnly, Category = "Carry Weight")
 	float CurrentCarryWeight = 0.f;
+
+	// UI 갱신 관련 함수
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION()
+	void OnRep_MaxCarryWeightBonus();
 
 
 private:
@@ -73,6 +92,9 @@ private:
 
 	// 0.1초마다 현재 운반 무게를 갱신한다.
 	void RefreshCurrentCarryWeight();
+
+	// UI 갱신 관련
+	void BroadcastCarryWeightChanged();
 
 public:
 	UFUNCTION(BlueprintCallable, Category = "Carry Weight")
