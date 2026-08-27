@@ -4,6 +4,7 @@
 #include "Player/CarryWeightProvider.h"
 #include "Player/Damageable.h"
 #include "Player/DeathNotifier.h"
+#include "Player/OxygenDrainBoostConfig.h"
 
 UOxygenComponent::UOxygenComponent()
 {
@@ -89,6 +90,7 @@ void UOxygenComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActo
 		return;
 	}
 
+	RemoveInvalidDrainBoosts();
 	UpdateOxygen(DeltaTime);
 }
 
@@ -217,7 +219,10 @@ float UOxygenComponent::CalculateOxygenDrainRate() const
 	const float BaseDrainRate = MaxOxygen / TargetOxygenDuration;
 	const float OverweightDrainMultiplier = CalculateOverweightDrainMultiplier();
 
-	return FMath::Max(0.f, BaseDrainRate * OverweightDrainMultiplier);
+	// 몬스터 배율 추가 계산식 변경
+	const float MonsterDrainMultiplier = CalculateMonsterDrainMultiplier();
+
+	return FMath::Max(0.f, BaseDrainRate * OverweightDrainMultiplier * MonsterDrainMultiplier);
 }
 
 float UOxygenComponent::CalculateOverweightDrainMultiplier() const
@@ -260,4 +265,70 @@ void UOxygenComponent::OnRep_Oxygen()
 void UOxygenComponent::OnRep_InSafeZone()
 {
 	OnSafeZoneChanged.Broadcast(bInSafeZone);
+}
+
+
+// 몬스터 산소 추가 감소 관련 함수들
+void UOxygenComponent::StartOxygenDrainBoostFromInstigator(AActor* InstigatorActor)
+{
+	if (!HasOwnerAuthority() || !IsValid(InstigatorActor))
+	{
+		return;
+	}
+
+	RemoveInvalidDrainBoosts();
+
+	const float DrainMultiplier = OxygenDrainBoostConfig
+		? OxygenDrainBoostConfig->GetDrainMultiplierForInstigator(InstigatorActor)
+		: 1.f;
+
+	if (DrainMultiplier <= 1.f)
+	{
+		ActiveBoosts.Remove(TWeakObjectPtr<AActor>(InstigatorActor));
+		return;
+	}
+
+	ActiveBoosts.FindOrAdd(TWeakObjectPtr<AActor>(InstigatorActor)) = DrainMultiplier;
+}
+
+void UOxygenComponent::StopOxygenDrainBoostFromInstigator(AActor* InstigatorActor)
+{
+	if (!HasOwnerAuthority() || !InstigatorActor)
+	{
+		return;
+	}
+
+	ActiveBoosts.Remove(TWeakObjectPtr<AActor>(InstigatorActor));
+}
+
+float UOxygenComponent::CalculateMonsterDrainMultiplier() const
+{
+	float CombinedMultiplier = 1.f;
+
+	for (const TPair<TWeakObjectPtr<AActor>, float>& BoostPair : ActiveBoosts)
+	{
+		if (!BoostPair.Key.IsValid())
+		{
+			continue;
+		}
+
+		CombinedMultiplier += FMath::Max(1.f, BoostPair.Value) - 1.f;
+	}
+
+	const float MaxMultiplier = OxygenDrainBoostConfig
+		? FMath::Max(1.f, OxygenDrainBoostConfig->MaxMonsterDrainMultiplier)
+		: CombinedMultiplier;
+
+	return FMath::Clamp(CombinedMultiplier, 1.f, MaxMultiplier);
+}
+
+void UOxygenComponent::RemoveInvalidDrainBoosts()
+{
+	for (auto It = ActiveBoosts.CreateIterator(); It; ++It)
+	{
+		if (!It.Key().IsValid())
+		{
+			It.RemoveCurrent();
+		}
+	}
 }

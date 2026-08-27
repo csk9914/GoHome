@@ -5,6 +5,7 @@
 #include "Player/CarryWeightProvider.h"
 #include "OxygenComponent.generated.h"
 
+class UOxygenDrainBoostConfig;
 class UCurveFloat;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnOxygenChanged, float, CurrentOxygen, float, MaxOxygen);
@@ -108,4 +109,20 @@ private:
 	float GetCachedOverweightAmount() const;
 	// 죽으면 산소 Tick 끄기
 	void HandleOwnerDeath();
+
+
+// 몬스터 공격시 추가 산소 감소 관련
+private:
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Oxygen|Monster Drain", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UOxygenDrainBoostConfig> OxygenDrainBoostConfig;
+
+	TMap<TWeakObjectPtr<AActor>, float> ActiveBoosts;
+
+private:
+	float CalculateMonsterDrainMultiplier() const;
+	void RemoveInvalidDrainBoosts();
+
+public:
+	void StartOxygenDrainBoostFromInstigator(AActor* InstigatorActor);
+	void StopOxygenDrainBoostFromInstigator(AActor* InstigatorActor);
 };
