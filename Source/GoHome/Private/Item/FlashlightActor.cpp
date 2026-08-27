@@ -59,10 +59,13 @@ void AFlashlightActor::SyncLightFromData()
 	SpotLight->SetLightColor(FlashlightData->LightColor);
 	SpotLight->AttenuationRadius = FlashlightData->AttenuationRadius;
 	SpotLight->SetOuterConeAngle(FlashlightData->OuterConeAngle);
+	SpotLight->SetInnerConeAngle(FlashlightData->InnerConeAngle);
+	SpotLight->SetVolumetricScatteringIntensity(FlashlightData->VolumetricScatteringIntensity);
 
 	PointLight->Intensity = FlashlightData->Intensity;
 	PointLight->SetLightColor(FlashlightData->LightColor);
 	PointLight->AttenuationRadius = FlashlightData->AttenuationRadius;
+	PointLight->SetVolumetricScatteringIntensity(FlashlightData->VolumetricScatteringIntensity);
 
 	const bool bUseSpot = FlashlightData->FixtureType == ELightFixtureType::Spot;
 	ActiveLight = bUseSpot ? Cast<USceneComponent>(SpotLight) : Cast<USceneComponent>(PointLight);
