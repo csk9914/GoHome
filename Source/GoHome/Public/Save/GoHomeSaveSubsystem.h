@@ -1,11 +1,10 @@
-
-
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "GoHomeSaveSubsystem.generated.h"
 
+class UWorld;
 class UGoHomeSaveGame;
 enum class EExpeditionState : uint8;
 
@@ -15,19 +14,28 @@ enum class EExpeditionState : uint8;
  * NewState == Lobby일 때 저장하며, 구독 직후 현재 상태가 이미 Lobby면 즉시 저장한다
  * (로비 맵 재진입 시 엣지 트리거 누락 방지).
  */
+
 UCLASS()
 class GOHOME_API UGoHomeSaveSubsystem : public UGameInstanceSubsystem
 {
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(BlueprintReadOnly, Category = "Save")
-	TObjectPtr<UGoHomeSaveGame> SaveGame;
-
+	virtual void Initialize(FSubsystemCollectionBase& CollectionBase) override;
+	virtual void Deinitialize() override;
+	
 	UFUNCTION(BlueprintCallable, Category = "Save")
 	void SaveToDisk();
 
 protected:
 	UFUNCTION()
 	void OnExpeditionStateChanged(EExpeditionState NewState);
+	
+	void OnPostLoadMap(UWorld* LoadedWorld);
+	
+	UPROPERTY(BlueprintReadOnly, Category = "Save")
+	TObjectPtr<UGoHomeSaveGame> SaveGame;
+	
+private:
+	FDelegateHandle PostLoadMapHandle;
 };

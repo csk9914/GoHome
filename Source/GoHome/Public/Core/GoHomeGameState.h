@@ -20,9 +20,6 @@ class GOHOME_API AGoHomeGameState : public AGameState
 public:
 	AGoHomeGameState();
 
-	UFUNCTION(BlueprintCallable, Category="Expedition")
-	void SetState(EExpeditionState NewState);
-
 	UFUNCTION(BlueprintCallable, Category = "Expedition")
 	void AddDeliveredValue(int32 Value);
 
@@ -31,21 +28,28 @@ public:
 
 	void OnPlayerRemovedFromParty(APlayerState* PlayerState);
 
-	UFUNCTION(BlueprintPure, Category="Docking Door")
-	UDockingDoorComponent* GetDockingDoorComponent() const { return DockingDoorComponent; }
-
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UFUNCTION()
 	void OnRep_State();
 
-protected:
-	UPROPERTY(ReplicatedUsing = OnRep_State, BlueprintReadOnly, Category = "Expedition")
-	EExpeditionState CurrentState = EExpeditionState::Lobby;
+public:
+	UFUNCTION(BlueprintCallable, Category="Expedition")
+	void SetState(EExpeditionState NewState);
+	
+	UFUNCTION(BlueprintPure, Category = "Expedition")
+	EExpeditionState GetCurrentState() const { return CurrentState; }
+
+	UFUNCTION(BlueprintPure, Category="Docking Door")
+	UDockingDoorComponent* GetDockingDoorComponent() const { return DockingDoorComponent; }
 
 	UPROPERTY(BlueprintAssignable, Category = "Expedition")
 	FOnExpeditionStateChanged OnStateChanged;
+
+protected:
+	UPROPERTY(ReplicatedUsing = OnRep_State, BlueprintReadOnly, Category = "Expedition")
+	EExpeditionState CurrentState = EExpeditionState::Lobby;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Docking Door")
 	TObjectPtr<UDockingDoorComponent> DockingDoorComponent;
