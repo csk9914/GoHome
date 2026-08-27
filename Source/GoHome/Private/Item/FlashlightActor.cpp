@@ -25,6 +25,31 @@ void AFlashlightActor::BeginPlay()
 	SyncLightFromData();
 }
 
+
+void AFlashlightActor::Tick(float DeltaTime)
+{
+	if (HoldingPawn)
+	{
+		// 손에 들린 동안은 부력 로직(Super) 대신, 빛 회전을 풀레이어 시야 방향으로 계속 맟춰줌.
+		// Camera 컴포넌트를 직접 읽으면 본인 화면에서만 정확하고 다른 클라이언트에겐 실시간으로 복제 되지 않음.
+		// 리플리케이트 되는 ActorRotation(Yaw) + CurrentPitch 조합 사용.
+		// 모든 클라이언트에서 각자 로컬로 계산 -> 서버 권위 체크 없음.
+		if (bIsOn)
+		{
+			if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(HoldingPawn))
+			{
+				const FRotator ViewRotation(Character->CurrentPitch, HoldingPawn->GetActorRotation().Yaw, 0.f);
+				SpotLight->SetWorldRotation(ViewRotation);
+			}
+		}
+		return;
+	}
+
+	Super::Tick(DeltaTime); //  드롭된 상태(부유/가라앉기)는 기존 부력 로직 그대로 수행.
+
+}
+
+
 void AFlashlightActor::SyncLightFromData()
 {
 	const UFlashlightDataAsset* FlashlightData = Cast<UFlashlightDataAsset>(ItemData);
@@ -70,12 +95,16 @@ void AFlashlightActor::UpdateAttachment(APawn* OldHoldinPawn)
 	{
 		MeshComponent->SetVisibility(true, false);
 		MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		MeshComponent->SetCastShadow(false); // 손전등 그림자가 생기는 것 방지.
 
 		if (HasAuthority())
 		{
 			MeshComponent->SetSimulatePhysics(false);
-			CancelFloatCycle();
+			CancelFloatCycle(); // 부력용 Tick은 끔.
 		}
+
+		// 빛 회전 동기화용으로 Tick은 계속 켜둬야함(서버+클라 전부 로컬로 계산 해야함 -> HasAuthority 밖에서 호출).
+		SetActorTickEnabled(true);
 
 		if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(HoldingPawn))
 		{
@@ -88,6 +117,7 @@ void AFlashlightActor::UpdateAttachment(APawn* OldHoldinPawn)
 		MeshComponent->SetVisibility(true, false);
 		MeshComponent->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
 		MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		MeshComponent->SetCastShadow(true); // 월드에 놓인 손전등은 다시 정상적으로 그림자를 짐.
 
 		if (HasAuthority())
 		{

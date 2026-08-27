@@ -39,6 +39,7 @@ public:
 protected:
 
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaTime) override;
 	virtual void OnRep_ItemData() override;
 	virtual void UpdateAttachment(APawn* OldHoldingPawn = nullptr) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
