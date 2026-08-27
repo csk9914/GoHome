@@ -37,8 +37,8 @@ void UGoHomeNoiseLibrary::GenerateNoise(
 			Listener->GetActorLocation(),
 			Location
 		);
-		if (Distance <= Radius)
-		{
+		
+		
 			IMonsterNoiseListener::Execute_OnNoiseHeard(
 				Listener,
 				Location,
@@ -46,6 +46,6 @@ void UGoHomeNoiseLibrary::GenerateNoise(
 				Type,
 				Source
 			);
-		}
+		
 	}
 }
