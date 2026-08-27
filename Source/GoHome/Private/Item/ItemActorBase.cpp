@@ -193,6 +193,8 @@ void AItemActorBase::UpdateAttachment(APawn* OldHoldingPawn)
 		// 활성 슬롯: 손에 보이게 부착.
 		MeshComponent->SetVisibility(true, true);
 		MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		// 습득한 아이템의 그림자가 시야를 가리는 것 방지.
+		MeshComponent->SetCastShadow(false);
 
 		if (HasAuthority())
 		{
@@ -235,6 +237,8 @@ void AItemActorBase::UpdateAttachment(APawn* OldHoldingPawn)
 		MeshComponent->SetVisibility(true, true);
 		MeshComponent->DetachFromComponent(FDetachmentTransformRules::KeepWorldTransform);
 		MeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+		// 월드에 놓인 오브젝트는 다시 정상적으로 그림자가 생김.
+		MeshComponent->SetCastShadow(true);
 
 		if (HasAuthority())
 		{
