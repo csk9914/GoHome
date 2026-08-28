@@ -37,6 +37,11 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Interaction")
 	float TraceInterval = 0.1f;
 
+	// 오브젝트 테두리 강조 표시용. Custom Depth 스텐실 값.
+	// 추후 아이템 종류에 따라 색상을 다르게 쓰고 싶다면, 해당 값을 종류별로 다르게 주고,
+	// 포스트프로세싱 머터리얼에서 값별로 분기하면 됨(지금은 1가지만 사용).
+	UPROPERTY(EditAnywhere, Category = "Interaction")
+	int32 OutlineStencilValue = 1;
 
 	// 지금 조준 중인 대상 (없으면 nullptr). HUD/디버깅에서 조회용.
 	UFUNCTION(BlueprintPure, Category = "Interaction")
@@ -56,6 +61,9 @@ protected:
 private:
 
 	void PerformTrace();
+
+	// Target의 모든 PrimitiveComponent에 Custom Depth 렌더링을 켜거나 끔(메쉬 테두리 강조 표시용).
+	void SetOutlineEnabled(AActor* Target, bool bEnabled);
 
 	UPROPERTY()
 	TObjectPtr<UCameraComponent> CachedCamera;

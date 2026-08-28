@@ -20,6 +20,7 @@ AHydrothermalVentZone::AHydrothermalVentZone()
 
 	VentSmokeVFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("VentSmokeVFX"));
 	VentSmokeVFX->SetupAttachment(EffectArea);
+	VentSmokeVFX->SetAbsolute(false, false, true);
 	VentSmokeVFX->bAutoActivate = true;
 }
 

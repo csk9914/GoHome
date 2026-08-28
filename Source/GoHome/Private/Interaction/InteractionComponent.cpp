@@ -4,6 +4,7 @@
 #include "Interaction/Interactable.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/Pawn.h"
+#include "Components/PrimitiveComponent.h"
 
 UInteractionComponent::UInteractionComponent()
 {
@@ -61,11 +62,32 @@ void UInteractionComponent::PerformTrace()
 
 	if (NewTarget != CurrentTarget)
 	{
+		SetOutlineEnabled(CurrentTarget, false);
 		CurrentTarget = NewTarget;
+		SetOutlineEnabled(CurrentTarget, true);
 
 		OnInteractableTargetChanged.Broadcast(CurrentTarget);
 	}
 }
+
+void UInteractionComponent::SetOutlineEnabled(AActor* Target, bool bEnabled)
+{
+	if (!Target) return;
+
+	TArray<UPrimitiveComponent*> PrimitiveComponents;
+	Target->GetComponents<UPrimitiveComponent>(PrimitiveComponents);
+
+	for (UPrimitiveComponent* Component : PrimitiveComponents)
+	{
+		Component->SetRenderCustomDepth(bEnabled);
+		if (bEnabled)
+		{
+			Component->SetCustomDepthStencilValue(OutlineStencilValue);
+		}
+	}
+}
+
+
 
 
 
