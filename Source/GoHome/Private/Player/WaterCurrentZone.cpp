@@ -23,6 +23,7 @@ AWaterCurrentZone::AWaterCurrentZone()
 
 	FlowVFX = CreateDefaultSubobject<UNiagaraComponent>(TEXT("FlowVFX"));
 	FlowVFX->SetupAttachment(EffectArea);
+	FlowVFX->SetAbsolute(false, false, true);
 	FlowVFX->bAutoActivate = true;
 }
 
