@@ -59,6 +59,16 @@ void UOxygenComponent::SetInSafeZone(bool bNewInSafeZone)
 	OnSafeZoneChanged.Broadcast(bInSafeZone);
 }
 
+void UOxygenComponent::SetSprintDrainMultiplier(float NewMultiplier)
+{
+	if (!HasOwnerAuthority())
+	{
+		return;
+	}
+
+	SprintDrainMultiplier = FMath::Max(0.f, NewMultiplier);
+}
+
 void UOxygenComponent::BeginPlay()
 {
 	Super::BeginPlay();
@@ -222,7 +232,7 @@ float UOxygenComponent::CalculateOxygenDrainRate() const
 	// 몬스터 배율 추가 계산식 변경
 	const float MonsterDrainMultiplier = CalculateMonsterDrainMultiplier();
 
-	return FMath::Max(0.f, BaseDrainRate * OverweightDrainMultiplier * MonsterDrainMultiplier);
+	return FMath::Max(0.f, BaseDrainRate * OverweightDrainMultiplier * MonsterDrainMultiplier * SprintDrainMultiplier);
 }
 
 float UOxygenComponent::CalculateOverweightDrainMultiplier() const

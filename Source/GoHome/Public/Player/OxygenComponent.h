@@ -52,6 +52,10 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Oxygen")
 	void SetInSafeZone(bool bNewInSafeZone);
 
+	// 스프린트 전용 산소 소모 배율. 1.0 = 평소와 동일. 기존 초과무게/몬스터 배율과는 별개로 곱해진다.
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Oxygen")
+	void SetSprintDrainMultiplier(float NewMultiplier);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
@@ -109,6 +113,8 @@ private:
 	float GetCachedOverweightAmount() const;
 	// 죽으면 산소 Tick 끄기
 	void HandleOwnerDeath();
+
+	float SprintDrainMultiplier = 1.f;
 
 
 // 몬스터 공격시 추가 산소 감소 관련

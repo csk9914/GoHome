@@ -13,6 +13,7 @@ class UInputAction;
 class UInputMappingContext;
 class UCameraComponent;
 class USkeletalMeshComponent;
+class UOxygenComponent;
 
 UCLASS()
 class GOHOME_API AGoHomeCharacter : public ACharacter, public ISocketProvider
@@ -28,6 +29,14 @@ protected:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	void Move(const FInputActionValue& Value);
+	void MoveUpDown(const FInputActionValue& Value);
+	
+	void StartSprint();
+	void StopSprint();
+	UFUNCTION(Server, Reliable)
+	void ServerSetSprinting(bool bNewSprinting);
+	void ApplySprintState(bool bNewSprinting);
+
 	void Look(const FInputActionValue& Value);
 	void StartTalking();
 	void StopTalking();
@@ -44,6 +53,12 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> MoveAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> MoveUpDownAction;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> SprintAction;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> LookAction;
@@ -127,5 +142,19 @@ protected:
 
 	// 마지막 소음 발생 이후 누적 시간
 	float TimeSinceLastSwimNoise = 0.f;
+
+	// 스프린트 관련
+	private:
+		UPROPERTY(EditDefaultsOnly, Category = "Movement", meta = (ClampMin = "1.0", UIMin = "1.0"))
+		float SprintSpeedMultiplier = 1.5f;
+
+		UPROPERTY(EditDefaultsOnly, Category = "Movement", meta = (ClampMin = "1.0", UIMin = "1.0"))
+		float SprintOxygenDrainMultiplier = 1.5f;
+
+		bool bIsSprinting = false;
+		float DefaultMaxSwimSpeed = 0.f;
+
+		UPROPERTY()
+		TObjectPtr<UOxygenComponent> CachedOxygenComponent;
 };
 
