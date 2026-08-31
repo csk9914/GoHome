@@ -24,4 +24,11 @@ public:
 	// UI 실제 생성/뷰포트 추가는 BP에서 (WBP_ZoneSelect 참조는 C++이 몰라도 되므로)                  
 	UFUNCTION(Client, Reliable)                                                                       
 	void Client_OpenSelectZone();
+
+	// 강화 관련
+	UFUNCTION(BlueprintImplementableEvent, Category = "UI")
+	void OnOpenEquipmentUpgrade();
+
+	UFUNCTION(Client, Reliable)
+	void Client_OpenEquipmentUpgrade();
 };

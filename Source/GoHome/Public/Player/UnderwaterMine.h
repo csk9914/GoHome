@@ -30,6 +30,7 @@ public:
 protected:
     virtual void BeginPlay() override;
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    virtual void Tick(float DeltaSeconds) override;
 
     UFUNCTION()
     void OnTriggerBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
@@ -69,6 +70,11 @@ protected:
     bool bHasTriggered = false;
 
     FTimerHandle DetonationTimerHandle;
+
+    float WarningStartTime = 0.f;
+
+    UPROPERTY(BlueprintReadOnly, Category = "Mine")
+    float WarningProgress = 0.f;
 
 public:
     UFUNCTION(BlueprintImplementableEvent, Category = "Mine")
