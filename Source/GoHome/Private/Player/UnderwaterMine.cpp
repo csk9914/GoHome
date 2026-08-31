@@ -13,6 +13,7 @@
 AUnderwaterMine::AUnderwaterMine()
 {
     bReplicates = true;
+    PrimaryActorTick.bCanEverTick = true;
 
     TriggerArea = CreateDefaultSubobject<USphereComponent>(TEXT("TriggerArea"));
     SetRootComponent(TriggerArea);
@@ -35,6 +36,17 @@ void AUnderwaterMine::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(AUnderwaterMine, State);
+}
+
+void AUnderwaterMine::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+
+    if (State == EMineState::Warning && WarningDuration > 0.f)
+    {
+        const float Elapsed = GetWorld()->GetTimeSeconds() - WarningStartTime;
+        WarningProgress = FMath::Clamp(Elapsed / WarningDuration, 0.f, 1.f);
+    }
 }
 
 void AUnderwaterMine::OnTriggerBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
@@ -93,6 +105,8 @@ void AUnderwaterMine::HandleStateChanged()
     switch (State)
     {
     case EMineState::Warning:
+        WarningStartTime = GetWorld()->GetTimeSeconds();
+        WarningProgress = 0.f;
         OnMineArmed();
         break;
     case EMineState::Detonated:
@@ -101,7 +115,8 @@ void AUnderwaterMine::HandleStateChanged()
 
         if (ExplosionVFXAsset)
         {
-            UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ExplosionVFXAsset, GetActorLocation());
+            const FVector VFXSpawnLocation = GetActorLocation() + FVector(0.f, 0.f, 50.f);
+            UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, ExplosionVFXAsset, VFXSpawnLocation);
         }
 
         OnMineDetonated();

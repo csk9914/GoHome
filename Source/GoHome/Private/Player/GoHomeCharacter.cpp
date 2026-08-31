@@ -10,6 +10,7 @@
 #include "EnhancedInputComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Player/OxygenComponent.h"
 
 AGoHomeCharacter::AGoHomeCharacter()
 {
@@ -52,6 +53,9 @@ void AGoHomeCharacter::BeginPlay()
 	GetCharacterMovement()->SetMovementMode(MOVE_Swimming);
 	GetCharacterMovement()->Buoyancy = 1.0f;
 
+	DefaultMaxSwimSpeed = GetCharacterMovement()->MaxSwimSpeed;
+	CachedOxygenComponent = FindComponentByClass<UOxygenComponent>();
+
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem< UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
@@ -73,6 +77,15 @@ void AGoHomeCharacter::BeginPlay()
 void AGoHomeCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	// BP가 되돌린 직후, 스프린트 중이면 다시 덮어씌운다
+	if (bIsSprinting)
+	{
+		if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+		{
+			MoveComp->MaxSwimSpeed = DefaultMaxSwimSpeed * SprintSpeedMultiplier;
+		}
+	}
 
 	// 블랜더로 메시를 자체 수정함에 따라 해당 코드 불필요, 주석처리
 	if (IsLocallyControlled())
@@ -140,7 +153,11 @@ void AGoHomeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
 		EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ThisClass::Move);
+		EIC->BindAction(MoveUpDownAction, ETriggerEvent::Triggered, this, &ThisClass::MoveUpDown);
 		EIC->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Look);
+		EIC->BindAction(SprintAction, ETriggerEvent::Started, this, &ThisClass::StartSprint);
+		EIC->BindAction(SprintAction, ETriggerEvent::Completed, this, &ThisClass::StopSprint);
+		EIC->BindAction(SprintAction, ETriggerEvent::Canceled, this, &ThisClass::StopSprint);
 		EIC->BindAction(PushToTalkAction, ETriggerEvent::Started, this, &ThisClass::StartTalking);
 		EIC->BindAction(PushToTalkAction, ETriggerEvent::Completed, this, &ThisClass::StopTalking);
 		
@@ -157,6 +174,57 @@ void AGoHomeCharacter::Move(const FInputActionValue& Value)
 
 	AddMovementInput(ForwardDirection, MovementVector.Y);
 	AddMovementInput(RightDirection, MovementVector.X);
+}
+
+void AGoHomeCharacter::MoveUpDown(const FInputActionValue& Value)
+{
+	const float UpDownValue = Value.Get<float>();
+	AddMovementInput(FVector::UpVector, UpDownValue);
+}
+
+void AGoHomeCharacter::StartSprint()
+{
+	ApplySprintState(true);
+
+	if (!HasAuthority())
+	{
+		ServerSetSprinting(true);
+	}
+}
+
+void AGoHomeCharacter::StopSprint()
+{
+	ApplySprintState(false);
+
+	if (!HasAuthority())
+	{
+		ServerSetSprinting(false);
+	}
+}
+
+void AGoHomeCharacter::ServerSetSprinting_Implementation(bool bNewSprinting)
+{
+	ApplySprintState(bNewSprinting);
+}
+
+void AGoHomeCharacter::ApplySprintState(bool bNewSprinting)
+{
+	if (bIsSprinting == bNewSprinting)
+	{
+		return;
+	}
+
+	bIsSprinting = bNewSprinting;
+
+	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
+	{
+		MoveComp->MaxSwimSpeed = bIsSprinting ? DefaultMaxSwimSpeed * SprintSpeedMultiplier : DefaultMaxSwimSpeed;
+	}
+
+	if (HasAuthority() && CachedOxygenComponent)
+	{
+		CachedOxygenComponent->SetSprintDrainMultiplier(bIsSprinting ? SprintOxygenDrainMultiplier : 1.f);
+	}
 }
 
 void AGoHomeCharacter::Look(const FInputActionValue& Value)
