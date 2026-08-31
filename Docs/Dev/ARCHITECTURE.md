@@ -82,12 +82,12 @@ decisions:
       - `ZoneSelect`: 미사용 — `LobbyGameState::SelectedZoneId` 값 변경만으로 처리(상태 전이 아님)
       - Departure → Exploration: 트래블 완료 후 `ExplorationGameState` 생성자가 즉시 초기화, `BeginPlay`(서버)에서 `DockingDoorComponent->SetOpen(true)` 자동 호출(로딩 UI 붙으면 타이밍 재검증 필요)
       - Exploration → Return: 귀환 버튼 상호작용 시 `SetOpen(false)` → `ASubmarine`이 `InteriorVolume` 밖 플레이어 즉시 사망 처리 → `ServerTravelViaLoadingScreen`(로비 맵). **주의**: 이 경로도 `ServerTravelToMap`을 타므로, 곧 파괴될 `ExplorationGameState`가 `SetState(Departure)`로 세팅된 채 트래블에 들어간다 — 로딩 경유 중 그 상태를 구독하면 "Return"이 "Departure"로 보임
-      - Return → Settlement: 미착수 — 귀환 트래블은 로비 맵 직행, 정산 화면 연결은 별도 작업
-      - Exploration/Return → Failed: 제한 시간 만료, 도킹 문 위협 판정, 생존자 0명(→ Player 절 HP 0 처리) 중 하나
+      - Exploration → Return → Settlement: (설계 확정, 미구현) Return/Settlement를 탐사맵 인맵 페이즈로 사용 — 귀환버튼이 문 닫고 연출 대기 후 Settlement 진입, FinalizeRound + 정산 UI + 자동복귀 타이머, 그 다음에 로비 트래블. Save 절 decisions '정산 페이즈는 탐사맵 안에서' 참고.
+      - Exploration/Return → Failed: 제한 시간 만료, 도킹 문 위협 판정, 생존자 0명(→ Player 절 HP 0 처리) 중 하나. Failed도 FinalizeRound(bForfeited=true) 후 "구조 실패" 화면 + 자동복귀.
 
 known_gaps:
   - name: 정산 값 누적 미연결
-    detail: "`UInventoryComponent`(Interaction)가 납품 시 `GameState->AddDeliveredValue(int32)`를 실제로 호출하지만(`InventoryComponent.cpp`), `AGoHomeGameState::AddDeliveredValue` 자체는 빈 함수 — 호출은 되는데 값이 어디에도 누적되지 않는다."
+    detail: "`UInventoryComponent`(Interaction)가 납품 시 `GameState->AddDeliveredValue(int32)`를 실제로 호출하지만(`InventoryComponent.cpp`), `AGoHomeGameState::AddDeliveredValue` 자체는 빈 함수 — 호출은 되는데 값이 어디에도 누적되지 않는다. 배선 설계는 Save 절 참고(GameState가 SaveSubsystem::AccumulateDeliveredValue로 포워드)."
 ```
 
 ### Player
@@ -166,13 +166,38 @@ decisions:
   - name: 로드/생성
     detail: UGoHomeSaveSubsystem::Initialize()에서 디스크에 세이브 파일이 있으면 로드, 없으면(또는 캐스트 실패) 새 SaveGame 인스턴스를 생성.
   - name: 저장 트리거
-    detail: FCoreUObjectDelegates::PostLoadMapWithWorld 구독으로 레벨 전환마다 새 AGoHomeGameState::OnStateChanged에 재구독하고, NewState == Lobby일 때 SaveToDisk() 호출. 재구독 직후 이미 Lobby 상태면 즉시 저장(델리게이트 엣지 트리거 누락 방지).
+    detail: FCoreUObjectDelegates::PostLoadMapWithWorld 구독으로 레벨 전환마다 새 AGoHomeGameState::OnStateChanged에 재구독하고, NewState == Lobby일 때 SaveToDisk() 호출. 재구독 직후 이미 Lobby 상태면 즉시 저장(델리게이트 엣지 트리거 누락 방지). FinalizeRound()도 끝에서 직접 SaveToDisk() 하므로 정산 결과는 트래블 전에 디스크에 남는다.
   - name: 저장 주체
-    detail: OnPostLoadMap이 NM_Client면 즉시 리턴 — 호스트만 저장을 수행한다.
+    detail: OnPostLoadMap이 NM_Client면 즉시 리턴 — 호스트만 저장을 수행한다. SaveGame은 호스트에만 실재(클라의 서브시스템은 자기 로컬 빈 세이브만 가짐) → 클라 UI는 세이브를 직접 읽지 못하고 리플리케이트된 struct(FSettlementResult / FExpeditionProgress)로만 상태를 안다.
+  - name: 진행/판정 모델 (2026-08-31 확정, 기획서·기술분석서 Notion에 반영 예정)
+    detail: |
+      탐사 1회 = 1턴. 게임오버 경로 2개가 병존:
+        - 맵 할당량 / 3스트라이크: 매 턴 그 턴 납품액 < 그 맵의 MapQuota → QuotaMissCount +1(감소 없음). 3 도달 시 게임오버.
+        - 체크포인트: 특정 턴(EconomyConfigDataAsset.CheckPoints의 Round들, 예: 3·6·9) 종료 시 누적 자금(CurrentFunds, 강화 소비 차감 반영) < 그 체크포인트 목표 → 즉시 게임오버.
+      마지막 체크포인트 Round = 게임 총 턴 수 = 엔딩 판정 턴. 그 시점 목표 달성 = 엔딩(승리) → 세이브 초기화 → 타이틀.
+      게임오버·엔딩 모두 ResetSave()(새 SaveGame 인스턴스).
+      통화 통합: 구 SharedCurrency(강화 소비)와 TotalRecoveredValue(엔딩 판정)를 CurrentFunds 하나로 병합 — 납품 +, 강화/구매 −, 음수 허용(빚). 강화 투자가 곧 체크포인트 리스크(의도된 텐션).
+  - name: 정산 페이즈는 탐사맵 안에서 (트래블 아님)
+    detail: |
+      귀환/실패가 확정되는 순간(탐사맵, 서버)에 SaveSubsystem::FinalizeRound(bForfeited, CasualtyNames, MapQuota)를 명시적으로 호출해 세이브 데이터를 확정하고, 그 결과 FSettlementResult를 정산 UI로 넘긴다. 로비 도착 감지·라운드진행 플래그 같은 우회 없음.
+      - 정상 복귀: ADepartureButton 탐사 브랜치 → 문 닫힘 연출 대기 후 SetState(Settlement) → FinalizeRound(false, ...). 자동복귀 타이머 또는 "복귀" 버튼으로 로비 트래블.
+      - 완전 실패(전원사망·타임오버): GameState::Fail() → SetState(Failed) → FinalizeRound(true, ...) (그 턴 납품액 몰수 = CurrentFunds에서 되돌림). "구조 실패" 화면 + 자동복귀만(정산표 없음). 실패도 그 턴 스트라이크·체크포인트 판정은 정상 수행.
+      - Submarine 외부인원 즉사(SetOpen(false) 구독)가 FinalizeRound보다 먼저 동기 실행되므로 사망자 수가 정산에 반영됨 — 이 순서 의존성 유지.
+      - EExpeditionState의 Return/Settlement/Failed 값을 탐사맵 인맵 페이즈로 실제 사용(그 전엔 맵별 GameState 클래스 생성자가 상태를 하드셋할 뿐 미사용).
+  - name: EconomyConfig 로딩
+    detail: "UGoHomeSaveSubsystem::Initialize()에서 하드코딩 경로로 LoadObject<UEconomyConfigDataAsset>(/Game/GoHome/Data/DA_EconomyConfig) + ensureMsgf. DeveloperSettings 방식은 클래스 하나 더 필요해 보류."
 
 known_gaps:
-  - name: 세이브 필드 갱신 미연결
-    detail: "저장 파이프라인(로드/재구독/Lobby 진입 시 SaveToDisk) 자체는 동작하지만, `SharedCurrency`/`TotalRecoveredValue`/`QuotaMissCount` 같은 SaveGame 필드를 실제로 갱신하는 GameState 쪽 함수(`AddDeliveredValue`/`Fail`)가 빈 스텁이라 — 값이 갱신되지 않은 채로 저장/로드만 반복된다. Core 절 known_gaps '정산 값 누적 미연결' 참고."
+  - name: 정산 배선 미구현 (헤더만 존재)
+    detail: |
+      스키마·설정·결과 struct 헤더는 작성됨(UGoHomeSaveGame 필드 CurrentFunds/CurrentRoundDeliveredValue/RoundIndex/QuotaMissCount,
+      UEconomyConfigDataAsset(FCheckPoint 배열+CasualtyFee), Public/Data/FSettlementResult.h(ESettlementOutcome+FSettlementResult),
+      Public/Data/FExpeditionProgress.h, ExpeditionZoneDataAsset.MapQuota). 그러나:
+        - UGoHomeSaveSubsystem::AccumulateDeliveredValue / FinalizeRound / BuildProgress / ResetSave 전부 빈 스텁.
+        - AGoHomeGameState::AddDeliveredValue / Fail / OnPlayerRemovedFromParty 빈 스텁(InventoryComponent.cpp가 AddDeliveredValue를 호출은 함).
+        - 사망자 추적(각 폰 IDeathNotifier::OnDeath 구독), 정산 페이즈 머신·자동복귀 타이머·복귀 RPC, DA_EconomyConfig 애셋 생성, DepartureButton 재배선, 정산/구조실패/게임오버/엔딩 UI 위젯 미착수.
+        - FCheckPoint 배열의 정렬 강제 방식(TArray+IsDataValid vs TMap) 미결 — 대화 보류.
+      Core 절 known_gaps '정산 값 누적 미연결', Player 절 'HP 0 처리'와 같은 계열.
 ```
 
 ## 시스템 간 인터페이스 계약

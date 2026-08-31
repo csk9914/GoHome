@@ -24,4 +24,8 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Zone")
 	TSoftObjectPtr<UWorld> MapPath;
 	
+	// 해당 맵의 할당량
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Zone")
+	int32 MapQuota = 0;
+	
 };
