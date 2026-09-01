@@ -19,7 +19,24 @@ float UOxygenComponent::GetOxygen() const
 
 float UOxygenComponent::GetMaxOxygen() const
 {
-	return MaxOxygen;
+	//return MaxOxygen;
+	// 강화 포함 최종 산소 계산
+	return FMath::Max(0.f, MaxOxygen + MaxOxygenBonus);
+	/*
+	MaxOxygen 15
+	MaxOxygenBonus 3
+	GetMaxOxygen() 18
+	*/
+}
+
+float UOxygenComponent::GetBaseMaxOxygen() const
+{
+	return FMath::Max(0.f, MaxOxygen);
+}
+
+float UOxygenComponent::GetMaxOxygenBonus() const
+{
+	return MaxOxygenBonus;
 }
 
 int32 UOxygenComponent::GetDisplayedOxygenPips() const
@@ -29,18 +46,19 @@ int32 UOxygenComponent::GetDisplayedOxygenPips() const
 	Oxygen 14.0 -> 14칸
 	Oxygen 0.0 -> 0칸
 	*/
-	const int32 MaxPips = FMath::Max(0, FMath::CeilToInt(MaxOxygen));
+	const int32 MaxPips = FMath::Max(0, FMath::CeilToInt(GetMaxOxygen()));
 	return FMath::Clamp(FMath::CeilToInt(Oxygen), 0, MaxPips);
 }
 
 float UOxygenComponent::GetOxygenPercent() const
 {
-	if (MaxOxygen <= 0.f)
+	const float CurrentMaxOxygen = GetMaxOxygen();
+	if (CurrentMaxOxygen <= 0.f)
 	{
 		return 0.f;
 	}
 
-	return FMath::Clamp(Oxygen / MaxOxygen, 0.f, 1.f);
+	return FMath::Clamp(Oxygen / CurrentMaxOxygen, 0.f, 1.f);
 }
 
 bool UOxygenComponent::IsInSafeZone() const
@@ -69,6 +87,31 @@ void UOxygenComponent::SetSprintDrainMultiplier(float NewMultiplier)
 	SprintDrainMultiplier = FMath::Max(0.f, NewMultiplier);
 }
 
+void UOxygenComponent::SetMaxOxygenBonus(float NewBonus)
+{
+	if (!HasOwnerAuthority())
+	{
+		return;
+	}
+
+	const float ClampedBonus = FMath::Max(0.f, NewBonus);
+	if (FMath::IsNearlyEqual(MaxOxygenBonus, ClampedBonus))
+	{
+		return;
+	}
+
+	MaxOxygenBonus = ClampedBonus;
+
+	const float NewMaxOxygen = GetMaxOxygen();
+	if (Oxygen > NewMaxOxygen)
+	{
+		SetOxygen(NewMaxOxygen);
+		return;
+	}
+
+	OnOxygenChanged.Broadcast(Oxygen, NewMaxOxygen);
+}
+
 void UOxygenComponent::BeginPlay()
 {
 	Super::BeginPlay();
@@ -80,7 +123,7 @@ void UOxygenComponent::BeginPlay()
 	}
 
 	FindCarryWeightProviderComponent();
-	SetOxygen(MaxOxygen);
+	SetOxygen(GetMaxOxygen());
 
 	if (UActorComponent* DeathNotifierComponent = GetOwner()->FindComponentByInterface(UDeathNotifier::StaticClass()))
 	{
@@ -109,6 +152,7 @@ void UOxygenComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(UOxygenComponent, MaxOxygen);
+	DOREPLIFETIME(UOxygenComponent, MaxOxygenBonus);
 	DOREPLIFETIME(UOxygenComponent, Oxygen);
 	DOREPLIFETIME(UOxygenComponent, bInSafeZone);
 }
@@ -207,7 +251,7 @@ void UOxygenComponent::HandleOwnerDeath()
 
 void UOxygenComponent::SetOxygen(float NewOxygen)
 {
-	const float SafeMaxOxygen = FMath::Max(0.f, MaxOxygen);
+	const float SafeMaxOxygen = GetMaxOxygen();
 	const float ClampedOxygen = FMath::Clamp(NewOxygen, 0.f, SafeMaxOxygen);
 
 	if (FMath::IsNearlyEqual(Oxygen, ClampedOxygen))
@@ -269,12 +313,17 @@ float UOxygenComponent::GetCachedOverweightAmount() const
 
 void UOxygenComponent::OnRep_Oxygen()
 {
-	OnOxygenChanged.Broadcast(Oxygen, MaxOxygen);
+	OnOxygenChanged.Broadcast(Oxygen, GetMaxOxygen());
 }
 
 void UOxygenComponent::OnRep_InSafeZone()
 {
 	OnSafeZoneChanged.Broadcast(bInSafeZone);
+}
+
+void UOxygenComponent::OnRep_MaxOxygenBonus()
+{
+	OnOxygenChanged.Broadcast(Oxygen, GetMaxOxygen());
 }
 
 
