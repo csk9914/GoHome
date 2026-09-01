@@ -8,6 +8,7 @@
 #include "Core/LobbyGameState.h"
 #include "Core/DockingDoorComponent.h"
 #include "TimerManager.h"
+#include "Save/GoHomeSaveSubsystem.h"
 
 
 ADepartureButton::ADepartureButton()
@@ -23,9 +24,7 @@ void ADepartureButton::OnInteract(APawn* InstigatorPawn)
 {
 	AGoHomeGameMode* GoHomeGameMode = GetWorld()->GetAuthGameMode<AGoHomeGameMode>();
 	if (!GoHomeGameMode) return;
-
-
-
+	
 	//  현재 로비 맵일 때
 	if (ALobbyGameState* LobbyGameState = GetWorld()->GetGameState<ALobbyGameState>())
 	{
@@ -33,6 +32,11 @@ void ADepartureButton::OnInteract(APawn* InstigatorPawn)
 		const UExpeditionZoneDataAsset* SelectedZone = LobbyGameState->GetSelectedZone();
 		if (!SelectedZone) return;
 
+		if (UGoHomeSaveSubsystem* SaveSubsystem = GetGameInstance()->GetSubsystem<UGoHomeSaveSubsystem>())
+		{
+			SaveSubsystem->SetCurrentMapQuota(SelectedZone->MapQuota);
+		}
+		
 		GoHomeGameMode->ServerTravelViaLoadingScreen(SelectedZone->MapPath.ToSoftObjectPath().GetLongPackageName());
 	}
 	

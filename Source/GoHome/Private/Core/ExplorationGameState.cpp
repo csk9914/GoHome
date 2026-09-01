@@ -3,6 +3,8 @@
 
 #include "Core/ExplorationGameState.h"
 #include "Core/DockingDoorComponent.h"
+#include "GameFramework/PlayerState.h"
+
 
 AExplorationGameState::AExplorationGameState()
 {
@@ -14,6 +16,7 @@ AExplorationGameState::AExplorationGameState()
 void AExplorationGameState::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	DockingDoorComponent->SetOpen(true);
 }
+

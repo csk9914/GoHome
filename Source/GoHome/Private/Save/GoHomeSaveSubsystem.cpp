@@ -68,8 +68,7 @@ void UGoHomeSaveSubsystem::AccumulateDeliveredValue(int32 Value)
 	SaveGame->CurrentFunds += Value;
 }
 
-FSettlementResult UGoHomeSaveSubsystem::FinalizeRound(bool bForfeited, const TArray<FString>& CasualtyNames,
-                                                      int32 MapQuota)
+FSettlementResult UGoHomeSaveSubsystem::FinalizeRound(bool bForfeited, const TArray<FString>& CasualtyNames)
 {
 	if (!SaveGame || !EconomyConfig)
 	{
@@ -99,7 +98,7 @@ FSettlementResult UGoHomeSaveSubsystem::FinalizeRound(bool bForfeited, const TAr
 	const int32 CompletedRound = ++(SaveGame->CurrentRound);
 
 	// 스트라이크 판정
-	if (EffectiveDelivered < MapQuota)
+	if (EffectiveDelivered < CurrentMapQuota)
 	{
 		SaveGame->QuotaMissCount++;
 	}
@@ -112,7 +111,7 @@ FSettlementResult UGoHomeSaveSubsystem::FinalizeRound(bool bForfeited, const TAr
 	Result.bForfeited = bForfeited;
 	Result.Outcome = Outcome;
 	Result.RoundDeliveredValue = RoundDeliveredValue;
-	Result.MapQuota = MapQuota;
+	Result.MapQuota = CurrentMapQuota;
 	Result.CasualtyNames = CasualtyNames;
 	Result.CasualtyPenalty = CasualtyPenalty;
 	Result.NetGain = NetGain;
@@ -138,6 +137,9 @@ FSettlementResult UGoHomeSaveSubsystem::FinalizeRound(bool bForfeited, const TAr
 	// 트래블 전에 디스크에 남긴다
 	SaveToDisk();
 
+	// 다음 라운드 출발 때 다시 세팅되므로 필수는 아니지만, 0으로 초기화
+	CurrentMapQuota = 0;
+	
 	return Result;
 }
 

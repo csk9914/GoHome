@@ -6,9 +6,12 @@
 #include "GoHomeGameState.h"
 #include "ExplorationGameState.generated.h"
 
+class UHealthComponent;
+
 /**
  * 
  */
+
 UCLASS()
 class GOHOME_API AExplorationGameState : public AGoHomeGameState
 {
@@ -19,4 +22,9 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+
+	
+private:
+
+	
 };

@@ -26,38 +26,43 @@ class GOHOME_API UGoHomeSaveSubsystem : public UGameInstanceSubsystem
 public:
 	virtual void Initialize(FSubsystemCollectionBase& CollectionBase) override;
 	virtual void Deinitialize() override;
-	
+
 	UFUNCTION(BlueprintCallable, Category = "Save")
 	void SaveToDisk();
 
 	// 납품 계산
 	void AccumulateDeliveredValue(int32 Value);
-	
+
 	// 라운드 종료 정산
-	FSettlementResult FinalizeRound(bool bForfeited, const TArray<FString>& CasualtyNames, int32 MapQuota);
+	FSettlementResult FinalizeRound(bool bForfeited, const TArray<FString>& CasualtyNames);
 
 	// 세이브의 상태를 리플리케이트 가능한 평면 struct로 복사
 	FExpeditionProgress BuildProgress() const;
-	
+
 	UFUNCTION(BlueprintPure, Category = "Save")
-	const UGoHomeSaveGame* GetSaveGame() const {return SaveGame;};
-	
+	const UGoHomeSaveGame* GetSaveGame() const { return SaveGame; };
+
+	// 출발 시 호출해서 값을 초기화
+	void SetCurrentMapQuota(int32 Quota) { CurrentMapQuota = Quota; };
+
 private:
 	void ResetSave();
 	ESettlementOutcome DetermineOutcome(const FCheckPoint* CheckPoint, int32 CompletedRound) const;
+
 protected:
 	UFUNCTION()
 	void OnExpeditionStateChanged(EExpeditionState NewState);
-	
+
 	void OnPostLoadMap(UWorld* LoadedWorld);
-	
+
 	UPROPERTY(BlueprintReadOnly, Category = "Save")
 	TObjectPtr<UGoHomeSaveGame> SaveGame;
-	
+
 private:
 	FDelegateHandle PostLoadMapHandle;
-	
+
 	UPROPERTY()
 	TObjectPtr<UEconomyConfigDataAsset> EconomyConfig;
-	
+
+	int32 CurrentMapQuota = 0;
 };

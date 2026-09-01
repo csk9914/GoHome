@@ -3,6 +3,7 @@
 #include "Core/GoHomeGameState.h"
 #include "Core/DockingDoorComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "Save/GoHomeSaveSubsystem.h"
 
 AGoHomeGameState::AGoHomeGameState()
 {
@@ -20,6 +21,25 @@ void AGoHomeGameState::SetState(EExpeditionState NewState)
 
 void AGoHomeGameState::AddDeliveredValue(int32 Value)
 {
+	if (!HasAuthority())
+	{
+		return;
+	}
+	
+	UGameInstance* GameInstance = GetGameInstance();
+	if (!GameInstance)
+	{
+		return;
+	}
+	
+	UGoHomeSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<UGoHomeSaveSubsystem>();
+	if (!SaveSubsystem)
+	{
+		return;
+	}
+	
+	SaveSubsystem->AccumulateDeliveredValue(Value);
+	
 }
 
 void AGoHomeGameState::Fail(EFailReason Reason)
