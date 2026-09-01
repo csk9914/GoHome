@@ -49,7 +49,7 @@ AI 컨트롤러(`AIC_`), 파티클 시스템(`PS_`) 등 위 표에 없는 타입
 
 - 새 시스템이 기존 7개 폴더([ARCHITECTURE.md 모듈/폴더 구조](ARCHITECTURE.md#모듈폴더-구조) 기준) 중 어디에도 안 맞으면, 새 폴더를 만들기 전에 그 문서에 먼저 매핑을 기록한다 (폴더 구조의 단일 출처는 그 문서).
 - 기존 폴더에 기술적으로 끼워 넣을 수 있어도 새 폴더로 분리하는 게 나은 경우의 기준은 [ARCHITECTURE.md "새 폴더를 파야 하는가"](ARCHITECTURE.md#새-폴더를-파야-하는가) 참고.
-- 폴더를 넘나드는 의존은 인터페이스(`IInteractable`, `IWeightProvider`류)로만 한다 — 컴포넌트가 다른 폴더의 구체 클래스를 직접 include하지 않는다. 단, `AGoHomeGameState`처럼 여러 폴더가 공유하는 클래스는 예외 — 퍼블릭 서버 함수(`AddDeliveredValue` 등) 호출 목적의 include는 허용한다([ARCHITECTURE.md 헤더 소유권](ARCHITECTURE.md#헤더-소유권) 참고).
+- 폴더를 넘나드는 의존은 인터페이스(`IInteractable`, `IWeightProvider`류)로만 한다 — 컴포넌트가 다른 폴더의 구체 클래스를 직접 include하지 않는다. 단, `AGoHomeGameState`처럼 여러 폴더가 공유하는 클래스는 예외 — 퍼블릭 서버 함수(`AddDeliveredValue` 등) 호출 목적의 include는 허용한다([ARCHITECTURE.md 공유 헤더 규칙](ARCHITECTURE.md#공유-헤더-규칙) 참고).
 
 ### Content (에셋)
 
@@ -74,12 +74,12 @@ AI 컨트롤러(`AIC_`), 파티클 시스템(`PS_`) 등 위 표에 없는 타입
 
 ### AI(몬스터 BP) 작업 방식
 
-AI는 다른 시스템보다 BP 비중이 크지만, 필요하면 담당자가 C++ 쪽도 직접 고칠 수 있다.
+AI는 다른 시스템보다 BP 비중이 크다.
 
-- `AUnderwaterEnemyBase`(C++)가 경계 인터페이스([ARCHITECTURE.md "AI (경계만)"](ARCHITECTURE.md#ai-경계만))를 `BlueprintNativeEvent`로 노출하고, 그 자식 BP인 `BP_UnderwaterMonster`가 상태 머신·Steering Behaviors를 구현한다. **주의**: `BP_WormBase`(`AActor` 직속)·`BP_Bloop`(`APawn` 직속)는 `AUnderwaterEnemyBase`를 상속하지 않아 이 경계 인터페이스가 적용되지 않는다 — 신규 몬스터를 이 경계에 태우려면 `AUnderwaterEnemyBase` 상속부터 확인([ARCHITECTURE.md "AI (경계만)"](ARCHITECTURE.md#ai-경계만) known_gaps 참고).
+- `AUnderwaterEnemyBase`(C++)가 경계 인터페이스([ARCHITECTURE.md "AI (경계만)"](ARCHITECTURE.md#ai-경계만))를 `BlueprintNativeEvent`로 노출하고, 그 자식 BP인 `BP_UnderwaterMonster`가 상태 머신·Steering Behaviors를 구현한다. `BP_WormBase`(`AActor` 직속)·`BP_Bloop`(`APawn` 직속)는 `AUnderwaterEnemyBase`를 상속하지 않아 이 경계 인터페이스가 적용되지 않는다([ARCHITECTURE.md "AI (경계만)"](ARCHITECTURE.md#ai-경계만) known_gaps 참고).
 - 데미지 적용·소음 판정처럼 서버 권위가 걸린 처리는 BP가 직접 구현하지 않고 C++ 함수 호출로 끝낸다.
 - 상태 머신을 Behavior Tree + Blackboard로 구성해도 무방(기술분석서(Notion)의 "Enum 상태 머신 + Steering Behaviors"와 병행 가능).
-- 경계 인터페이스 시그니처 변경은 C++ 담당과 사전 협의([ARCHITECTURE.md 소유권 규칙](ARCHITECTURE.md#헤더-소유권)).
+- 경계 인터페이스 헤더 변경 규칙은 [ARCHITECTURE.md 공유 헤더 규칙](ARCHITECTURE.md#공유-헤더-규칙).
 
 ## 블루프린트 변수 규칙
 
@@ -91,7 +91,7 @@ AI는 다른 시스템보다 BP 비중이 크지만, 필요하면 담당자가 C
 - 상태가 3개 이상이면 bool 여러 개 대신 Enum 하나로 표현 (몬스터 BP 상태 머신이 대표 사례)
 - Editable(에디터에 노출) 변수는 Tooltip 필수, 값 범위가 있으면 Slider/Value Range 설정
 - 변수가 10개를 넘으면 카테고리를 `|`로 하위 분류 (예: `Config | Noise`)
-- 경고·오류 없이 컴파일되는 상태로만 커밋한다 — 깨진 블루프린트를 소스 컨트롤에 올리지 않는다
+- 경고·오류 없이 컴파일되는 상태로만 커밋한다
 
 ## 블루프린트 코멘트 박스 색상 규칙
 
@@ -150,6 +150,6 @@ git commit
 - [OOP/SOLID 적용 방식](#oopsolid-적용-방식) 위반 없는지
 - [C++ / Blueprint 경계](#c--blueprint-경계) 위반 없는지: 서버 권위가 걸린 로직이 BP에만 있고 C++ 호출 없이 끝나지 않았는지
 - 폴더 간 경계(인터페이스 시그니처, decoupling 규칙)를 바꿨으면 [ARCHITECTURE.md](ARCHITECTURE.md)의 "시스템별 결정과 경계"·"시스템 간 인터페이스 계약"이 여전히 맞는지
-- 기획 문서(GoHome 기획서·기술분석서, Notion)는 예외 상황에서만 연다: 유저에게 보이는 동작·밸런스 수치·시스템 범위 자체를 바꾸는 변경일 때만 해당 절을 확인하고 어긋나지 않는지 본다 — 어긋나면 코드가 아니라 기획서 쪽을 먼저 팀과 조율. ARCHITECTURE.md 스펙대로의 순수 구현 작업(리팩터링, 버그 수정, 이미 확정된 클래스/인터페이스 구현)에는 열 필요 없다
+- 기획 문서(GoHome 기획서·기술분석서, Notion)는 유저에게 보이는 동작·밸런스 수치·시스템 범위 자체를 바꾸는 변경일 때만 해당 절을 열어 어긋나지 않는지 본다. ARCHITECTURE.md 스펙대로의 순수 구현 작업(리팩터링, 버그 수정, 이미 확정된 클래스/인터페이스 구현)에는 열 필요 없다
 - C++ 빌드 경고 0개, 블루프린트는 경고·오류 없이 컴파일되는 상태
 

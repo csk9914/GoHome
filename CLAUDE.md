@@ -24,6 +24,16 @@ This repo is GoHome (a deep-sea Lethal Company-like co-op survival game), UE5.7.
 | `Docs/Dev/NODECASTER_GUIDE.md` | md/git (dev) | NodeCaster install check + Blueprint graph JSON procedure — only opened for Blueprint node-graph questions |
 | `Docs/Dev/BP_COMMENT_COLORS.md` | md/git (dev) | Blueprint comment-box color semantics (HSV/Hex table) — only opened when adding comment boxes to a BP graph |
 
+## Starting Work
+
+Before implementing, modifying, or advising on a system — including step-by-step guidance — do all three:
+
+1. **Read the relevant `ARCHITECTURE.md` section(s)** for the systems the task touches, plus the cross-cutting rule sections (`공유 헤더 규칙`, `Replication 권한 원칙`). Section-by-section per the Document Map note.
+2. **Read the full header of every class you'll name**, and the specific `.cpp` functions you'll change or that your advice depends on (delegate signatures, existing overrides). Headers whole; `.cpp` selectively — not whole-file.
+3. **If `git status` shows a modified `Docs/Dev/*.md`, read its `git diff`.** A doc under edit is someone revising the design for this exact work; for continuation work also check `git log --oneline origin/dev -10` and `git diff origin/dev...HEAD -- Docs/Dev`.
+
+Memory notes and prior-session summaries are pointers, not substitutes for the above — they go stale and may predate a written decision. Do not produce a plan from them alone.
+
 ## Validation Scripts
 
 ```
