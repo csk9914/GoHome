@@ -82,11 +82,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void AttachItemToRightHand(UStaticMeshComponent* ItemMeshComponent);
 	
-	UFUNCTION(BlueprintCallable, Category = "Interaction")
-	void AttachFlashlightToLeftHand(UStaticMeshComponent* FlashlightMeshComponent);
+	// 손전등(Spot) 전용 부착 소켓. 가슴 쪽 본에 붙여서 양손을 자유롭게 사용.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
+	FName FlashlightSocketName = "Spine_03";
 
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
-	void DetachFlashlightFromLeftHand();
+	void AttachFlashlightToChest(UStaticMeshComponent* FlashlightMeshComponent);
+
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void DetachFlashlightFromChest();
 
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	bool IsHoldingFlashlight() const { return bIsHoldingFlashlight; }

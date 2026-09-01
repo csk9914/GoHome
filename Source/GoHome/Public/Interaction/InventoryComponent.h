@@ -87,12 +87,19 @@ public:
 
 	int32 FindSlotIndexOf(AItemActorBase* Item) const;
 
-	// FlashLight F키 진입.
+	// F키: 보유 중인 Spot 손전등(있다면 하나)만 토글.
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void TryToggleFlashlight();
 
 	UFUNCTION(Server, Reliable)
 	void Server_RequestToggleFlashlight();
+
+	// 좌클릭: 지금 오른손 활성 슬롯에 든 "사용 아이템"(AUsableItemBase)만 사용.
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void TryUseActiveItem();
+
+	UFUNCTION(Server, Reliable)
+	void Server_RequestUseActiveItem();
 
 
 protected:

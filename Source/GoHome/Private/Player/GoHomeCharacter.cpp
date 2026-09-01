@@ -262,19 +262,19 @@ void AGoHomeCharacter::AttachItemToRightHand(UStaticMeshComponent* ItemMeshCompo
 	bIsHoldingItem = true;
 }
 
-void AGoHomeCharacter::AttachFlashlightToLeftHand(UStaticMeshComponent* FlashlightMeshComponent)
+void AGoHomeCharacter::AttachFlashlightToChest(UStaticMeshComponent* FlashlightMeshComponent)
 {
 	if (!FlashlightMeshComponent) return;
 
 	FlashlightMeshComponent->AttachToComponent(
 		GetMesh(),
 		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
-		LeftHandSocketName);
+		FlashlightSocketName);
 
 	bIsHoldingFlashlight = true;
 }
 
-void AGoHomeCharacter::DetachFlashlightFromLeftHand()
+void AGoHomeCharacter::DetachFlashlightFromChest()
 {
 	bIsHoldingFlashlight = false;
 }
