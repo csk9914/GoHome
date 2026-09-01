@@ -2,7 +2,10 @@
 
 #include "Interaction/InteractionComponent.h"
 #include "Interaction/Interactable.h"
+#include "Interaction/CoopCarryObjectBase.h"
+#include "Player/GoHomeCharacter.h"
 #include "Camera/CameraComponent.h"
+#include "Interaction/DeliveryPoint.h"
 #include "GameFramework/Pawn.h"
 #include "Components/PrimitiveComponent.h"
 
@@ -88,15 +91,26 @@ void UInteractionComponent::SetOutlineEnabled(AActor* Target, bool bEnabled)
 }
 
 
-
-
-
 void UInteractionComponent::TryInteract()
 {
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+
+	if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(OwnerPawn))
+	{
+		if (Character->IsCoopCarrying())
+		{
+			// 운반 중엔 납품 지점을 보고 있을 때만 반응(정산). 그 외엔 아무 것도 안 함(다른 상호작용 차단).
+			if (Cast<ADeliveryPoint>(CurrentTarget))
+			{
+				Server_RequestDeliverCarry();
+			}
+			return;
+		}
+	}
+
 	IInteractable* Interactable = Cast<IInteractable>(CurrentTarget);
 	if (!Interactable) return;
 
-	APawn* OwnerPawn = Cast<APawn>(GetOwner());
 	if (Interactable->CanInteract(OwnerPawn))
 	{
 		Server_RequestInteract(CurrentTarget);
@@ -120,6 +134,17 @@ void UInteractionComponent::Server_RequestInteract_Implementation(AActor* Target
 
 }
 
+void UInteractionComponent::Server_RequestDeliverCarry_Implementation()
+{
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(OwnerPawn))
+	{
+		if (ACoopCarryObjectBase* CarryObject = Character->GetCurrentCarryObject())
+		{
+			CarryObject->ServerDeliver();
+		}
+	}
+}
 
 FText UInteractionComponent::GetInteractionPromptTextFor(AActor* Target)
 {

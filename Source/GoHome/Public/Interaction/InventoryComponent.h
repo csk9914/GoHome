@@ -53,6 +53,13 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Server_RequestDrop(AItemActorBase* ItemToDrop);
 
+	// Q키 입력 하나로 통합: 코옵 운반 중이면 그거 놓기, 아니면 기존처럼 활성 아이템 드롭.
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void TryDropOrReleaseCarry();
+
+	UFUNCTION(Server, Reliable)
+	void Server_RequestReleaseCarry();
+
 	// 슬롯 인덱스로 아이템 조회 (인벤토리 UI/드롭 테스트용).
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	AItemActorBase* GetItemInSlot(int32 SlotIndex) const;
@@ -87,12 +94,19 @@ public:
 
 	int32 FindSlotIndexOf(AItemActorBase* Item) const;
 
-	// FlashLight F키 진입.
+	// F키: 보유 중인 Spot 손전등(있다면 하나)만 토글.
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void TryToggleFlashlight();
 
 	UFUNCTION(Server, Reliable)
 	void Server_RequestToggleFlashlight();
+
+	// 좌클릭: 지금 오른손 활성 슬롯에 든 "사용 아이템"(AUsableItemBase)만 사용.
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void TryUseActiveItem();
+
+	UFUNCTION(Server, Reliable)
+	void Server_RequestUseActiveItem();
 
 
 protected:
