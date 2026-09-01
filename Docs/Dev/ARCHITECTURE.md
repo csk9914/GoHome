@@ -83,11 +83,11 @@ decisions:
       - Departure → Exploration: 트래블 완료 후 `ExplorationGameState` 생성자가 즉시 초기화, `BeginPlay`(서버)에서 `DockingDoorComponent->SetOpen(true)` 자동 호출(로딩 UI 붙으면 타이밍 재검증 필요)
       - Exploration → Return: 귀환 버튼 상호작용 시 `SetOpen(false)` → `ASubmarine`이 `InteriorVolume` 밖 플레이어 즉시 사망 처리 → `ServerTravelViaLoadingScreen`(로비 맵). **주의**: 이 경로도 `ServerTravelToMap`을 타므로, 곧 파괴될 `ExplorationGameState`가 `SetState(Departure)`로 세팅된 채 트래블에 들어간다 — 로딩 경유 중 그 상태를 구독하면 "Return"이 "Departure"로 보임
       - Exploration → Return → Settlement: (설계 확정, 미구현) Return/Settlement를 탐사맵 인맵 페이즈로 사용 — 귀환버튼이 문 닫고 연출 대기 후 Settlement 진입, FinalizeRound + 정산 UI + 자동복귀 타이머, 그 다음에 로비 트래블. Save 절 decisions '정산 페이즈는 탐사맵 안에서' 참고.
-      - Exploration/Return → Failed: 제한 시간 만료, 도킹 문 위협 판정, 생존자 0명(→ Player 절 HP 0 처리) 중 하나. Failed도 FinalizeRound(bForfeited=true) 후 "구조 실패" 화면 + 자동복귀.
+      - Exploration/Return → Failed: 제한 시간 만료, 도킹 문 위협 판정, 생존자 0명(→ Player 절 HP 0 처리) 중 하나. 전원사망 경로는 `AExplorationGameMode::CheckAllDead → HandleFail`이 구현됨(SetState(Failed) + FinalizeRound(bForfeited=true) + 자동복귀 타이머). 타임오버·도킹문 위협은 `AGoHomeGameState::Fail()` 라우팅 미구현.
 
 known_gaps:
-  - name: 정산 값 누적 미연결
-    detail: "`UInventoryComponent`(Interaction)가 납품 시 `GameState->AddDeliveredValue(int32)`를 호출하지만 `AGoHomeGameState::AddDeliveredValue`가 빈 스텁이라 값이 누적되지 않는다 — `SaveSubsystem::AccumulateDeliveredValue`로 포워드하는 배선 필요(미연결 스텁 전체는 `남은 의존성`)."
+  - name: 실패 사유별 진입점
+    detail: "전원사망은 `AExplorationGameMode`가 직접 판정하지만, 타임오버·도킹문 위협은 `AGoHomeGameState::Fail(EFailReason)`가 빈 스텁이라 `HandleFail`로 이어지지 않는다(미연결 스텁 전체는 `남은 의존성`)."
 ```
 
 ### Player
@@ -101,13 +101,15 @@ decisions:
   - name: 산소 0 → 데미지 경로
     detail: UOxygenComponent가 산소 0시 매 틱 IDamageable::ApplyDamage(질식 데미지, Owner, "Suffocation") 동기 호출.
   - name: 중복 사망 방지
-    detail: OnDeath는 캐릭터당 탐사 1회만 브로드캐스트 — Core가 생존자 수를 추적하므로 이 보장이 깨지면 카운트가 틀어진다.
+    detail: OnDeath는 캐릭터당 탐사 1회만 브로드캐스트 — `AExplorationGameMode`가 생존자 수를 추적하므로 이 보장이 깨지면 카운트가 틀어진다.
+
+decisions:
+  - name: HP 0 처리
+    detail: "HealthComponent가 서버 전용 OnDeath 브로드캐스트 → `AExplorationGameMode`가 `RestartPlayer`마다 폰의 `IDeathNotifier`를 구독(`TrackPawnDeath`), 사망 시 `DeadPawns`/`CasualtyNames` 집계 후 `CheckAllDead`. 생존자 0명이면 `HandleFail(EFailReason::AllPlayersDead)`. 사망 추적은 GameState가 아니라 GameMode 소유(서버 전용이라 HasAuthority 가드 불필요)."
 
 known_gaps:
-  - name: HP 0 처리
-    detail: "설계 의도: HealthComponent가 서버 전용 OnDeath 브로드캐스트, GameState가 탐사마다 재구독해 생존자 수 추적, 0명이면 Fail(EFailReason::AllPlayersDead). 현재 OnDeath 브로드캐스트는 구현됐지만 GameState 구독부와 Fail()은 빈 스텁 — 미연결(`남은 의존성` 참고)."
   - name: 접속 종료 처리
-    detail: "설계 의도: Logout이 GameState::OnPlayerRemovedFromParty(APlayerState*)를 호출해 OnDeath와 같은 경로로 합류(TSet으로 멱등 보장). 현재 Logout은 Super::Logout 한 줄, OnPlayerRemovedFromParty도 빈 함수 — 미연결이라 접속 종료가 생존자 수에 반영되지 않는다."
+    detail: "설계 의도: Logout이 사망(OnDeath)과 같은 생존자 집계 경로에 합류(TSet으로 멱등 보장). 현재 Logout은 Super::Logout 한 줄, `AGoHomeGameState::OnPlayerRemovedFromParty`도 빈 함수 — 미연결이라 접속 종료가 생존자 수에 반영되지 않는다. 사망 추적이 `AExplorationGameMode`로 옮겨졌으므로 이탈 처리도 GameMode의 `DeadPawns` 집계에 합류시켜야 한다."
 ```
 
 ### Interaction
@@ -179,18 +181,20 @@ decisions:
       CurrentFunds: 납품 +, 강화/구매 −, 음수 허용(빚). 강화 투자가 곧 체크포인트 리스크(의도된 텐션).
   - name: 정산 페이즈는 탐사맵 안에서 (트래블 아님)
     detail: |
-      귀환/실패가 확정되는 순간(탐사맵, 서버)에 SaveSubsystem::FinalizeRound(bForfeited, CasualtyNames, MapQuota)를 명시적으로 호출해 세이브 데이터를 확정하고, 그 결과 FSettlementResult를 정산 UI로 넘긴다. 로비 도착 감지·라운드진행 플래그 같은 우회 없음.
-      - 정상 복귀: ADepartureButton 탐사 브랜치 → 문 닫힘 연출 대기 후 SetState(Settlement) → FinalizeRound(false, ...). 자동복귀 타이머 또는 "복귀" 버튼으로 로비 트래블.
-      - 완전 실패(전원사망·타임오버): GameState::Fail() → SetState(Failed) → FinalizeRound(true, ...) (그 턴 납품액 몰수 = CurrentFunds에서 되돌림). "구조 실패" 화면 + 자동복귀만(정산표 없음). 실패도 그 턴 스트라이크·체크포인트 판정은 정상 수행.
+      귀환/실패가 확정되는 순간(탐사맵, 서버)에 SaveSubsystem::FinalizeRound(bForfeited, CasualtyNames)를 명시적으로 호출해 세이브 데이터를 확정하고, 그 결과 FSettlementResult를 정산 UI로 넘긴다. 로비 도착 감지·라운드진행 플래그 같은 우회 없음.
+      - MapQuota는 FinalizeRound 인자가 아니라, 출발 시 ADepartureButton 로비 브랜치가 SaveSubsystem::SetCurrentMapQuota(SelectedZone->MapQuota)로 미리 넘겨둔다(GameInstanceSubsystem이라 트래블 간 유지, FinalizeRound 끝에서 0으로 소비).
+      - 정상 복귀: (미구현) ADepartureButton 탐사 브랜치 → 문 닫힘 연출 대기 후 SetState(Settlement) → FinalizeRound(false, ...). 현재는 문만 닫고 로비로 트래블.
+      - 완전 실패(전원사망): AExplorationGameMode::CheckAllDead → HandleFail → SetState(Failed) → FinalizeRound(true, ...) (그 턴 납품액 몰수 = CurrentFunds에서 되돌림) → AutoReturnDelay 후 로비 트래블. "구조 실패" 화면 + 자동복귀만(정산표 없음). 실패도 그 턴 스트라이크·체크포인트 판정은 정상 수행. 타임오버·도킹문 위협도 같은 HandleFail로 들어가야 하나 Fail() 라우팅 미구현.
       - Submarine 외부인원 즉사(SetOpen(false) 구독)가 FinalizeRound보다 먼저 동기 실행되므로 사망자 수가 정산에 반영됨 — 이 순서 의존성 유지.
-      - EExpeditionState의 Return/Settlement/Failed 값을 탐사맵 인맵 페이즈로 실제 사용(그 전엔 맵별 GameState 클래스 생성자가 상태를 하드셋할 뿐 미사용).
+      - EExpeditionState의 Failed 값은 탐사맵 인맵 페이즈로 실제 사용(HandleFail이 SetState). Return/Settlement는 아직 미사용(맵별 GameState 생성자가 상태를 하드셋할 뿐).
   - name: EconomyConfig 로딩
     detail: "UGoHomeSaveSubsystem::Initialize()에서 하드코딩 경로로 LoadObject<UEconomyConfigDataAsset>(/Game/GoHome/Data/DA_EconomyConfig) + ensureMsgf. DeveloperSettings 방식은 클래스 하나 더 필요해 보류. CheckPoints 배열은 Round 오름차순+중복 없음을 UEconomyConfigDataAsset::IsDataValid(#if WITH_EDITOR)가 강제 — FindNextCheckPoint 등은 이 불변식을 가정한다."
 
 known_gaps:
-  - name: 정산 배선 절반 완료 (SaveSubsystem 로직 O, 호출부·UI·애셋 X)
+  - name: 정산 배선 (SaveSubsystem 로직 O, 실패 경로 O, 정상복귀·UI·애셋 X)
     detail: |
-      구현됨: UGoHomeSaveSubsystem::AccumulateDeliveredValue / FinalizeRound(forfeit 롤백·CasualtyFee 차감·스트라이크·DetermineOutcome·터미널 시 ResetSave·SaveToDisk) / BuildProgress / ResetSave.
+      구현됨: UGoHomeSaveSubsystem::AccumulateDeliveredValue / FinalizeRound(forfeit 롤백·CasualtyFee 차감·스트라이크·DetermineOutcome·터미널 시 ResetSave·SaveToDisk) / BuildProgress / ResetSave / SetCurrentMapQuota.
+      호출부 연결됨: AGoHomeGameState::AddDeliveredValue → AccumulateDeliveredValue 포워드, ADepartureButton 로비 브랜치 → SetCurrentMapQuota, AExplorationGameMode::HandleFail → FinalizeRound(bForfeited=true).
       관련 struct: FSettlementResult(ESettlementOutcome), FExpeditionProgress, UEconomyConfigDataAsset(FCheckPoint+CasualtyFee), UGoHomeSaveGame 필드(CurrentFunds/CurrentRoundDeliveredValue/CurrentRound/QuotaMissCount), ExpeditionZoneDataAsset.MapQuota.
       미연결분은 `남은 의존성` 참고.
 ```
@@ -210,8 +214,8 @@ known_gaps:
 | GameState 상태 델리게이트 | Core | UI(바인딩), `UGoHomeSaveSubsystem`(진행 지점 저장), Interaction(정산 시점 갱신) |
 | 도킹 문 상태 | Core | AI(위협 판정 구독 — 설계 의도, 현재 미연결. AI 절 known_gaps 참고), `ASubmarine`(안전볼륨 밖 즉사 처리 구독, 구현됨), `UMultiActorGateComponent`(기반 재사용) |
 | 인벤토리 슬롯 | Interaction | UI(슬롯별 바인딩) |
-| `IDeathNotifier::OnDeath` | Player (`DeathNotifier.h`, `UHealthComponent`가 구현) | Interaction(`UInventoryComponent`가 `BeginPlay`에서 `FindComponentByInterface<IDeathNotifier>()`로 구독 → `ServerDropAllItems` 구현됨), Core(설계 의도 — 현재 미연결). 구체 타입을 몰라도 사망 시점을 구독하게 하는 게 목적 |
-| 정산/납품 값 흐름 | Interaction → Core → Save | Interaction(딜리버리 존 진입 시 호출), Save(스키마·로직 O, GameState 포워드 미연결 — `남은 의존성` 참고) |
+| `IDeathNotifier::OnDeath` | Player (`DeathNotifier.h`, `UHealthComponent`가 구현) | Interaction(`UInventoryComponent`가 `BeginPlay`에서 `FindComponentByInterface<IDeathNotifier>()`로 구독 → `ServerDropAllItems` 구현됨), Core(`AExplorationGameMode`가 `RestartPlayer`→`TrackPawnDeath`에서 폰별 구독 → 전원 사망 시 `HandleFail`, 구현됨). 구체 타입을 몰라도 사망 시점을 구독하게 하는 게 목적 |
+| 정산/납품 값 흐름 | Interaction → Core → Save | Interaction(딜리버리 존 진입 시 `AddDeliveredValue` 호출), Core(`AGoHomeGameState::AddDeliveredValue` → `SaveSubsystem::AccumulateDeliveredValue` 포워드, 구현됨), Save(스키마·로직 O) |
 
 ## 공유 헤더 규칙
 
@@ -223,12 +227,12 @@ known_gaps:
 
 미연결 스텁 마스터 목록 — 각 절 known_gaps는 여기를 가리킨다.
 
-- **`AGoHomeGameState::AddDeliveredValue` / `Fail` / `OnPlayerRemovedFromParty` 빈 스텁** — 여기에 아래가 다 걸려 있다:
-  - 정산 누적: `UInventoryComponent`가 `AddDeliveredValue` 호출하지만 `SaveSubsystem::AccumulateDeliveredValue`로 포워드 안 됨
-  - 생존자 수 추적 / 파산·전원사망 판정: `Fail()` 빈 스텁
-  - 접속 종료: `OnPlayerRemovedFromParty` 빈 함수 (생존자 수에 미반영)
+- **`AGoHomeGameState::Fail` / `OnPlayerRemovedFromParty` 빈 스텁**:
+  - 타임오버·도킹문 위협 → 실패: `Fail(EFailReason)`가 빈 스텁이라 `AExplorationGameMode::HandleFail`로 라우팅 안 됨 (전원사망 경로는 `CheckAllDead`에서 직접 호출돼 동작)
+  - 접속 종료: `OnPlayerRemovedFromParty` 빈 함수 — GameMode의 `DeadPawns` 집계에 미합류 (생존자 수에 미반영)
+  - (`AddDeliveredValue`는 `SaveSubsystem::AccumulateDeliveredValue`로 포워드 완료)
 - **도킹 문 위협 판정** — AI가 `OnDoorStateChanged` 구독해 `Fail()` 호출하는 코드 없음
-- **정산 배선 나머지** — 사망자 추적(`IDeathNotifier::OnDeath`), 정산 페이즈 머신·자동복귀 타이머·복귀 RPC, DA_EconomyConfig 애셋 생성, DepartureButton 재배선, 정산/게임오버/엔딩 UI 위젯
+- **정산 배선 나머지** — 정상복귀 Settlement 경로(DepartureButton 탐사 브랜치 재배선, FinalizeRound(false)), `FSettlementResult`/`FExpeditionProgress` GameState 복제, 복귀 버튼 RPC, DA_EconomyConfig 애셋 생성, 정산/게임오버/엔딩 UI 위젯. (사망자 추적·실패 경로 자동복귀 타이머는 구현됨)
 - `UI/`는 C++ 베이스 클래스 없음(Blueprint 전용).
 - `Save/` 장비 강화 구매 로직 미구현 — 스키마 필드(`PurchasedUpgrades`)만 있음.
 - 레벨/그레이박스는 `Source/GoHome/` 코드가 아니라 레벨 애셋 작업.
