@@ -3,7 +3,11 @@
 #include "Interaction/InventoryComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Item/ItemActorBase.h"
+#include "Item/FlashlightActor.h"
+#include "Item/UsableItemBase.h"
 #include "Player/DeathNotifier.h"
+#include "Player/GoHomeCharacter.h"
+#include "Interaction/CoopCarryObjectBase.h"
 #include "Core/GoHomeGameState.h"
 
 UInventoryComponent::UInventoryComponent()
@@ -163,6 +167,31 @@ void UInventoryComponent::Server_RequestDrop_Implementation(AItemActorBase* Item
 	ItemToDrop->ServerDrop();
 }
 
+void UInventoryComponent::TryDropOrReleaseCarry()
+{
+	if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(GetOwner()))
+	{
+		if (Character->IsCoopCarrying())
+		{
+			Server_RequestReleaseCarry();
+			return;
+		}
+	}
+
+	TryDropItem(GetActiveItem());
+}
+
+void UInventoryComponent::Server_RequestReleaseCarry_Implementation()
+{
+	if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(GetOwner()))
+	{
+		if (ACoopCarryObjectBase* CarryObject = Character->GetCurrentCarryObject())
+		{
+			CarryObject->ReleaseCarriers();
+		}
+	}
+}
+
 AItemActorBase* UInventoryComponent::GetItemInSlot(int32 SlotIndex) const
 {
 	// Slots는 고정 C 배열이라 수동 범위 체크.
@@ -229,11 +258,29 @@ void UInventoryComponent::TryToggleFlashlight()
 
 void UInventoryComponent::Server_RequestToggleFlashlight_Implementation()
 {
+	// Spot은 최대 1개만 소지 가능하니, 찾으면 그걸로 끝.
 	for (const FInventorySlot& Slot : Slots)
 	{
-		if (Slot.Item)
+		if (AFlashlightActor* Flashlight = Cast<AFlashlightActor>(Slot.Item))
 		{
-			Slot.Item->ServerUseSpecialAction();
+			Flashlight->ServerUseSpecialAction();
+			break;
+		}
+	}
+}
+
+void UInventoryComponent::TryUseActiveItem()
+{
+	Server_RequestUseActiveItem();
+}
+
+void UInventoryComponent::Server_RequestUseActiveItem_Implementation()
+{
+	if (AUsableItemBase* UsableItem = Cast<AUsableItemBase>(GetActiveItem()))
+	{
+		if (UsableItem->CanUse())
+		{
+			UsableItem->ServerUseSpecialAction();
 		}
 	}
 }

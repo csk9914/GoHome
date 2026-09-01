@@ -4,6 +4,9 @@
 #include "Player/GoHomeCharacter.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Player/HealthComponent.h"
+#include "Player/DeathNotifier.h"
+#include "Interaction/CoopCarryObjectBase.h"
 #include "Camera/CameraComponent.h"
 #include "InputAction.h"
 #include "EnhancedInputSubsystems.h"
@@ -71,6 +74,16 @@ void AGoHomeCharacter::BeginPlay()
 			PC->SetInputMode(FInputModeGameOnly());
 			PC->bShowMouseCursor = false;
 		}
+	}
+
+	if (UHealthComponent* Health = FindComponentByClass<UHealthComponent>())
+	{
+		Health->OnHPChanged.AddDynamic(this, &AGoHomeCharacter::HandleHPChanged);
+	}
+
+	if (IDeathNotifier* DeathNotifier = FindComponentByInterface<IDeathNotifier>())
+	{
+		DeathNotifier->GetOnDeathDelegate().AddUObject(this, &AGoHomeCharacter::HandleForcedCarryRelease);
 	}
 }
 
@@ -153,6 +166,8 @@ void AGoHomeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
 		EIC->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ThisClass::Move);
+		EIC->BindAction(MoveAction, ETriggerEvent::Completed, this, &ThisClass::StopCarryInput);
+		EIC->BindAction(MoveAction, ETriggerEvent::Canceled, this, &ThisClass::StopCarryInput);
 		EIC->BindAction(MoveUpDownAction, ETriggerEvent::Triggered, this, &ThisClass::MoveUpDown);
 		EIC->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Look);
 		EIC->BindAction(SprintAction, ETriggerEvent::Started, this, &ThisClass::StartSprint);
@@ -174,6 +189,35 @@ void AGoHomeCharacter::Move(const FInputActionValue& Value)
 
 	AddMovementInput(ForwardDirection, MovementVector.Y);
 	AddMovementInput(RightDirection, MovementVector.X);
+
+	if (CurrentCarryObject)
+	{
+		// 협동 운반 중이면 서버가 두 캐리어 입력을 평균 낼 수 있게 월드 스페이스 이동 의도를 알려줌.
+		const FVector WorldIntent = ForwardDirection * MovementVector.Y + RightDirection * MovementVector.X;
+		if (HasAuthority())
+		{
+			// 호스트 자기 자신이면 굳이 RPC 안 거치고 바로 반영.
+			LastCarryInputWorld = WorldIntent;
+		}
+		else
+		{
+			Server_UpdateCarryInput(WorldIntent);
+		}
+	}
+}
+
+void AGoHomeCharacter::StopCarryInput()
+{
+	if (!CurrentCarryObject) return;
+
+	if (HasAuthority())
+	{
+		LastCarryInputWorld = FVector::ZeroVector;
+	}
+	else
+	{
+		Server_UpdateCarryInput(FVector::ZeroVector);
+	}
 }
 
 void AGoHomeCharacter::MoveUpDown(const FInputActionValue& Value)
@@ -262,19 +306,19 @@ void AGoHomeCharacter::AttachItemToRightHand(UStaticMeshComponent* ItemMeshCompo
 	bIsHoldingItem = true;
 }
 
-void AGoHomeCharacter::AttachFlashlightToLeftHand(UStaticMeshComponent* FlashlightMeshComponent)
+void AGoHomeCharacter::AttachFlashlightToChest(UStaticMeshComponent* FlashlightMeshComponent)
 {
 	if (!FlashlightMeshComponent) return;
 
 	FlashlightMeshComponent->AttachToComponent(
 		GetMesh(),
 		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
-		LeftHandSocketName);
+		FlashlightSocketName);
 
 	bIsHoldingFlashlight = true;
 }
 
-void AGoHomeCharacter::DetachFlashlightFromLeftHand()
+void AGoHomeCharacter::DetachFlashlightFromChest()
 {
 	bIsHoldingFlashlight = false;
 }
@@ -321,4 +365,41 @@ void AGoHomeCharacter::OnRep_ReplicatedPitch()
 void AGoHomeCharacter::ServerUpdatePitch_Implementation(float NewPitch)
 {
 	ReplicatedPitch = NewPitch;
+}
+
+void AGoHomeCharacter::Server_UpdateCarryInput_Implementation(FVector WorldIntent)
+{
+	LastCarryInputWorld = WorldIntent;
+}
+
+void AGoHomeCharacter::OnRep_CurrentCarryObject()
+{
+	// 필요하면 여기서 애니메이션 상태(bIsCoopCarrying 등) 갱신.
+}
+
+void AGoHomeCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (HasAuthority() && CurrentCarryObject)
+	{
+		CurrentCarryObject->ReleaseCarriers();
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
+void AGoHomeCharacter::HandleHPChanged(float CurrentHP, float MaxHP)
+{
+	if (LastKnownHP >= 0.f && CurrentHP < LastKnownHP)
+	{
+		HandleForcedCarryRelease();
+	}
+	LastKnownHP = CurrentHP;
+}
+
+void AGoHomeCharacter::HandleForcedCarryRelease()
+{
+	if (HasAuthority() && CurrentCarryObject)
+	{
+		CurrentCarryObject->ReleaseCarriers();
+	}
 }
