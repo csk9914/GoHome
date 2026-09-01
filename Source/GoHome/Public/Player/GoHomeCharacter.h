@@ -14,6 +14,7 @@ class UInputMappingContext;
 class UCameraComponent;
 class USkeletalMeshComponent;
 class UOxygenComponent;
+class ACoopCarryObjectBase;
 
 UCLASS()
 class GOHOME_API AGoHomeCharacter : public ACharacter, public ISocketProvider
@@ -26,11 +27,15 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	void Move(const FInputActionValue& Value);
 	void MoveUpDown(const FInputActionValue& Value);
 	
+	// 이동 입력을 뗐을 때(Completed/Canceled) 호출 - 운반 중이면 정체된 LastCarryInputWorld를 0으로 리셋.
+	void StopCarryInput();
+
 	void StartSprint();
 	void StopSprint();
 	UFUNCTION(Server, Reliable)
@@ -108,6 +113,28 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	bool IsHoldingItem() const { return bIsHoldingItem; }
 
+	// 협동 운반(CoopCarryObject) 관련.
+	// 현재 협동 운반 중인지.
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	bool IsCoopCarrying() const { return CurrentCarryObject != nullptr; }
+
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	ACoopCarryObjectBase* GetCurrentCarryObject() const { return CurrentCarryObject; }
+
+	// ACoopCarryObjectBase가 잡기/놓기 시 호출(서버 권위).
+	void SetCoopCarryObject(ACoopCarryObjectBase* NewCarryObject)
+	{
+		CurrentCarryObject = NewCarryObject;
+		if (!NewCarryObject)
+		{
+			// 놓는 순간 묵은 입력값도 같이 리셋 -> 다음에 다시 잡을 때 재생되는 것 방지.
+			LastCarryInputWorld = FVector::ZeroVector;
+		}
+	}
+
+	// 협동 운반 중 서버가 두 캐리어 입력을 평균 낼 때 사용할, 이 캐릭터의 최신 월드 스페이스 이동 의도.
+	FVector GetLastCarryInputWorld() const { return LastCarryInputWorld; }
+
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
@@ -132,6 +159,25 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_ReplicatedPitch)
 	float ReplicatedPitch = 0.f;
 	
+	// CoopCarryObject 관련
+	// ---------------------------------------------------
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentCarryObject, BlueprintReadOnly, Category = "Interaction")
+	TObjectPtr<ACoopCarryObjectBase> CurrentCarryObject;
+
+	UFUNCTION()
+	void OnRep_CurrentCarryObject();
+
+	UFUNCTION(Server, Unreliable)
+	void Server_UpdateCarryInput(FVector WorldIntent);
+
+	// 피격/사망 시 강제로 운반 해제하기 위한 구독 핸들러.
+	UFUNCTION()
+	void HandleHPChanged(float CurrentHP, float MaxHP);
+
+	void HandleForcedCarryRelease();
+    // ---------------------------------------------------
+
+
 	// 수영, 소음 등급
 	UPROPERTY(EditDefaultsOnly, Category = "Noise")
 	ENoiseType SwimNoiseType = ENoiseType::Small;
@@ -160,5 +206,8 @@ protected:
 
 		UPROPERTY()
 		TObjectPtr<UOxygenComponent> CachedOxygenComponent;
+
+		FVector LastCarryInputWorld = FVector::ZeroVector;
+		float LastKnownHP = -1.f; // -1 = 아직 초기화 안됨(최초 값으로는 감소 판정 안 하기 위함).
 };
 

@@ -6,6 +6,8 @@
 #include "Item/FlashlightActor.h"
 #include "Item/UsableItemBase.h"
 #include "Player/DeathNotifier.h"
+#include "Player/GoHomeCharacter.h"
+#include "Interaction/CoopCarryObjectBase.h"
 #include "Core/GoHomeGameState.h"
 
 UInventoryComponent::UInventoryComponent()
@@ -163,6 +165,31 @@ void UInventoryComponent::Server_RequestDrop_Implementation(AItemActorBase* Item
 	if (!bOwnsItem) return;
 
 	ItemToDrop->ServerDrop();
+}
+
+void UInventoryComponent::TryDropOrReleaseCarry()
+{
+	if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(GetOwner()))
+	{
+		if (Character->IsCoopCarrying())
+		{
+			Server_RequestReleaseCarry();
+			return;
+		}
+	}
+
+	TryDropItem(GetActiveItem());
+}
+
+void UInventoryComponent::Server_RequestReleaseCarry_Implementation()
+{
+	if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(GetOwner()))
+	{
+		if (ACoopCarryObjectBase* CarryObject = Character->GetCurrentCarryObject())
+		{
+			CarryObject->ReleaseCarriers();
+		}
+	}
 }
 
 AItemActorBase* UInventoryComponent::GetItemInSlot(int32 SlotIndex) const

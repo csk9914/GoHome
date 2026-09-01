@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Interaction/CoopCarryObjectBase.h"
 #include "InteractionComponent.generated.h"
 
 class UCameraComponent;
@@ -30,6 +31,9 @@ public:
 
 	UFUNCTION(Server, Reliable)
 	void Server_RequestInteract(AActor* Target);
+
+	UFUNCTION(Server, Reliable)
+	void Server_RequestDeliverCarry();
 
 	UPROPERTY(EditAnywhere, Category = "Interaction")
 	float TraceDistance = 200.f;
