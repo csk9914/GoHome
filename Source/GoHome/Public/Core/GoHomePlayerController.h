@@ -6,6 +6,8 @@
 #include "GameFramework/PlayerController.h"
 #include "GoHomePlayerController.generated.h"
 
+class UEquipmentUpgradeDataAsset;
+
 /**
  * 
  */
@@ -31,4 +33,9 @@ public:
 
 	UFUNCTION(Client, Reliable)
 	void Client_OpenEquipmentUpgrade();
+
+	// 클라이언트 UI에서 누른 강화 요청을 서버로 전달한다.
+	// 실제 처리 로직은 EquipmentUpgradeSubsystem에서 담당한다.
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Equipment Upgrade")
+	void Server_RequestEquipmentUpgrade(UEquipmentUpgradeDataAsset* UpgradeData);
 };

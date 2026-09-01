@@ -37,6 +37,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Oxygen")
 	float GetMaxOxygen() const;
 
+	UFUNCTION(BlueprintPure, Category = "Oxygen")
+	float GetBaseMaxOxygen() const;
+
+	UFUNCTION(BlueprintPure, Category = "Oxygen")
+	float GetMaxOxygenBonus() const;
+
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Oxygen")
+	void SetMaxOxygenBonus(float NewBonus);
+
 	// UI에서 15칸 산소 표시할 때 사용할 값.
 	UFUNCTION(BlueprintPure, Category = "Oxygen")
 	int32 GetDisplayedOxygenPips() const;
@@ -62,8 +71,13 @@ protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	// UI 기준 산소 칸 수. 기본 15칸.
+	// 강화가 없는 기본 산소 최대치. 최종 최대 산소는 GetMaxOxygen()로 가져온다.
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_Oxygen, Category = "Oxygen", meta = (ClampMin = "0.0", UIMin = "0.0"))
 	float MaxOxygen = 15.f;
+
+	// 강화용 보너스 산소
+	UPROPERTY(ReplicatedUsing = OnRep_MaxOxygenBonus, BlueprintReadOnly, Category = "Oxygen")
+	float MaxOxygenBonus = 0.f;
 
 	UPROPERTY(ReplicatedUsing = OnRep_Oxygen, BlueprintReadOnly, Category = "Oxygen")
 	float Oxygen = 15.f;
@@ -94,6 +108,9 @@ protected:
 
 	UFUNCTION()
 	void OnRep_InSafeZone();
+
+	UFUNCTION()
+	void OnRep_MaxOxygenBonus();
 
 private:
 	// 초과 무게 상태를 제공하는 인터페이스만 저장한다.
