@@ -5,6 +5,9 @@
 
 #include "Core/LobbyGameState.h"
 
+#include "Engine/GameInstance.h"
+#include "Upgrade/EquipmentUpgradeSubsystem.h"
+
 void AGoHomePlayerController::Server_SelectZone_Implementation(FName ZoneId)
 {
 	if (ALobbyGameState* LobbyGameState = GetWorld()->GetGameState<ALobbyGameState>())
@@ -23,4 +26,23 @@ void AGoHomePlayerController::Client_OpenSelectZone_Implementation()
 void AGoHomePlayerController::Client_OpenEquipmentUpgrade_Implementation()
 {
 	OnOpenEquipmentUpgrade();
+}
+
+// PlayerController는 클라이언트 UI 요청을 서버로 넘기는 통로만 맡는다.
+// 실제 강화 처리는 EquipmentUpgradeSubsystem에 위임한다.
+void AGoHomePlayerController::Server_RequestEquipmentUpgrade_Implementation(UEquipmentUpgradeDataAsset* UpgradeData)
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	if (!GameInstance)
+	{
+		return;
+	}
+
+	UEquipmentUpgradeSubsystem* UpgradeSubsystem = GameInstance->GetSubsystem<UEquipmentUpgradeSubsystem>();
+	if (!UpgradeSubsystem)
+	{
+		return;
+	}
+
+	UpgradeSubsystem->RequestUpgrade(this, UpgradeData);
 }
