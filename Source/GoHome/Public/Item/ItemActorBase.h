@@ -105,6 +105,10 @@ protected:
 	// 다시 손에 들렸을 때 호출 : 부유 사이클 정지(타이머 취소 + Tick 끄기).
 	void CancelFloatCycle();
 
+	// 가라앉다가 바닥 등에 부딪혀 완전히 정지하는 순간 호출됨(뜨는 아이템에는 안 불림).
+	// 기본은 아무 것도 안 함 -> 필요한 서브클래스만 오버라이드.
+	virtual void OnSettled() {}
+
 	UFUNCTION()
 	virtual void OnRep_ItemData();
 

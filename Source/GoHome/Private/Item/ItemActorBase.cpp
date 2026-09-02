@@ -85,6 +85,7 @@ void AItemActorBase::Tick(float DeltaTime)
 		else if (bHasReachedSinkSpeed)
 		{
 			SetActorTickEnabled(false);
+			OnSettled();
 			return;
 		}
 	}
