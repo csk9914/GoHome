@@ -52,10 +52,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Avoidance")
 	TEnumAsByte<ECollisionChannel> ObstacleTraceChannel = ECC_Visibility;
 
-	// true면 Sphere Trace 디버그 선/구를 화면에 표시한다.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Avoidance")
-	bool bDrawObstacleDebug = true;
-
 	// 회피 방향을 한번 정한 뒤 유지하는 시간. 너무 낮으면 방향이 계속 바뀌며 떨린다.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Avoidance")
 	float AvoidLockDuration = 0.25f;
@@ -71,10 +67,6 @@ public:
 	// Sphere Trace 시작점. BP에서 EyePoint나 몸 중심 SceneComponent를 넣을 수 있다.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Avoidance")
 	TObjectPtr<USceneComponent> TraceStartComponent = nullptr;
-
-	// true면 이동/벽검사 함수 호출 여부를 화면에 출력한다.
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug")
-	bool bDebugSteering = true;
 
 	// 현재 회피 방향을 잠깐 고정 중인지 여부.
 	UPROPERTY(BlueprintReadOnly, Category = "Avoidance")

@@ -74,12 +74,6 @@ void UUnderwaterSteeringMovement::Steering_MoveToLocation(FVector TargetLocation
 		return;
 	}
 
-	if (bDebugSteering && GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 0.0f, FColor::Cyan, TEXT("Steering_MoveToLocation"));
-	}
-
-
 	const FVector OwnerLocation = Owner->GetActorLocation();
 	const FVector ToTarget = TargetLocation - OwnerLocation;
 
@@ -260,11 +254,6 @@ bool UUnderwaterSteeringMovement::IsDirectionBlocked(FVector CheckDir) const
 		return false;
 	}
 
-	if (bDebugSteering && GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 0.0f, FColor::Yellow, TEXT("IsDirectionBlocked"));
-	}
-
 	const FVector Dir = CheckDir.GetSafeNormal();
 	if (Dir.IsNearlyZero())
 	{
@@ -286,12 +275,9 @@ bool UUnderwaterSteeringMovement::IsDirectionBlocked(FVector CheckDir) const
 		UEngineTypes::ConvertToTraceType(ObstacleTraceChannel),
 		false,
 		ActorsToIgnore,
-		bDrawObstacleDebug ? EDrawDebugTrace::ForOneFrame : EDrawDebugTrace::None,
+		EDrawDebugTrace::None,
 		Hit,
-		true,
-		FLinearColor::Green,
-		FLinearColor::Red,
-		0.05f
+		true
 	);
 
 	return bHit;
