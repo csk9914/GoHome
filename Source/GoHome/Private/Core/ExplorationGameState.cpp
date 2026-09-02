@@ -4,6 +4,7 @@
 #include "Core/ExplorationGameState.h"
 #include "Core/DockingDoorComponent.h"
 #include "GameFramework/PlayerState.h"
+#include "Net/UnrealNetwork.h"
 
 
 AExplorationGameState::AExplorationGameState()
@@ -13,10 +14,36 @@ AExplorationGameState::AExplorationGameState()
 	CurrentState = EExpeditionState::Exploration;
 }
 
+void AExplorationGameState::SetExpeditionDeadline(float InDeadlineServerTime)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	
+	ExpeditionDeadline = InDeadlineServerTime;
+}
+
+float AExplorationGameState::GetRemainingSeconds() const
+{
+	if (ExpeditionDeadline <= 0.f)
+	{
+		return 0.f;
+	}
+	
+	return FMath::Max(0.f, ExpeditionDeadline - GetServerWorldTimeSeconds());
+}
+
 void AExplorationGameState::BeginPlay()
 {
 	Super::BeginPlay();
 
 	DockingDoorComponent->SetOpen(true);
+}
+
+void AExplorationGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AExplorationGameState, ExpeditionDeadline);
 }
 

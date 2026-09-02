@@ -43,7 +43,7 @@ public:
 	const UGoHomeSaveGame* GetSaveGame() const { return SaveGame; };
 
 	// 출발 시 호출해서 값을 초기화
-	void SetCurrentMapQuota(int32 Quota) { CurrentMapQuota = Quota; };
+	void SetTargetMapQuota(int32 Quota) { CurrentMapQuota = Quota; };
 
 private:
 	void ResetSave();

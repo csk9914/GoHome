@@ -2,6 +2,7 @@
 
 #include "Core/GoHomeGameState.h"
 #include "Core/DockingDoorComponent.h"
+#include "Core/ExplorationGameMode.h"
 #include "Net/UnrealNetwork.h"
 #include "Save/GoHomeSaveSubsystem.h"
 
@@ -44,6 +45,18 @@ void AGoHomeGameState::AddDeliveredValue(int32 Value)
 
 void AGoHomeGameState::Fail(EFailReason Reason)
 {
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	// GameMode는 서버 전용, 클라는 null
+	if (AExplorationGameMode* ExplorationGameMode = GetWorld()->GetAuthGameMode<AExplorationGameMode>())
+	{
+		ExplorationGameMode->HandleFail(Reason);
+	}
+
+	
 }
 
 void AGoHomeGameState::OnPlayerRemovedFromParty(APlayerState* PlayerState)

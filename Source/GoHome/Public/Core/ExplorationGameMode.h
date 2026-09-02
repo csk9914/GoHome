@@ -21,25 +21,44 @@ class GOHOME_API AExplorationGameMode : public AGoHomeGameMode
 	
 public:
 	AExplorationGameMode();
-	void HandleFail(EFailReason Reason);
 	
 	virtual void RestartPlayer(AController* NewPlayer) override;
-
+	
+	void HandleFail(EFailReason Reason);
+	void HandleReturn();
+	
+protected:
+	virtual void BeginPlay() override;
 	
 private:
 	void TrackPawnDeath(APawn* Pawn);
 	void HandlePawnDeath(TWeakObjectPtr<APawn> DeadPawn);
-	void CheckAllDead();
+	void HandleTimeExpired();
 	
+	void CheckAllDead();
 	void ReturnToLobby();
+	void EnterSettlement();
 	
 private:
 	
 	// 구조 실패 화면 노출 시간
 	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
 	float AutoReturnDelay = 8.f;
+
+	// 문이 닫히는 시간
+	UPROPERTY(EditDefaultsOnly, Category = "Expedition")
+	float DoorCloseDelay = 8.f;
+
+	// 자동 복귀 타이머
+	FTimerHandle AutoReturnTimer;
 	
-	// 정산에 넘길 명단
+	// door close 타이머
+	FTimerHandle DoorCloseTimer;
+	
+	// 제한 시간 타이머
+	FTimerHandle TimeLimitTimer;
+	
+	// 정산에 넘길 사망자 명단
 	TSet<FString> CasualtyNames;
 	
 	// 중복 구독 방지용
@@ -48,9 +67,10 @@ private:
 	// 사망 폰 집계
 	TSet<TWeakObjectPtr<APawn>> DeadPawns;
 	
-	FTimerHandle AutoReturnTimer;
+
 	
-	bool bFailHandled = false;
+	bool bRoundResolved = false;
+	bool bReturnPending = false;
 	
 	
 };

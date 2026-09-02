@@ -6,10 +6,8 @@
 #include "Core/ExpeditionZoneDataAsset.h"
 #include "Core/GoHomeGameMode.h"
 #include "Core/LobbyGameState.h"
-#include "Core/DockingDoorComponent.h"
-#include "TimerManager.h"
-#include "Save/GoHomeSaveSubsystem.h"
-
+#include "Core/ExpeditionTravelSubsystem.h"
+#include "Core/ExplorationGameMode.h"
 
 ADepartureButton::ADepartureButton()
 {
@@ -32,9 +30,10 @@ void ADepartureButton::OnInteract(APawn* InstigatorPawn)
 		const UExpeditionZoneDataAsset* SelectedZone = LobbyGameState->GetSelectedZone();
 		if (!SelectedZone) return;
 
-		if (UGoHomeSaveSubsystem* SaveSubsystem = GetGameInstance()->GetSubsystem<UGoHomeSaveSubsystem>())
+		// 선택된 존 에셋을 트래블 간 유지되는 서브시스템에 넘겨둔다.
+		if (UExpeditionTravelSubsystem* TravelSubsystem = GetGameInstance()->GetSubsystem<UExpeditionTravelSubsystem>())
 		{
-			SaveSubsystem->SetCurrentMapQuota(SelectedZone->MapQuota);
+			TravelSubsystem->SetActiveZone(SelectedZone);
 		}
 		
 		GoHomeGameMode->ServerTravelViaLoadingScreen(SelectedZone->MapPath.ToSoftObjectPath().GetLongPackageName());
@@ -43,30 +42,10 @@ void ADepartureButton::OnInteract(APawn* InstigatorPawn)
 	// 현재 탐사 맵일 때
 	else if (AGoHomeGameState* GoHomeGameState = GetWorld()->GetGameState<AGoHomeGameState>())
 	{
-		// 문을 닫고
-		if (UDockingDoorComponent* DoorComponent = GoHomeGameState->GetDockingDoorComponent())
+		if (AExplorationGameMode* ExplorationGameMode = GetWorld()->GetAuthGameMode<AExplorationGameMode>())
 		{
-			DoorComponent->SetOpen(false);
+			ExplorationGameMode->HandleReturn();
 		}
-		
-		// 타이머를 이용해서 문이 닫히는 시간까지 딜레이를 준다
-		// DoorCloseDelay 기다린 다음에 로비 맵으로 이동한다.
-		GetWorldTimerManager().SetTimer(
-			TravelDelayTimer, 
-			FTimerDelegate::CreateUObject(this, &ADepartureButton::ExecuteDelayedTravel, GoHomeGameMode->GetLobbyMapPath()),
-			DoorCloseDelay,
-			false);
-		
-		// CreateUObject를 쓰는 이유는 
-		// this(ADepartureButton 인스턴스)가 콜백 실행 전에 파괴돼도 
-		// 엔진이 안전하게 무시하기 때문(레벨 트래블 중 액터가 사라지는 경우)
 	}
 }
 
-void ADepartureButton::ExecuteDelayedTravel(FString TravelPath)
-{
-	if (AGoHomeGameMode* GoHomeGameMode = GetWorld()->GetAuthGameMode<AGoHomeGameMode>())
-	{
-		GoHomeGameMode->ServerTravelViaLoadingScreen(TravelPath);
-	}
-}

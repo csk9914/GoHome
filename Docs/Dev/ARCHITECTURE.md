@@ -60,12 +60,14 @@ decisions:
       서브클래스가 아니라 런타임 `GetWorld()->GetGameState<ALobbyGameState>()` 유효 여부로 판별한다 —
       서브클래스로 나누면 두 맵의 외형이 각 BP에 따로 들려 드리프트 위험이 생기므로 기각.
         - ZoneSelectMonitor: `ALobbyGameState` 유효할 때만 CanInteract() true
-        - ADepartureButton: 로비면 Departure 동작, 아니면 Return 동작(`DockingDoorComponent->SetOpen(false)`
-          → `DoorCloseDelay`(기본 8초, 문 닫히는 연출 대기) 타이머 만료 시 `ExecuteDelayedTravel` →
-          `AGoHomeGameMode::ServerTravelViaLoadingScreen(GoHomeGameMode->GetLobbyMapPath())` 호출.
-          `LobbyMapPath`는 `GoHomeGameMode`의 실재 필드(기본값 `/Game/GoHome/Maps/LV_Lobby`). 목적지는
-          `UExpeditionTravelSubsystem::PendingDestinationMap`에 저장 후 `LoadingMapPath`로 먼저 경유.
-          타이머 콜백은 `CreateUObject`(약한 참조) 사용 — 액터가 트래블 중 파괴돼도 안전)
+        - ADepartureButton: 로비면 Departure 동작(선택된 존 에셋을 `UExpeditionTravelSubsystem::SetActiveZone`으로
+          넘긴 뒤 `ServerTravelViaLoadingScreen`으로 탐사맵 트래블), 탐사맵이면 Return 동작 — 자체 처리 없이
+          `AExplorationGameMode::HandleReturn()`에 위임한다. 문 닫기·연출 대기·Settlement 진입·`FinalizeRound(false)`·
+          자동복귀 타이머·로비 트래블은 전부 GameMode 소유(실패 경로 `HandleFail`과 같은 곳에 라운드 종료 시퀀싱을 모음).
+          할당량·제한 시간 같은 존별 런타임 설정은 `AExplorationGameMode::BeginPlay`가 `ActiveZone` 하나에서 읽는다
+          (`SetTargetMapQuota` 호출도 여기, DepartureButton 아님 — 존 데이터 단일 출처). `LobbyMapPath`는
+          `GoHomeGameMode`의 실재 필드(기본값 `/Game/GoHome/Maps/LV_Lobby`), 목적지는
+          `UExpeditionTravelSubsystem`의 `PendingDestinationMap`(C++ 쓰기 전용, 로딩 맵 BP가 읽음)에 저장 후 `LoadingMapPath`로 먼저 경유.
   - name: 도킹 문 밖 생존자 처리
     detail: |
       문이 닫히는 순간(bOpen: true → false) ASubmarine이 InteriorVolume 밖에 있는 플레이어를 즉시 사망
@@ -81,13 +83,12 @@ decisions:
       - Lobby → Departure: 출발 버튼 상호작용 즉시(전원 확정 없음). **주의**: `SetState(Departure)`는 `ServerTravelToMap` 내부에 무조건 있어, `ServerTravelViaLoadingScreen`(Return도 재사용)을 포함한 모든 서버 트래블에서 발동 — 이 전이 전용이 아니다.
       - `ZoneSelect`: 미사용 — `LobbyGameState::SelectedZoneId` 값 변경만으로 처리(상태 전이 아님)
       - Departure → Exploration: 트래블 완료 후 `ExplorationGameState` 생성자가 즉시 초기화, `BeginPlay`(서버)에서 `DockingDoorComponent->SetOpen(true)` 자동 호출(로딩 UI 붙으면 타이밍 재검증 필요)
-      - Exploration → Return: 귀환 버튼 상호작용 시 `SetOpen(false)` → `ASubmarine`이 `InteriorVolume` 밖 플레이어 즉시 사망 처리 → `ServerTravelViaLoadingScreen`(로비 맵). **주의**: 이 경로도 `ServerTravelToMap`을 타므로, 곧 파괴될 `ExplorationGameState`가 `SetState(Departure)`로 세팅된 채 트래블에 들어간다 — 로딩 경유 중 그 상태를 구독하면 "Return"이 "Departure"로 보임
-      - Exploration → Return → Settlement: (설계 확정, 미구현) Return/Settlement를 탐사맵 인맵 페이즈로 사용 — 귀환버튼이 문 닫고 연출 대기 후 Settlement 진입, FinalizeRound + 정산 UI + 자동복귀 타이머, 그 다음에 로비 트래블. Save 절 decisions '정산 페이즈는 탐사맵 안에서' 참고.
-      - Exploration/Return → Failed: 제한 시간 만료, 도킹 문 위협 판정, 생존자 0명(→ Player 절 HP 0 처리) 중 하나. 전원사망 경로는 `AExplorationGameMode::CheckAllDead → HandleFail`이 구현됨(SetState(Failed) + FinalizeRound(bForfeited=true) + 자동복귀 타이머). 타임오버·도킹문 위협은 `AGoHomeGameState::Fail()` 라우팅 미구현.
+      - Exploration → Settlement: 귀환 버튼 상호작용 → `AExplorationGameMode::HandleReturn()` → `DockingDoorComponent->SetOpen(false)`(→ `ASubmarine`이 `InteriorVolume` 밖 플레이어 즉시 사망 처리) → `DoorCloseTimer`(`DoorCloseDelay` 기본 8초, 문 닫힘 연출 대기) 만료 시 `EnterSettlement` → `SetState(Settlement)` + `FinalizeRound(bForfeited=false, CasualtyNames)` → `AutoReturnDelay` 후 `ReturnToLobby`. 버튼 연타 재진입은 `bReturnPending`, 종료 락은 `bRoundResolved`. `EExpeditionState::Return` 값은 여전히 미사용.
+      - Exploration/Settlement → Failed: 제한 시간 만료, 도킹 문 위협 판정, 생존자 0명(→ Player 절 HP 0 처리) 중 하나 → `AExplorationGameMode::HandleFail`(SetState(Failed) + FinalizeRound(bForfeited=true) + 자동복귀 타이머). 전원사망은 `CheckAllDead`가, 타임오버는 `AExplorationGameMode::BeginPlay`가 존 `TimeLimitSeconds`로 건 `TimeLimitTimer`(만료 시 `Fail(EFailReason::TimeExpired)`)가, 도킹문 위협은 `AGoHomeGameState::Fail(EFailReason)`가 각각 `HandleFail`로 라우팅한다(모두 서버). `HandleFail`·`EnterSettlement`는 진입 시 `TimeLimitTimer`를 `ClearTimer`하고, `HandleFail`은 `DoorCloseTimer`도 끊으므로, 귀환 연출 중(아직 `EnterSettlement` 전) 마지막 생존자까지 밖에서 죽거나 시간이 만료되면 정산이 아니라 실패(forfeit)가 선점한다. **AI 도킹문 위협 콜러만 아직 미구현.**
 
 known_gaps:
   - name: 실패 사유별 진입점
-    detail: "전원사망은 `AExplorationGameMode`가 직접 판정하지만, 타임오버·도킹문 위협은 `AGoHomeGameState::Fail(EFailReason)`가 빈 스텁이라 `HandleFail`로 이어지지 않는다(미연결 스텁 전체는 `남은 의존성`)."
+    detail: "타임오버·전원사망은 콜러까지 배선 완료(`TimeLimitTimer`, `CheckAllDead`). `AGoHomeGameState::Fail(EFailReason)` 포워더도 살아있으나, 이를 호출하는 AI 도킹문 위협 판정만 미구현(미연결 스텁 전체는 `남은 의존성`)."
 ```
 
 ### Player
@@ -143,7 +144,7 @@ known_gaps:
   - name: AMonsterBase 미사용 (고아 클래스)
     detail: "`AI/MonsterBase.h`의 `AMonsterBase`는 경계 3종(IDamageable 호출·IMonsterNoiseListener 구현·도킹 문 상태 구독)을 다 갖췄지만 아무 BP도 상속하지 않는다. 실제 스폰되는 `BP_UnderwaterMonster`는 `AUnderwaterEnemyBase`(빈 APawn), `BP_WormBase`는 `AActor`를 직접 상속한다. 데미지 처리·도킹 문 위협 구독은 `AMonsterBase` 경유 없이 각 BP가 별도 구현해야 한다(소음 감지는 원래 BP가 직접 구현이라 무관)."
   - name: 도킹 문 위협 판정 미구현
-    detail: "boundary_interfaces에 계약만 있고, UDockingDoorComponent::OnDoorStateChanged를 구독해 위협 판정 후 GameState::Fail(EFailReason)을 호출하는 코드가 AI 쪽에 없다."
+    detail: "수신 측(`AGoHomeGameState::Fail(EFailReason)` → `AExplorationGameMode::HandleFail`)은 배선됐으나, `UDockingDoorComponent::OnDoorStateChanged`를 구독해 위협 판정 후 `Fail(EFailReason::DockThreatened)`을 호출하는 코드가 AI 쪽에 없다."
 ```
 
 ### Item
@@ -182,20 +183,22 @@ decisions:
   - name: 정산 페이즈는 탐사맵 안에서 (트래블 아님)
     detail: |
       귀환/실패가 확정되는 순간(탐사맵, 서버)에 SaveSubsystem::FinalizeRound(bForfeited, CasualtyNames)를 명시적으로 호출해 세이브 데이터를 확정하고, 그 결과 FSettlementResult를 정산 UI로 넘긴다. 로비 도착 감지·라운드진행 플래그 같은 우회 없음.
-      - MapQuota는 FinalizeRound 인자가 아니라, 출발 시 ADepartureButton 로비 브랜치가 SaveSubsystem::SetCurrentMapQuota(SelectedZone->MapQuota)로 미리 넘겨둔다(GameInstanceSubsystem이라 트래블 간 유지, FinalizeRound 끝에서 0으로 소비).
-      - 정상 복귀: (미구현) ADepartureButton 탐사 브랜치 → 문 닫힘 연출 대기 후 SetState(Settlement) → FinalizeRound(false, ...). 현재는 문만 닫고 로비로 트래블.
-      - 완전 실패(전원사망): AExplorationGameMode::CheckAllDead → HandleFail → SetState(Failed) → FinalizeRound(true, ...) (그 턴 납품액 몰수 = CurrentFunds에서 되돌림) → AutoReturnDelay 후 로비 트래블. "구조 실패" 화면 + 자동복귀만(정산표 없음). 실패도 그 턴 스트라이크·체크포인트 판정은 정상 수행. 타임오버·도킹문 위협도 같은 HandleFail로 들어가야 하나 Fail() 라우팅 미구현.
-      - Submarine 외부인원 즉사(SetOpen(false) 구독)가 FinalizeRound보다 먼저 동기 실행되므로 사망자 수가 정산에 반영됨 — 이 순서 의존성 유지.
-      - EExpeditionState의 Failed 값은 탐사맵 인맵 페이즈로 실제 사용(HandleFail이 SetState). Return/Settlement는 아직 미사용(맵별 GameState 생성자가 상태를 하드셋할 뿐).
+      - MapQuota는 FinalizeRound 인자가 아니라, ADepartureButton 로비 브랜치가 선택된 존 에셋을 UExpeditionTravelSubsystem::SetActiveZone으로 넘기고, 탐사맵 도착 후 AExplorationGameMode::BeginPlay가 ActiveZone->MapQuota를 읽어 SaveSubsystem::SetTargetMapQuota로 넘긴다(내부 필드명은 CurrentMapQuota, GameInstanceSubsystem이라 트래블 간 유지, FinalizeRound 끝에서 0으로 소비). 같은 BeginPlay가 ActiveZone->TimeLimitSeconds로 제한 시간 타이머도 건다.
+      - 정상 복귀: ADepartureButton 탐사 브랜치 → AExplorationGameMode::HandleReturn → SetOpen(false) → DoorCloseTimer(DoorCloseDelay) 후 EnterSettlement → SetState(Settlement) + FinalizeRound(false, CasualtyNames) → AutoReturnDelay 후 ReturnToLobby. FSettlementResult 반환값은 아직 버려짐(정산 UI·복제 미구현).
+      - 완전 실패(전원사망): AExplorationGameMode::CheckAllDead → HandleFail → SetState(Failed) → FinalizeRound(true, ...) (그 턴 납품액 몰수 = CurrentFunds에서 되돌림) → AutoReturnDelay 후 로비 트래블. "구조 실패" 화면 + 자동복귀만(정산표 없음). 실패도 그 턴 스트라이크·체크포인트 판정은 정상 수행. 타임오버는 TimeLimitTimer 만료 → HandleFail(TimeExpired)로 배선됨. 도킹문 위협만 AGoHomeGameState::Fail(EFailReason) 포워더는 살아있으나 콜러(AI)가 아직 없음.
+      - Submarine 외부인원 즉사(SetOpen(false) 구독)가 FinalizeRound보다 먼저 동기 실행되므로 사망자 수가 정산에 반영됨 — HandleReturn이 SetOpen(false) 직후 DoorCloseDelay를 기다린 뒤에야 EnterSettlement를 부르므로 이 순서는 자연히 유지된다.
+      - bRoundResolved 단일 락이 FinalizeRound 1회·자동복귀 타이머 1회를 보장(EnterSettlement/HandleFail 공유). HandleFail·EnterSettlement은 진입 시 TimeLimitTimer를 ClearTimer하고, HandleFail은 DoorCloseTimer도 끊는다 → 귀환 연출 중 전원사망하거나 시간이 만료되면 실패가 정산을 선점.
+      - EExpeditionState의 Failed·Settlement 값은 탐사맵 인맵 페이즈로 실제 사용(HandleFail·EnterSettlement이 SetState). Return 값은 아직 미사용.
+      - UI 카운트다운은 AExplorationGameState의 복제 필드 ExpeditionDeadline(절대 서버 시각)을 GetRemainingSeconds()/HasTimeLimit()로 읽는다(표시 전용, 실제 실패 트리거는 서버 TimeLimitTimer).
   - name: EconomyConfig 로딩
     detail: "UGoHomeSaveSubsystem::Initialize()에서 하드코딩 경로로 LoadObject<UEconomyConfigDataAsset>(/Game/GoHome/Data/DA_EconomyConfig) + ensureMsgf. DeveloperSettings 방식은 클래스 하나 더 필요해 보류. CheckPoints 배열은 Round 오름차순+중복 없음을 UEconomyConfigDataAsset::IsDataValid(#if WITH_EDITOR)가 강제 — FindNextCheckPoint 등은 이 불변식을 가정한다."
 
 known_gaps:
-  - name: 정산 배선 (SaveSubsystem 로직 O, 실패 경로 O, 정상복귀·UI·애셋 X)
+  - name: 정산 배선 (SaveSubsystem 로직 O, 실패·정상복귀 경로 O, UI·애셋·복제 X)
     detail: |
-      구현됨: UGoHomeSaveSubsystem::AccumulateDeliveredValue / FinalizeRound(forfeit 롤백·CasualtyFee 차감·스트라이크·DetermineOutcome·터미널 시 ResetSave·SaveToDisk) / BuildProgress / ResetSave / SetCurrentMapQuota.
-      호출부 연결됨: AGoHomeGameState::AddDeliveredValue → AccumulateDeliveredValue 포워드, ADepartureButton 로비 브랜치 → SetCurrentMapQuota, AExplorationGameMode::HandleFail → FinalizeRound(bForfeited=true).
-      관련 struct: FSettlementResult(ESettlementOutcome), FExpeditionProgress, UEconomyConfigDataAsset(FCheckPoint+CasualtyFee), UGoHomeSaveGame 필드(CurrentFunds/CurrentRoundDeliveredValue/CurrentRound/QuotaMissCount), ExpeditionZoneDataAsset.MapQuota.
+      구현됨: UGoHomeSaveSubsystem::AccumulateDeliveredValue / FinalizeRound(forfeit 롤백·CasualtyFee 차감·스트라이크·DetermineOutcome·터미널 시 ResetSave·SaveToDisk) / BuildProgress / ResetSave / SetTargetMapQuota.
+      호출부 연결됨: AGoHomeGameState::AddDeliveredValue → AccumulateDeliveredValue 포워드, AExplorationGameMode::BeginPlay → SetTargetMapQuota(ActiveZone->MapQuota), AExplorationGameMode::HandleFail → FinalizeRound(true), AExplorationGameMode::EnterSettlement(귀환) → FinalizeRound(false).
+      관련 struct: FSettlementResult(ESettlementOutcome), FExpeditionProgress, UEconomyConfigDataAsset(FCheckPoint+CasualtyFee), UGoHomeSaveGame 필드(CurrentFunds/CurrentRoundDeliveredValue/CurrentRound/QuotaMissCount), ExpeditionZoneDataAsset.MapQuota/TimeLimitSeconds.
       미연결분은 `남은 의존성` 참고.
 ```
 
@@ -212,9 +215,10 @@ known_gaps:
 | `GenerateNoise` | AI | Item(구현됨, `ItemActorBase.cpp`)과 Player(구현됨, 수영 중 주기 소음 — `GoHomeCharacter.cpp`의 `SwimNoiseInterval`/`SwimNoiseRadius`, 보이스챗 발화 시)가 발생원. 호출 즉시 서버 동기 처리 |
 | `IMonsterNoiseListener` | AI | `BP_UnderwaterMonster`/`BP_WormBase`가 각각 직접 구현(BP 쪽에서 구현 진행 중, C++ 몬스터 베이스 상속과 무관 — AI 절 decisions 참고) |
 | GameState 상태 델리게이트 | Core | UI(바인딩), `UGoHomeSaveSubsystem`(진행 지점 저장), Interaction(정산 시점 갱신) |
-| 도킹 문 상태 | Core | AI(위협 판정 구독 — 설계 의도, 현재 미연결. AI 절 known_gaps 참고), `ASubmarine`(안전볼륨 밖 즉사 처리 구독, 구현됨), `UMultiActorGateComponent`(기반 재사용) |
+| 도킹 문 상태 | Core | AI(위협 판정 구독 → `Fail()` — 설계 의도, 현재 미연결. AI 절 known_gaps 참고), `ASubmarine`(안전볼륨 밖 즉사 처리 구독, 구현됨), `AExplorationGameMode::HandleReturn`(귀환 시 `SetOpen(false)` 호출), `UMultiActorGateComponent`(기반 재사용) |
 | 인벤토리 슬롯 | Interaction | UI(슬롯별 바인딩) |
 | `IDeathNotifier::OnDeath` | Player (`DeathNotifier.h`, `UHealthComponent`가 구현) | Interaction(`UInventoryComponent`가 `BeginPlay`에서 `FindComponentByInterface<IDeathNotifier>()`로 구독 → `ServerDropAllItems` 구현됨), Core(`AExplorationGameMode`가 `RestartPlayer`→`TrackPawnDeath`에서 폰별 구독 → 전원 사망 시 `HandleFail`, 구현됨). 구체 타입을 몰라도 사망 시점을 구독하게 하는 게 목적 |
+| `AGoHomeGameState::Fail(EFailReason)` | Core (`GoHomeGameState.h`) | 서버 전용 얇은 포워더 — `HasAuthority` 가드 후 `GetAuthGameMode<AExplorationGameMode>()->HandleFail(Reason)`. 콜러는 AI 도킹문 위협만 남음(미구현) — 타임오버는 `AExplorationGameMode`가 `TimeLimitTimer`로 `HandleFail`을 직접 부른다 |
 | 정산/납품 값 흐름 | Interaction → Core → Save | Interaction(딜리버리 존 진입 시 `AddDeliveredValue` 호출), Core(`AGoHomeGameState::AddDeliveredValue` → `SaveSubsystem::AccumulateDeliveredValue` 포워드, 구현됨), Save(스키마·로직 O) |
 
 ## 공유 헤더 규칙
@@ -227,12 +231,12 @@ known_gaps:
 
 미연결 스텁 마스터 목록 — 각 절 known_gaps는 여기를 가리킨다.
 
-- **`AGoHomeGameState::Fail` / `OnPlayerRemovedFromParty` 빈 스텁**:
-  - 타임오버·도킹문 위협 → 실패: `Fail(EFailReason)`가 빈 스텁이라 `AExplorationGameMode::HandleFail`로 라우팅 안 됨 (전원사망 경로는 `CheckAllDead`에서 직접 호출돼 동작)
+- **`AGoHomeGameState::Fail` 콜러 부재 / `OnPlayerRemovedFromParty` 빈 스텁**:
+  - `Fail(EFailReason)` → `HandleFail` 라우팅은 배선됨(포워더). 남은 미구현 콜러는 AI 도킹문 위협 판정 하나 (전원사망은 `CheckAllDead`, 타임오버는 `AExplorationGameMode::BeginPlay`가 건 `TimeLimitTimer`가 각각 `HandleFail` 직접 호출)
   - 접속 종료: `OnPlayerRemovedFromParty` 빈 함수 — GameMode의 `DeadPawns` 집계에 미합류 (생존자 수에 미반영)
   - (`AddDeliveredValue`는 `SaveSubsystem::AccumulateDeliveredValue`로 포워드 완료)
-- **도킹 문 위협 판정** — AI가 `OnDoorStateChanged` 구독해 `Fail()` 호출하는 코드 없음
-- **정산 배선 나머지** — 정상복귀 Settlement 경로(DepartureButton 탐사 브랜치 재배선, FinalizeRound(false)), `FSettlementResult`/`FExpeditionProgress` GameState 복제, 복귀 버튼 RPC, DA_EconomyConfig 애셋 생성, 정산/게임오버/엔딩 UI 위젯. (사망자 추적·실패 경로 자동복귀 타이머는 구현됨)
+- **도킹 문 위협 판정** — AI가 `OnDoorStateChanged` 구독해 `Fail(EFailReason::DockThreatened)` 호출하는 코드 없음
+- **정산 배선 나머지** — `FSettlementResult`/`FExpeditionProgress` GameState 복제(현재 `FinalizeRound` 반환값은 버려짐), 복귀 버튼 RPC, DA_EconomyConfig 애셋 생성, 정산/게임오버/엔딩 UI 위젯. (사망자 추적, 실패 경로, 타임오버 경로, 정상복귀 Settlement 경로 `HandleReturn→EnterSettlement`, 자동복귀 타이머는 구현됨)
 - `UI/`는 C++ 베이스 클래스 없음(Blueprint 전용).
 - `Save/` 장비 강화 구매 로직 미구현 — 스키마 필드(`PurchasedUpgrades`)만 있음.
 - 레벨/그레이박스는 `Source/GoHome/` 코드가 아니라 레벨 애셋 작업.

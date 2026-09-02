@@ -6,6 +6,9 @@
 #include "Player/DeathNotifier.h"
 #include "GameFramework/PlayerState.h"
 #include "Save/GoHomeSaveSubsystem.h"
+#include "Core/DockingDoorComponent.h"
+#include "Core/ExpeditionTravelSubsystem.h"
+#include "Core/ExpeditionZoneDataAsset.h"
 
 
 AExplorationGameMode::AExplorationGameMode()
@@ -13,27 +16,43 @@ AExplorationGameMode::AExplorationGameMode()
 	GameStateClass = AExplorationGameState::StaticClass();
 }
 
-void AExplorationGameMode::HandleFail(EFailReason Reason)
+void AExplorationGameMode::BeginPlay()
 {
-	if (bFailHandled)
+	Super::BeginPlay();
+
+	UExpeditionTravelSubsystem* TravelSubsystem = GetGameInstance()->GetSubsystem<UExpeditionTravelSubsystem>();
+
+	UExpeditionZoneDataAsset* Zone = TravelSubsystem ? TravelSubsystem->GetActiveZone() : nullptr;
+	if (!Zone)
 	{
+		// DepartureButton을 거치지 않고 탐사맵을 직접 연 경우(PIE 등). 제한 시간/할당량 없음
+		UE_LOG(LogTemp, Warning, TEXT("AExplorationGameMode: ActiveZone 없음 — 제한 시간/할당량 미적용"));
 		return;
 	}
-	bFailHandled = true;
-	
-	if (AGoHomeGameState* GoHomeGameState = GetGameState<AGoHomeGameState>())
-	{
-		GoHomeGameState->SetState(EExpeditionState::Failed);
-	}
-	
+
+	// 할당량 세팅
 	if (UGoHomeSaveSubsystem* SaveSubsystem = GetGameInstance()->GetSubsystem<UGoHomeSaveSubsystem>())
 	{
-		SaveSubsystem->FinalizeRound(/*bForfeited=*/true, CasualtyNames.Array());
+		SaveSubsystem->SetTargetMapQuota(Zone->MapQuota);
 	}
-	
-	GetWorldTimerManager().SetTimer(AutoReturnTimer, this, &AExplorationGameMode::ReturnToLobby,AutoReturnDelay, false );
-	
+
+	// 정상적으로 타이며가 세팅 되어 있는 경우
+	if (Zone->TimeLimitSeconds > 0.f)
+	{
+		if (AExplorationGameState* ExplorationGameState = GetGameState<AExplorationGameState>())
+		{
+			const float Deadline = ExplorationGameState->GetServerWorldTimeSeconds() + Zone->TimeLimitSeconds;
+			ExplorationGameState->SetExpeditionDeadline(Deadline);
+		}
+
+		GetWorldTimerManager().SetTimer(TimeLimitTimer, this, &AExplorationGameMode::HandleTimeExpired,
+		                                Zone->TimeLimitSeconds, false);
+	}
+
+	// 참조 방지, 이미 읽었으니 null 초기화
+	TravelSubsystem->SetActiveZone(nullptr);
 }
+
 
 void AExplorationGameMode::RestartPlayer(AController* NewPlayer)
 {
@@ -48,6 +67,52 @@ void AExplorationGameMode::RestartPlayer(AController* NewPlayer)
 	}
 }
 
+void AExplorationGameMode::HandleFail(EFailReason Reason)
+{
+	if (bRoundResolved)
+	{
+		return;
+	}
+	bRoundResolved = true;
+
+	GetWorldTimerManager().ClearTimer(TimeLimitTimer);
+	GetWorldTimerManager().ClearTimer(DoorCloseTimer);
+
+	if (AGoHomeGameState* GoHomeGameState = GetGameState<AGoHomeGameState>())
+	{
+		GoHomeGameState->SetState(EExpeditionState::Failed);
+	}
+
+	if (UGoHomeSaveSubsystem* GoHomeSaveSubsystem = GetGameInstance()->GetSubsystem<UGoHomeSaveSubsystem>())
+	{
+		GoHomeSaveSubsystem->FinalizeRound(/*bForfeited=*/true, CasualtyNames.Array());
+	}
+
+	GetWorldTimerManager().SetTimer(AutoReturnTimer, this, &AExplorationGameMode::ReturnToLobby, AutoReturnDelay,
+	                                false);
+}
+
+void AExplorationGameMode::HandleReturn()
+{
+	if (bRoundResolved || bReturnPending)
+	{
+		return;
+	}
+
+	bReturnPending = true;
+
+	if (AGoHomeGameState* GoHomeGameState = GetGameState<AGoHomeGameState>())
+	{
+		if (UDockingDoorComponent* DockingDoorComponent = GoHomeGameState->GetDockingDoorComponent())
+		{
+			DockingDoorComponent->SetOpen(false);
+		}
+	}
+
+	GetWorldTimerManager().SetTimer(DoorCloseTimer, this, &AExplorationGameMode::EnterSettlement, DoorCloseDelay,
+	                                false);
+}
+
 void AExplorationGameMode::TrackPawnDeath(APawn* Pawn)
 {
 	if (UActorComponent* NotifierComponent = Pawn->FindComponentByInterface(UDeathNotifier::StaticClass()))
@@ -57,16 +122,16 @@ void AExplorationGameMode::TrackPawnDeath(APawn* Pawn)
 		{
 			return;
 		}
-		
+
 		// 재구독 방지
 		if (TrackedNotifiers.Contains(NotifierComponent))
 		{
 			return;
 		}
-		
+
 		TrackedNotifiers.Add(NotifierComponent);
-		DeathNotifier->GetOnDeathDelegate().AddUObject(this, &AExplorationGameMode::HandlePawnDeath, TWeakObjectPtr<APawn>(Pawn));
-		
+		DeathNotifier->GetOnDeathDelegate().AddUObject(this, &AExplorationGameMode::HandlePawnDeath,
+		                                               TWeakObjectPtr<APawn>(Pawn));
 	}
 }
 
@@ -80,19 +145,24 @@ void AExplorationGameMode::HandlePawnDeath(TWeakObjectPtr<APawn> DeadPawn)
 
 	// 사망 집계
 	DeadPawns.Add(Pawn);
-	
+
 	// 사망 순간폰이 이미 파괴돼 있으면 이름을 못 얻음
 	if (APlayerState* PlayerState = Pawn->GetPlayerState())
 	{
 		CasualtyNames.Add(PlayerState->GetPlayerName());
 	}
-	
+
 	CheckAllDead();
+}
+
+void AExplorationGameMode::HandleTimeExpired()
+{
+	HandleFail(EFailReason::TimeExpired);
 }
 
 void AExplorationGameMode::CheckAllDead()
 {
-	if (bFailHandled)
+	if (bRoundResolved)
 	{
 		return;
 	}
@@ -122,4 +192,29 @@ void AExplorationGameMode::CheckAllDead()
 void AExplorationGameMode::ReturnToLobby()
 {
 	ServerTravelViaLoadingScreen(GetLobbyMapPath());
+}
+
+void AExplorationGameMode::EnterSettlement()
+{
+	if (bRoundResolved)
+	{
+		return;
+	}
+
+	bRoundResolved = true;
+
+	GetWorldTimerManager().ClearTimer(TimeLimitTimer);
+
+	if (AGoHomeGameState* GoHomeGameState = GetGameState<AGoHomeGameState>())
+	{
+		GoHomeGameState->SetState(EExpeditionState::Settlement);
+	}
+
+	if (UGoHomeSaveSubsystem* GoHomeSaveSubsystem = GetGameInstance()->GetSubsystem<UGoHomeSaveSubsystem>())
+	{
+		GoHomeSaveSubsystem->FinalizeRound(/*bForfeited=*/false, CasualtyNames.Array());
+	}
+
+	GetWorldTimerManager().SetTimer(AutoReturnTimer, this, &AExplorationGameMode::ReturnToLobby, AutoReturnDelay,
+	                                false);
 }

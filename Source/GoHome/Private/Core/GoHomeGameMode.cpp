@@ -34,7 +34,7 @@ void AGoHomeGameMode::ServerTravelViaLoadingScreen(const FString& FinalMapPath)
 	{
 		if (UExpeditionTravelSubsystem* TravelSubsystem = GameInstance->GetSubsystem<UExpeditionTravelSubsystem>())
 		{
-			TravelSubsystem->PendingDestinationMap = FinalMapPath;
+			TravelSubsystem->SetPendingDestinationMap(FinalMapPath);
 		}
 	}
 
