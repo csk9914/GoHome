@@ -24,6 +24,25 @@ void AExplorationGameState::SetExpeditionDeadline(float InDeadlineServerTime)
 	ExpeditionDeadline = InDeadlineServerTime;
 }
 
+void AExplorationGameState::SetSettlementResult(const FSettlementResult& InResult)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	SettlementResult = InResult;
+
+	// 리슨 서버 호스트는 OnRep이 불리지 않으므로 서버에서 직접 브로드캐스트
+	// (AGoHomeGameState::SetState가 같은 이유로 수동 Broadcast + OnRep 양쪽 하는 패턴)
+	OnSettlementReady.Broadcast(SettlementResult);
+}
+
+void AExplorationGameState::OnRep_SettlementResult()
+{
+	OnSettlementReady.Broadcast(SettlementResult);
+}
+
 float AExplorationGameState::GetRemainingSeconds() const
 {
 	if (ExpeditionDeadline <= 0.f)
@@ -45,5 +64,6 @@ void AExplorationGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AExplorationGameState, ExpeditionDeadline);
+	DOREPLIFETIME(AExplorationGameState, SettlementResult);
 }
 

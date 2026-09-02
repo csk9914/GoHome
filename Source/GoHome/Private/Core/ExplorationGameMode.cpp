@@ -78,14 +78,21 @@ void AExplorationGameMode::HandleFail(EFailReason Reason)
 	GetWorldTimerManager().ClearTimer(TimeLimitTimer);
 	GetWorldTimerManager().ClearTimer(DoorCloseTimer);
 
-	if (AGoHomeGameState* GoHomeGameState = GetGameState<AGoHomeGameState>())
-	{
-		GoHomeGameState->SetState(EExpeditionState::Failed);
-	}
+	AExplorationGameState* ExplorationGameState = GetGameState<AExplorationGameState>();
 
+	// 정산부터 확정한 뒤 상태를 넘긴다 — 호스트 로컬에서 SetState 리스너가 결과를 이미 읽을 수 있도록
 	if (UGoHomeSaveSubsystem* GoHomeSaveSubsystem = GetGameInstance()->GetSubsystem<UGoHomeSaveSubsystem>())
 	{
-		GoHomeSaveSubsystem->FinalizeRound(/*bForfeited=*/true, CasualtyNames.Array());
+		const FSettlementResult Result = GoHomeSaveSubsystem->FinalizeRound(/*bForfeited=*/true, CasualtyNames.Array());
+		if (ExplorationGameState)
+		{
+			ExplorationGameState->SetSettlementResult(Result);
+		}
+	}
+
+	if (ExplorationGameState)
+	{
+		ExplorationGameState->SetState(EExpeditionState::Failed);
 	}
 
 	GetWorldTimerManager().SetTimer(AutoReturnTimer, this, &AExplorationGameMode::ReturnToLobby, AutoReturnDelay,
@@ -205,14 +212,20 @@ void AExplorationGameMode::EnterSettlement()
 
 	GetWorldTimerManager().ClearTimer(TimeLimitTimer);
 
-	if (AGoHomeGameState* GoHomeGameState = GetGameState<AGoHomeGameState>())
-	{
-		GoHomeGameState->SetState(EExpeditionState::Settlement);
-	}
+	AExplorationGameState* ExplorationGameState = GetGameState<AExplorationGameState>();
 
 	if (UGoHomeSaveSubsystem* GoHomeSaveSubsystem = GetGameInstance()->GetSubsystem<UGoHomeSaveSubsystem>())
 	{
-		GoHomeSaveSubsystem->FinalizeRound(/*bForfeited=*/false, CasualtyNames.Array());
+		const FSettlementResult Result = GoHomeSaveSubsystem->FinalizeRound(/*bForfeited=*/false, CasualtyNames.Array());
+		if (ExplorationGameState)
+		{
+			ExplorationGameState->SetSettlementResult(Result);
+		}
+	}
+
+	if (ExplorationGameState)
+	{
+		ExplorationGameState->SetState(EExpeditionState::Settlement);
 	}
 
 	GetWorldTimerManager().SetTimer(AutoReturnTimer, this, &AExplorationGameMode::ReturnToLobby, AutoReturnDelay,
