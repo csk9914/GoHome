@@ -8,6 +8,8 @@
 #include "Interaction/DeliveryPoint.h"
 #include "GameFramework/Pawn.h"
 #include "Components/PrimitiveComponent.h"
+#include "Item/ItemActorBase.h"
+#include "Kismet/GameplayStatics.h"
 
 UInteractionComponent::UInteractionComponent()
 {
@@ -39,7 +41,8 @@ void UInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	if (TimeSinceLastTrace >= TraceInterval)
 	{
 		TimeSinceLastTrace = 0.f;
-		PerformTrace();
+		PerformTrace(); // CurrenTarget 먼저 갱신함.
+		UpdateNearbyItemHints(); // 갱신된 CurrentTarget을 제외하고 계산.
 	}
 }
 
@@ -65,15 +68,15 @@ void UInteractionComponent::PerformTrace()
 
 	if (NewTarget != CurrentTarget)
 	{
-		SetOutlineEnabled(CurrentTarget, false);
+		SetOutlineEnabled(CurrentTarget, false, AimOutlineStencilValue);
 		CurrentTarget = NewTarget;
-		SetOutlineEnabled(CurrentTarget, true);
+		SetOutlineEnabled(CurrentTarget, true, AimOutlineStencilValue);
 
 		OnInteractableTargetChanged.Broadcast(CurrentTarget);
 	}
 }
 
-void UInteractionComponent::SetOutlineEnabled(AActor* Target, bool bEnabled)
+void UInteractionComponent::SetOutlineEnabled(AActor* Target, bool bEnabled, int32 StencilValue)
 {
 	if (!Target) return;
 
@@ -85,10 +88,58 @@ void UInteractionComponent::SetOutlineEnabled(AActor* Target, bool bEnabled)
 		Component->SetRenderCustomDepth(bEnabled);
 		if (bEnabled)
 		{
-			Component->SetCustomDepthStencilValue(OutlineStencilValue);
+			Component->SetCustomDepthStencilValue(StencilValue);
 		}
 	}
 }
+
+void UInteractionComponent::UpdateNearbyItemHints()
+{
+	APawn* OwnerPawn = Cast<APawn>(GetOwner());
+	if (!OwnerPawn) return;
+
+	TArray<AActor*> AllItems;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AItemActorBase::StaticClass(), AllItems);
+
+	const FVector OwnerLocation = OwnerPawn->GetActorLocation();
+	const float RadiusSquared = FMath::Square(NearbyHintRadius);
+
+	TSet<TObjectPtr<AActor>> NewNearbyActors;
+
+	for (AActor* Actor : AllItems)
+	{
+		if (!Actor || Actor == CurrentTarget) continue; // 조준 중인 대상은 제외(조준 강조 우선).
+
+		AItemActorBase* Item = Cast<AItemActorBase>(Actor);
+		if (!Item || !Item->CanInteract(OwnerPawn) || Item->HasBeenPickedUp()) continue; // 이미 누가 들고 있거나, 한 번 집혔던(버려진) 아이템은 제외.
+
+		if (FVector::DistSquared(OwnerLocation, Actor->GetActorLocation()) <= RadiusSquared)
+		{
+			NewNearbyActors.Add(Actor);
+		}
+	}
+
+	// 범위를 벗어났거나(또는 방금 조준 대상이 된) 아이템 -> 힌트 off.
+	for (AActor* OldActor : NearbyHintedActors)
+	{
+		if (OldActor && !NewNearbyActors.Contains(OldActor) && OldActor != CurrentTarget)
+		{
+			SetOutlineEnabled(OldActor, false, NearbyHintStencilValue);
+		}
+	}
+
+	// 새로 범위에 들어온 아이템 -> 힌트 on.
+	for (AActor* NewActor : NewNearbyActors)
+	{
+		if (!NearbyHintedActors.Contains(NewActor))
+		{
+			SetOutlineEnabled(NewActor, true, NearbyHintStencilValue);
+		}
+	}
+	NearbyHintedActors = NewNearbyActors;
+}
+
+
 
 
 void UInteractionComponent::TryInteract()

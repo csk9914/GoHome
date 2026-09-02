@@ -41,11 +41,17 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Interaction")
 	float TraceInterval = 0.1f;
 
-	// 오브젝트 테두리 강조 표시용. Custom Depth 스텐실 값.
-	// 추후 아이템 종류에 따라 색상을 다르게 쓰고 싶다면, 해당 값을 종류별로 다르게 주고,
-	// 포스트프로세싱 머터리얼에서 값별로 분기하면 됨(지금은 1가지만 사용).
+	// 조준 중 대상 강조용 Custom Depth 스텐실 값.
 	UPROPERTY(EditAnywhere, Category = "Interaction")
-	int32 OutlineStencilValue = 1;
+	int32 AimOutlineStencilValue = 1;
+
+	// 근처 루팅 아이템 힌트용 Custom Depth 스텐실 값(조준 강조와 다른 값 -> 머터리얼에서 다른 효과로 분기).
+	UPROPERTY(EditAnywhere, Category = "Interaction")
+	int32 NearbyHintStencilValue = 2;
+
+	// 근처 아이템 힌트가 켜지는 반경(cm). 기본 1000 = 10m.
+	UPROPERTY(EditAnywhere, Category = "Interaction")
+	float NearbyHintRadius = 1000.f;
 
 	// 지금 조준 중인 대상 (없으면 nullptr). HUD/디버깅에서 조회용.
 	UFUNCTION(BlueprintPure, Category = "Interaction")
@@ -66,14 +72,21 @@ private:
 
 	void PerformTrace();
 
+	// 반경 안의 미획득 아이템들을 찾아 근접 힌트(스텐실)를 켜거나 끔. CurrentTarget은 제외(조준 강조가 우선).
+	void UpdateNearbyItemHints();
+
 	// Target의 모든 PrimitiveComponent에 Custom Depth 렌더링을 켜거나 끔(메쉬 테두리 강조 표시용).
-	void SetOutlineEnabled(AActor* Target, bool bEnabled);
+	void SetOutlineEnabled(AActor* Target, bool bEnabled, int32 StencilValue);
 
 	UPROPERTY()
 	TObjectPtr<UCameraComponent> CachedCamera;
 
 	UPROPERTY()
 	TObjectPtr<AActor> CurrentTarget;
+
+	// 지금 근접 힌트가 켜져있는 아이템들(매 체크마다 비교용).
+	UPROPERTY()
+	TSet<TObjectPtr<AActor>> NearbyHintedActors;
 
 	float TimeSinceLastTrace = 0.f;
 	

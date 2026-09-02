@@ -85,6 +85,7 @@ void AItemActorBase::Tick(float DeltaTime)
 		else if (bHasReachedSinkSpeed)
 		{
 			SetActorTickEnabled(false);
+			OnSettled();
 			return;
 		}
 	}
@@ -170,6 +171,7 @@ void AItemActorBase::OnInteract(APawn* InstigatorPawn)
 	if (!Inventory->TryAddItem(this)) return;
 
 	bIsBeingClaimed = true;
+	bHasBeenPickedUp = true;
 	HoldingPawn = InstigatorPawn;
 
 	// 새로 주운 아이템을 바로 활성 슬롯으로 전환(손에 부착까지 여기서 처리됨).
@@ -307,6 +309,7 @@ void AItemActorBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AItemActorBase, HoldingPawn);
 	DOREPLIFETIME(AItemActorBase, bIsActiveHeld);
 	DOREPLIFETIME(AItemActorBase, ItemData);
+	DOREPLIFETIME(AItemActorBase, bHasBeenPickedUp);
 }
 
 void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp,

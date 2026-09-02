@@ -372,9 +372,30 @@ void AGoHomeCharacter::Server_UpdateCarryInput_Implementation(FVector WorldInten
 	LastCarryInputWorld = WorldIntent;
 }
 
+void AGoHomeCharacter::SetCoopCarryObject(ACoopCarryObjectBase* NewCarryObject)
+{
+	CurrentCarryObject = NewCarryObject;
+	if (!NewCarryObject)
+	{
+		// 놓는 순간 묵은 입력값도 같이 리셋 -> 다음에 다시 잡을 때 재생되는 것 방지.
+		LastCarryInputWorld = FVector::ZeroVector;
+	}
+	OnRep_CurrentCarryObject(); // 서버 자신에게는 RepNotify가 안 뜨므로 직접 호출 -> 호스트 로컬도 즉시 반영.
+}
+
 void AGoHomeCharacter::OnRep_CurrentCarryObject()
 {
-	// 필요하면 여기서 애니메이션 상태(bIsCoopCarrying 등) 갱신.
+	const bool bIsCarrying = (CurrentCarryObject != nullptr);
+
+	// 운반 중엔 시야는 자유롭게, 몸통 Yaw는 고정(잡은 모습 유지). 운반 아니면 원래대로 시야를 따라감.
+	bUseControllerRotationYaw = !bIsCarrying;
+
+	// 1인칭 팔은 몸통(캡슐) 기준 Yaw를 따라가는데, 운반 중엔 몸통 Yaw가 고정되고 카메라만 돌아서
+	// 팔이 시야랑 어긋나 이상하게 늘어져 보임 -> 운반 중엔 숨김(잡는 자세 애니메이션은 아직 없음).
+	if (FirstPersonArmsMesh)
+	{
+		FirstPersonArmsMesh->SetVisibility(!bIsCarrying);
+	}
 }
 
 void AGoHomeCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -403,3 +424,5 @@ void AGoHomeCharacter::HandleForcedCarryRelease()
 		CurrentCarryObject->ReleaseCarriers();
 	}
 }
+
+

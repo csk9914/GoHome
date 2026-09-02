@@ -71,6 +71,10 @@ public:
 	UPROPERTY(ReplicatedUsing = OnRep_IsActiveHeld)
 	bool bIsActiveHeld = false;
 
+	// 근접 힌트 제외용 조회. 한 번이라도 집힌 적 있으면 true(드롭해도 안 풀림) - 이미 발견된 아이템이라 힌트 불필요.
+	UFUNCTION(BlueprintPure, Category = "Item")
+	bool HasBeenPickedUp() const { return bHasBeenPickedUp; }
+
 	UFUNCTION()
 	void OnRep_IsActiveHeld();
 
@@ -105,6 +109,10 @@ protected:
 	// 다시 손에 들렸을 때 호출 : 부유 사이클 정지(타이머 취소 + Tick 끄기).
 	void CancelFloatCycle();
 
+	// 가라앉다가 바닥 등에 부딪혀 완전히 정지하는 순간 호출됨(뜨는 아이템에는 안 불림).
+	// 기본은 아무 것도 안 함 -> 필요한 서브클래스만 오버라이드.
+	virtual void OnSettled() {}
+
 	UFUNCTION()
 	virtual void OnRep_ItemData();
 
@@ -123,6 +131,10 @@ protected:
 	// 동시 픽업 레이스 컨디션 방지: 서버 틱 단일 스레드 특성 이용 (동기 함수 호출 안에서 끊김 없이 검사+설정).
 	UPROPERTY(Replicated)
 	bool bIsBeingClaimed = false;
+
+	// 근접 힌트 제외 플래그. OnInteract에서 최초 픽업 시 true로 세팅되고 이후 계속 유지됨(드롭해도 안 풀림).
+	UPROPERTY(Replicated)
+	bool bHasBeenPickedUp = false;
 
 	// 파손형 누적 파손 횟수. ItemData->MaxBreakCount에서 멈춘다.
 	UPROPERTY(Replicated)

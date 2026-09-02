@@ -122,15 +122,8 @@ public:
 	ACoopCarryObjectBase* GetCurrentCarryObject() const { return CurrentCarryObject; }
 
 	// ACoopCarryObjectBase가 잡기/놓기 시 호출(서버 권위).
-	void SetCoopCarryObject(ACoopCarryObjectBase* NewCarryObject)
-	{
-		CurrentCarryObject = NewCarryObject;
-		if (!NewCarryObject)
-		{
-			// 놓는 순간 묵은 입력값도 같이 리셋 -> 다음에 다시 잡을 때 재생되는 것 방지.
-			LastCarryInputWorld = FVector::ZeroVector;
-		}
-	}
+	void SetCoopCarryObject(ACoopCarryObjectBase* NewCarryObject);
+
 
 	// 협동 운반 중 서버가 두 캐리어 입력을 평균 낼 때 사용할, 이 캐릭터의 최신 월드 스페이스 이동 의도.
 	FVector GetLastCarryInputWorld() const { return LastCarryInputWorld; }

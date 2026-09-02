@@ -179,3 +179,4 @@ void AGlowItemActor::OnRep_ItemData()
 	Super::OnRep_ItemData();
 	SyncLightFromData();
 }
+
