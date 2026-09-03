@@ -69,10 +69,12 @@ else switch Result.Outcome:
     Normal / CheckPointPassed             → 정산표 페이지
     GameOver_Strike / GameOver_CheckPoint → 게임오버 페이지
     Ending                                → 엔딩 페이지
-켜는 페이지마다 Setup(Result) → 라우터 Visible → 자동복귀 카운트다운
+켜는 페이지마다 Setup(Result) → 라우터 Visible → 페이지 인트로 연출 → (연출 끝난 뒤) 자동복귀 카운트다운
 ```
 
 `FSettlementResult` 하나가 `bForfeited`와 `Outcome`을 둘 다 싣고 `DetermineOutcome`은 forfeit와 무관하게 돈다(`GoHomeSaveSubsystem.cpp`) → forfeit→게임오버 연쇄에 추가 이벤트 불필요, 게임오버 페이지는 정상복귀·forfeit 경로 공용. forfeit인데 `Outcome`이 terminal 아니면 임무 실패 페이지만 뜨고 로비로.
+
+**데이터 갭 — 체크포인트 레일**: 정산표가 상시 표시하는 진행도 레일(턴 3/6/9 관문)은 전체 스케줄이 필요하나 `FSettlementResult` / `FExpeditionProgress`는 다음(`NextCheckPoint*`)·이번(`CheckPointQuota`) 것만 싣는다. 전체는 `UEconomyConfigDataAsset::CheckPoints`(`{Round, TargetQuota}[]`)에만 있음 → 구조체에 배열 복사 또는 GameState가 config 참조 노출, 미정.
 
 **페이지 인스턴스화**: `WidgetSwitcher` 말고 **on-demand 생성**(`NamedSlot` + `Create Widget` → `SetContent`). 세션당 한 페이지만 뜨고 각자 인트로가 있어 안 쓸 페이지를 미리 Construct할 이유가 없다. 재검토 트리거:
 
@@ -82,9 +84,10 @@ else switch Result.Outcome:
 
 **클라 바인딩 타이밍**: 클라는 `OnSettlementReady`(→ `OnRep_SettlementResult`) 전에 바인딩이 살아있어야 한다. PlayerController BeginPlay에 `AExplorationGameState`가 null일 수 있어 유효화 대기 가드 필요. state 델리게이트가 아니라 `OnSettlementReady`에 바인딩 — CurrentState/SettlementResult OnRep 순서 미보장(ARCHITECTURE.md Save 절 "정산 결과 복제").
 
-**자동복귀 카운트다운**: `AExplorationGameMode::AutoReturnDelay`(현재 8초)는 서버 전용, 복제 안 됨. `GetRemainingSeconds()` / `ExpeditionDeadline`은 탐사 제한시간 전용이라 재사용 불가 → 위젯이 `OnSettlementReady` 받은 순간 클라 로컬 타이머로 카운트다운(트래블은 서버 권한, 드리프트 무해). `AutoReturnDelay` 값만 BP에 노출.
+**자동복귀 카운트다운**: `AExplorationGameMode::AutoReturnDelay`(현재 8초)는 서버 전용·복제 안 됨. `GetRemainingSeconds()` / `ExpeditionDeadline`은 탐사 제한시간 전용이라 재사용 불가 → 위젯이 클라 로컬 타이머로 카운트다운(트래블은 서버 권한, 드리프트 무해). `AutoReturnDelay` 값만 BP 노출.
 
-- **스킵 없음** — 확인 RPC 같은 입력 경로 없음. 타이머 만료 = 유일한 복귀 트리거.
+- **페이지 연출이 전부 끝난 뒤 시작** (`OnSettlementReady` 수신 즉시가 아님) — 연출 중엔 바 꽉 참 + 숫자 라벨 고정. 카운트다운 시작 = "이제 읽고 나갈 시간".
+- **스킵 없음** — 입력 경로 없음. 타이머 만료 = 유일한 복귀 트리거.
 - **모든 Outcome은 로비로 복귀** — `ReturnToLobby` → `ServerTravelViaLoadingScreen(로비맵)` 공통. 게임오버/엔딩은 `FinalizeRound`가 `ResetSave()`한 상태로 도착 → 로비가 새 런 허브. "타이틀로" 버튼 없음.
 - **forfeit 2페이지는 `AutoReturnDelay` 안에 들어가야** 함 — 두 hold 합이 넘으면 트래블이 두 번째 페이지를 자른다. hold를 튜너블로 두고 필요 시 `AutoReturnDelay` 상향.
 

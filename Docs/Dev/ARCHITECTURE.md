@@ -181,6 +181,8 @@ decisions:
 known_gaps:
   - name: 할당량 라이브 HUD 데이터 미복제
     detail: 제한시간 HUD는 ExpeditionDeadline + GetRemainingSeconds()/HasTimeLimit()로 가능. 할당량 HUD("납품 / MapQuota")는 복제 소스 없음 — CurrentMapQuota·CurrentRoundDeliveredValue가 UGoHomeSaveSubsystem(호스트 전용)에만 있고 AddDeliveredValue는 포워드만, FSettlementResult는 정산 시점에만 도착. → AExplorationGameState에 복제 int 2개 + OnRep 필요.
+  - name: 정산 체크포인트 레일 — 전체 스케줄 미노출
+    detail: 정산표/엔딩의 턴 3/6/9 관문 진행도 레일은 전체 체크포인트 스케줄이 필요하나 FSettlementResult/FExpeditionProgress는 다음·이번 것만 싣는다. 전체는 UEconomyConfigDataAsset::CheckPoints(호스트 전용)에만 있음 → FSettlementResult에 TArray<FCheckPoint> 복사 또는 GameState가 config 노출. UI_GUIDE.md "데이터 갭 — 체크포인트 레일".
 ```
 
 ### Save
