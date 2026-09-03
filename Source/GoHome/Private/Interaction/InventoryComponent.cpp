@@ -129,16 +129,36 @@ void UInventoryComponent::ServerDeliverAllItems()
 	AGoHomeGameState* GameState = GetWorld()->GetGameState<AGoHomeGameState>();
 	if (!GameState) return;
 
+	// 정산으로 파괴되는 아이템은 ServerDrop()을 안거치기 때문에, 그게 활성(손에 든) 아이템이었다면
+	// DetachItemFromRightHand()가 안 불려서 캐릭터의 bIsHoldingItem이 안 풀리는 버그가 있었음.
+	// -> 오브젝트는 사라졌는데 들고 있는 모션만 그대로 남음. 활성 아이템이 실제로 정산 대상이었을 때만 리셋.
+	AItemActorBase* PreviousActiveItem = GetActiveItem();
+	bool bActiveItemDelivered = false;
+
 	for (FInventorySlot& Slot : Slots)
 	{
 		AItemActorBase* Item = Slot.Item;
 		if (!Item || !Item->IsDeliverable()) continue;
+
+		if (Item == PreviousActiveItem)
+		{
+			bActiveItemDelivered = true;
+		}
 
 		GameState->AddDeliveredValue(FMath::RoundToInt(Item->GetCurrentValue()));
 		// 슬롯 비우기 + NotifyDropped() (소음 타이머 정지).
 		RemoveItem(Item);
 		Item->Destroy();
 	}
+
+	if (bActiveItemDelivered)
+	{
+		if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(GetOwner()))
+		{
+			Character->DetachItemFromRightHand();
+		}
+	}
+
 }
 
 void UInventoryComponent::TryDropItem(AItemActorBase* ItemToDrop)

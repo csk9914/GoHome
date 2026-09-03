@@ -208,7 +208,7 @@ FText UInteractionComponent::GetInteractionPromptTextFor(AActor* Target)
 		}
 
 	}
-
+	
 	return FText::FromString(TEXT("상호작용"));
 }
 
