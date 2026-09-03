@@ -2,6 +2,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "FExpeditionProgress.h"
+#include "FCheckPoint.h"
 #include "FSettlementResult.generated.h"
 
 // 정산 결과 - UI가 어떤 화면을 띄울지 결정
@@ -52,7 +53,11 @@ struct FSettlementResult
 	bool bWasCheckPoint = false;
 	// 이번 체크 포인트 목표액
 	UPROPERTY(BlueprintReadOnly)
-	int32 CheckPointQuota = 0;	
+	int32 CheckPointQuota = 0;
+	// 전체 자금 관문 스케줄({Round, TargetQuota} 오름차순). 정산표/엔딩 진행도 레일이 전 노드 위치·목표를 그리는 데 필요.
+	// EconomyConfig(호스트 전용)에만 있어 정산 시점에 스냅샷 복사 — WBP_CheckPointRail.Setup(CheckPoints[], ...).
+	UPROPERTY(BlueprintReadOnly)
+	TArray<FCheckPoint> CheckPointSchedule;
 	// ── 정산 반영 후 현재 상태 (로비 UI 와
 	UPROPERTY(BlueprintReadOnly)
 	FExpeditionProgress ExpeditionProgress;

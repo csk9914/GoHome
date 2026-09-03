@@ -21,6 +21,7 @@ This repo is GoHome (a deep-sea Lethal Company-like co-op survival game), UE5.7.
 | `Docs/Dev/ARCHITECTURE.md` | md/git (dev) | Maps design systems to UE classes/components/`Source/GoHome/` folders — boundary rules and decisions the code doesn't enforce |
 | `Docs/Dev/CODING_CONVENTIONS.md` | md/git (dev) | C++ coding standards, folder rules, C++/Blueprint boundary, binary (`.uasset`/`.umap`) merge-conflict CLI resolution |
 | `Docs/Dev/AI_AGENT_GUIDE.md` | md/git (dev) | Procedure teammates use to ask their AI coding agent about their assigned work, incl. the question → doc routing table |
+| `Docs/Dev/UI_GUIDE.md` | md/git (dev) | Blueprint UI 화면 구조 — 레이어·카탈로그·HUD 소유·라우터·연출·네이밍 — only opened when adding/restructuring a UI screen |
 | `Docs/Dev/NODECASTER_GUIDE.md` | md/git (dev) | NodeCaster install check + Blueprint graph JSON procedure — only opened for Blueprint node-graph questions |
 | `Docs/Dev/BP_COMMENT_COLORS.md` | md/git (dev) | Blueprint comment-box color semantics (HSV/Hex table) — only opened when adding comment boxes to a BP graph |
 

@@ -30,8 +30,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Save")
 	void SaveToDisk();
 
-	// 납품 계산
-	void AccumulateDeliveredValue(int32 Value);
+	// 납품 계산. 반영 후 이번 라운드 납품 누적액을 반환(GameState 복제 미러용).
+	int32 AccumulateDeliveredValue(int32 Value);
 
 	// 라운드 종료 정산
 	FSettlementResult FinalizeRound(bool bForfeited, const TArray<FString>& CasualtyNames);

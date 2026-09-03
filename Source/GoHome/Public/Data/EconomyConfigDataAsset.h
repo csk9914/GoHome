@@ -4,22 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "Data/FCheckPoint.h"
 #include "EconomyConfigDataAsset.generated.h"
-
-USTRUCT(BlueprintType)
-struct FCheckPoint
-{
-	GENERATED_BODY()
-
-	// 판정 라운드
-	UPROPERTY(EditDefaultsOnly, Category = "CheckPoint")
-	int32 Round = 0;
-
-	// 목표 할당액
-	UPROPERTY(EditDefaultsOnly, Category = "CheckPoint")
-	int32 TargetQuota = 0;
-};
-
 
 /**
  * 

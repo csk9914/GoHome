@@ -25,6 +25,7 @@ Dev가 1차, Notion은 필요 시만 부차적으로(에이전트가 직접 열�
 | 담당자/목표 기간/DoD가 뭐야? | GoHome 담당자 배정 DB, GoHome 착수 로드맵(Notion) — 사람이 확인해 전달 |
 | 브랜치 어떻게 만들어/머지해? PR은 언제부터 써? | GoHome Git 워크플로우(Notion) — 사람이 확인해 전달, 또는 사람이 직접 수행 |
 | 바이너리(.uasset/.umap) 머지 충돌 CLI로 어떻게 풀어? | [CODING_CONVENTIONS.md "바이너리 충돌 시 CLI로 한쪽 선택하기"](CODING_CONVENTIONS.md#바이너리uassetumap-충돌-시-cli로-한쪽-선택하기) — 실시간 도움이 필요한 절이라 md로 직접 참조 |
+| UI 화면 새로 만들거나 구조 바꿔야 해 (레이어·라우터·연출·네이밍) | [UI_GUIDE.md](UI_GUIDE.md) — 개별 위젯 필드는 `Content/GoHome/UI/`가 출처, 데이터 방향 원칙은 [ARCHITECTURE.md UI 절](ARCHITECTURE.md#ui) |
 | Blueprint 노드 그래프 어떻게 만들어? 코드랑 같이 BP 가이드도 줘 | [NODECASTER_GUIDE.md](NODECASTER_GUIDE.md) — 설치 안 돼 있으면 "2. 사용 절차"는 읽지 않고 기존 방식(텍스트 설명)으로 안내 |
 | 블루프린트 코멘트 박스 색상은 뭘 써야 해? | [BP_COMMENT_COLORS.md](BP_COMMENT_COLORS.md) |
 

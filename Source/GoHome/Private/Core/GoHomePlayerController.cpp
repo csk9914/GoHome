@@ -4,9 +4,84 @@
 #include "Core/GoHomePlayerController.h"
 
 #include "Core/LobbyGameState.h"
+#include "Core/ExplorationGameState.h"
 
 #include "Engine/GameInstance.h"
+#include "Engine/World.h"
+#include "GameFramework/GameStateBase.h"
 #include "Upgrade/EquipmentUpgradeSubsystem.h"
+
+void AGoHomePlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+	BindGameStateSetEvent();
+	RefreshExplorationHUD();
+}
+
+void AGoHomePlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (bExplorationHUDActive)
+	{
+		bExplorationHUDActive = false;
+		OnExplorationHUDTeardown();
+	}
+	Super::EndPlay(EndPlayReason);
+}
+
+void AGoHomePlayerController::OnRep_Pawn()
+{
+	Super::OnRep_Pawn();
+	BindGameStateSetEvent();
+	RefreshExplorationHUD();
+}
+
+void AGoHomePlayerController::SetPawn(APawn* InPawn)
+{
+	Super::SetPawn(InPawn);
+	BindGameStateSetEvent();
+	RefreshExplorationHUD();
+}
+
+void AGoHomePlayerController::BindGameStateSetEvent()
+{
+	UWorld* World = GetWorld();
+	if (!World || BoundGameStateWorld.Get() == World)
+	{
+		return;
+	}
+
+	BoundGameStateWorld = World;
+	World->GameStateSetEvent.AddUObject(this, &AGoHomePlayerController::HandleGameStateSet);
+}
+
+void AGoHomePlayerController::HandleGameStateSet(AGameStateBase* /*NewGameState*/)
+{
+	RefreshExplorationHUD();
+}
+
+void AGoHomePlayerController::RefreshExplorationHUD()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	const bool bWantHUD = GetWorld() && GetWorld()->GetGameState<AExplorationGameState>() != nullptr;
+	if (bWantHUD == bExplorationHUDActive)
+	{
+		return;
+	}
+
+	bExplorationHUDActive = bWantHUD;
+	if (bWantHUD)
+	{
+		OnExplorationHUDReady();
+	}
+	else
+	{
+		OnExplorationHUDTeardown();
+	}
+}
 
 void AGoHomePlayerController::Server_SelectZone_Implementation(FName ZoneId)
 {
