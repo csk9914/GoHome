@@ -21,6 +21,7 @@ public:
 
 	AFlashlightActor();
 
+	virtual bool CanInteract(APawn* InstigatorPawn) const override;
 	virtual void OnInteract(APawn* InstigatorPawn) override;
 
 	virtual FText GetInteractionPromptText_Implementation() const override;

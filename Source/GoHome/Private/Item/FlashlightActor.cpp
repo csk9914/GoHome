@@ -60,6 +60,25 @@ void AFlashlightActor::SyncLightFromData()
 
 }
 
+bool AFlashlightActor::CanInteract(APawn* InstigatorPawn) const
+{
+	if (!Super::CanInteract(InstigatorPawn)) return false;
+	if (!InstigatorPawn) return false;
+
+	// Spot 손전등은 최대 1개만 소지 가능 -> 인벤토리에 이미 있으면 픽업 자체를 막음.
+	UInventoryComponent* Inventory = InstigatorPawn->FindComponentByClass<UInventoryComponent>();
+	if (!Inventory) return true;
+
+	for (int32 SlotIndex = 0; SlotIndex < Inventory->GetInventorySlotCount(); ++SlotIndex)
+	{
+		if (Cast<AFlashlightActor>(Inventory->GetItemInSlot(SlotIndex)))
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
 void AFlashlightActor::OnInteract(APawn* InstigatorPawn)
 {
 	if (!HasAuthority() || !InstigatorPawn) return;
