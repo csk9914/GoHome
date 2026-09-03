@@ -119,6 +119,7 @@ FSettlementResult UGoHomeSaveSubsystem::FinalizeRound(bool bForfeited, const TAr
 	Result.NetGain = NetGain;
 	Result.bWasCheckPoint = CheckPoint != nullptr;
 	Result.CheckPointQuota = CheckPoint ? CheckPoint->TargetQuota : 0;
+	Result.CheckPointSchedule = EconomyConfig->CheckPoints;
 	Result.ExpeditionProgress = BuildProgress();
 
 	// 상태 반영

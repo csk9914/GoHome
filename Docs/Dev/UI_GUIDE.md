@@ -74,7 +74,7 @@ else switch Result.Outcome:
 
 `FSettlementResult` 하나가 `bForfeited`와 `Outcome`을 둘 다 싣고 `DetermineOutcome`은 forfeit와 무관하게 돈다(`GoHomeSaveSubsystem.cpp`) → forfeit→게임오버 연쇄에 추가 이벤트 불필요, 게임오버 페이지는 정상복귀·forfeit 경로 공용. forfeit인데 `Outcome`이 terminal 아니면 임무 실패 페이지만 뜨고 로비로.
 
-**데이터 갭 — 체크포인트 레일**: 정산표가 상시 표시하는 진행도 레일(턴 3/6/9 관문)은 전체 스케줄이 필요하나 `FSettlementResult` / `FExpeditionProgress`는 다음(`NextCheckPoint*`)·이번(`CheckPointQuota`) 것만 싣는다. 전체는 `UEconomyConfigDataAsset::CheckPoints`(`{Round, TargetQuota}[]`)에만 있음 → 구조체에 배열 복사 또는 GameState가 config 참조 노출, 미정.
+**체크포인트 레일 데이터**: 정산표가 상시 표시하는 진행도 레일(턴 3/6/9 관문)은 전체 스케줄이 필요하다. `FSettlementResult::CheckPointSchedule`(`TArray<FCheckPoint>`)이 정산 시점에 `UEconomyConfigDataAsset::CheckPoints`를 스냅샷 복사해 싣는다 — 레일은 이 배열 + `ExpeditionProgress`(`CurrentRound`/`FinalRound`/`CurrentFunds`)만으로 그린다.
 
 **페이지 인스턴스화**: `WidgetSwitcher` 말고 **on-demand 생성**(`NamedSlot` + `Create Widget` → `SetContent`). 세션당 한 페이지만 뜨고 각자 인트로가 있어 안 쓸 페이지를 미리 Construct할 이유가 없다. 재검토 트리거:
 
