@@ -179,8 +179,6 @@ decisions:
       현재 캐릭터 BP·컨트롤러 BP에 흩어짐 → 시스템 PR마다 하나씩 이주(빅뱅 금지). 상세 UI_GUIDE.md.
 
 known_gaps:
-  - name: 할당량 라이브 HUD 데이터 미복제
-    detail: 제한시간 HUD는 ExpeditionDeadline + GetRemainingSeconds()/HasTimeLimit()로 가능. 할당량 HUD("납품 / MapQuota")는 복제 소스 없음 — CurrentMapQuota·CurrentRoundDeliveredValue가 UGoHomeSaveSubsystem(호스트 전용)에만 있고 AddDeliveredValue는 포워드만, FSettlementResult는 정산 시점에만 도착. → AExplorationGameState에 복제 int 2개 + OnRep 필요.
   - name: 정산 체크포인트 레일 — 전체 스케줄 미노출
     detail: 정산표/엔딩의 턴 3/6/9 관문 진행도 레일은 전체 체크포인트 스케줄이 필요하나 FSettlementResult/FExpeditionProgress는 다음·이번 것만 싣는다. 전체는 UEconomyConfigDataAsset::CheckPoints(호스트 전용)에만 있음 → FSettlementResult에 TArray<FCheckPoint> 복사 또는 GameState가 config 노출. UI_GUIDE.md "데이터 갭 — 체크포인트 레일".
 ```
@@ -212,6 +210,7 @@ decisions:
       - bRoundResolved 단일 락이 FinalizeRound 1회·자동복귀 타이머 1회를 보장(EnterSettlement/HandleFail 공유). HandleFail·EnterSettlement은 진입 시 TimeLimitTimer를 ClearTimer하고, HandleFail은 DoorCloseTimer도 끊는다 → 귀환 연출 중 전원사망하거나 시간이 만료되면 실패가 정산을 선점.
       - EExpeditionState의 Failed·Settlement 값은 탐사맵 인맵 페이즈로 실제 사용(HandleFail·EnterSettlement이 SetState). Return 값은 아직 미사용.
       - UI 카운트다운은 AExplorationGameState의 복제 필드 ExpeditionDeadline(절대 서버 시각)을 GetRemainingSeconds()/HasTimeLimit()로 읽는다(표시 전용, 실제 실패 트리거는 서버 TimeLimitTimer).
+      - 라이브 할당량 HUD는 AExplorationGameState의 복제 필드 MapQuota·RoundDeliveredValue(둘 다 ReplicatedUsing=OnRep_QuotaProgress, BlueprintPure Get*)를 읽고 OnQuotaProgressChanged(Delivered, Quota)에 바인딩. MapQuota는 AExplorationGameMode::BeginPlay가 존 데이터에서 SetMapQuota로 1회, RoundDeliveredValue는 AGoHomeGameState::AddDeliveredValue가 AccumulateDeliveredValue 반환값(세이브 CurrentRoundDeliveredValue 합계)을 SetRoundDeliveredValue로 미러. 세이브는 여전히 호스트 전용 SoT, GameState 필드는 표시용 미러. 바인딩 직후 Get*()로 초기값 1회 당길 것.
       - 정산 결과 복제: AExplorationGameState::SettlementResult(DOREPLIFETIME, ReplicatedUsing=OnRep_SettlementResult) 한 필드. 서버 SetSettlementResult가 값 대입 + 호스트 로컬 OnSettlementReady 수동 브로드캐스트, 클라는 OnRep이 같은 델리게이트 브로드캐스트. FSettlementResult(중첩 FExpeditionProgress·TArray<FString> 포함)는 기본 struct 복제로 충분(커스텀 NetSerialize 불필요). 정산/실패 UI는 state 델리게이트가 아니라 OnSettlementReady에 바인딩 — 두 복제 필드(CurrentState/SettlementResult)의 OnRep 순서가 보장되지 않으므로.
   - name: EconomyConfig 로딩
     detail: "UGoHomeSaveSubsystem::Initialize()에서 하드코딩 경로로 LoadObject<UEconomyConfigDataAsset>(/Game/GoHome/Data/DA_EconomyConfig) + ensureMsgf. DeveloperSettings 방식은 클래스 하나 더 필요해 보류. CheckPoints 배열은 Round 오름차순+중복 없음을 UEconomyConfigDataAsset::IsDataValid(#if WITH_EDITOR)가 강제 — FindNextCheckPoint 등은 이 불변식을 가정한다."
@@ -220,7 +219,7 @@ known_gaps:
   - name: 정산 배선 (SaveSubsystem 로직 O, 실패·정상복귀 경로 O, 결과 복제 O, UI·애셋 X)
     detail: |
       구현됨: UGoHomeSaveSubsystem::AccumulateDeliveredValue / FinalizeRound(forfeit 롤백·CasualtyFee 차감·스트라이크·DetermineOutcome·터미널 시 ResetSave·SaveToDisk) / BuildProgress / ResetSave / SetTargetMapQuota.
-      호출부 연결됨: AGoHomeGameState::AddDeliveredValue → AccumulateDeliveredValue 포워드, AExplorationGameMode::BeginPlay → SetTargetMapQuota(ActiveZone->MapQuota), AExplorationGameMode::HandleFail → FinalizeRound(true), AExplorationGameMode::EnterSettlement(귀환) → FinalizeRound(false). 두 경로 모두 FinalizeRound 반환값을 AExplorationGameState::SetSettlementResult로 넘겨 복제(위 decisions "정산 결과 복제" 참고).
+      호출부 연결됨: AGoHomeGameState::AddDeliveredValue → AccumulateDeliveredValue(반환값을 AExplorationGameState::SetRoundDeliveredValue로 미러), AExplorationGameMode::BeginPlay → SetTargetMapQuota(ActiveZone->MapQuota) + AExplorationGameState::SetMapQuota, AExplorationGameMode::HandleFail → FinalizeRound(true), AExplorationGameMode::EnterSettlement(귀환) → FinalizeRound(false). 두 경로 모두 FinalizeRound 반환값을 AExplorationGameState::SetSettlementResult로 넘겨 복제(위 decisions "정산 결과 복제" 참고).
       관련 struct: FSettlementResult(ESettlementOutcome), FExpeditionProgress, UEconomyConfigDataAsset(FCheckPoint+CasualtyFee), UGoHomeSaveGame 필드(CurrentFunds/CurrentRoundDeliveredValue/CurrentRound/QuotaMissCount), ExpeditionZoneDataAsset.MapQuota/TimeLimitSeconds.
       미연결분은 `남은 의존성` 참고.
 ```
@@ -260,7 +259,6 @@ known_gaps:
   - (`AddDeliveredValue`는 `SaveSubsystem::AccumulateDeliveredValue`로 포워드 완료)
 - **도킹 문 위협 판정** — AI가 `OnDoorStateChanged` 구독해 `Fail(EFailReason::DockThreatened)` 호출하는 코드 없음
 - **정산 배선 나머지** — 복귀 버튼 RPC, DA_EconomyConfig 애셋 생성, 정산/게임오버/엔딩 UI 위젯. (사망자 추적, 실패 경로, 타임오버 경로, 정상복귀 Settlement 경로 `HandleReturn→EnterSettlement`, 자동복귀 타이머, `FSettlementResult` GameState 복제(`AExplorationGameState::SettlementResult`/`OnSettlementReady`)는 구현됨)
-- **할당량 라이브 HUD** — `AExplorationGameState`에 `CurrentMapQuota`/`CurrentRoundDelivered` 복제 필드 없음. 탐사 중 할당량 진행 HUD가 읽을 소스가 없다(UI 절 known_gaps 참고). 제한시간 HUD는 `ExpeditionDeadline`으로 이미 가능.
 - `UI/`는 C++ 베이스 클래스 없음(Blueprint 전용).
 - `Save/` 장비 강화 구매 로직 미구현 — 스키마 필드(`PurchasedUpgrades`)만 있음.
 - 레벨/그레이박스는 `Source/GoHome/` 코드가 아니라 레벨 애셋 작업.

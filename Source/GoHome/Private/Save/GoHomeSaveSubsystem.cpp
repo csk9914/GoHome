@@ -54,11 +54,11 @@ void UGoHomeSaveSubsystem::SaveToDisk()
 	UGameplayStatics::SaveGameToSlot(SaveGame, GoHomeSaveSlotName, GoHomeSaveUserIndex);
 }
 
-void UGoHomeSaveSubsystem::AccumulateDeliveredValue(int32 Value)
+int32 UGoHomeSaveSubsystem::AccumulateDeliveredValue(int32 Value)
 {
 	if (!SaveGame)
 	{
-		return;
+		return 0;
 	}
 
 	// 탐사중인 미션 할당량 반영
@@ -66,6 +66,8 @@ void UGoHomeSaveSubsystem::AccumulateDeliveredValue(int32 Value)
 
 	// 소유 자금에 납품액 반영
 	SaveGame->CurrentFunds += Value;
+
+	return SaveGame->CurrentRoundDeliveredValue;
 }
 
 FSettlementResult UGoHomeSaveSubsystem::FinalizeRound(bool bForfeited, const TArray<FString>& CasualtyNames)

@@ -3,6 +3,7 @@
 #include "Core/GoHomeGameState.h"
 #include "Core/DockingDoorComponent.h"
 #include "Core/ExplorationGameMode.h"
+#include "Core/ExplorationGameState.h"
 #include "Net/UnrealNetwork.h"
 #include "Save/GoHomeSaveSubsystem.h"
 
@@ -39,8 +40,13 @@ void AGoHomeGameState::AddDeliveredValue(int32 Value)
 		return;
 	}
 	
-	SaveSubsystem->AccumulateDeliveredValue(Value);
-	
+	const int32 RoundDeliveredTotal = SaveSubsystem->AccumulateDeliveredValue(Value);
+
+	// 호스트 전용 세이브 값을 탐사 GameState의 복제 미러로 밀어 라이브 할당량 HUD가 받게 한다
+	if (AExplorationGameState* ExplorationGameState = Cast<AExplorationGameState>(this))
+	{
+		ExplorationGameState->SetRoundDeliveredValue(RoundDeliveredTotal);
+	}
 }
 
 void AGoHomeGameState::Fail(EFailReason Reason)

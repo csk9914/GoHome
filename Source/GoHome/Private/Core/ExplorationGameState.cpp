@@ -43,6 +43,34 @@ void AExplorationGameState::OnRep_SettlementResult()
 	OnSettlementReady.Broadcast(SettlementResult);
 }
 
+void AExplorationGameState::SetMapQuota(int32 InMapQuota)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	MapQuota = InMapQuota;
+	// 리슨 서버 호스트는 OnRep이 불리지 않으므로 서버에서 직접 브로드캐스트
+	OnQuotaProgressChanged.Broadcast(RoundDeliveredValue, MapQuota);
+}
+
+void AExplorationGameState::SetRoundDeliveredValue(int32 InDeliveredValue)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	RoundDeliveredValue = InDeliveredValue;
+	OnQuotaProgressChanged.Broadcast(RoundDeliveredValue, MapQuota);
+}
+
+void AExplorationGameState::OnRep_QuotaProgress()
+{
+	OnQuotaProgressChanged.Broadcast(RoundDeliveredValue, MapQuota);
+}
+
 float AExplorationGameState::GetRemainingSeconds() const
 {
 	if (ExpeditionDeadline <= 0.f)
@@ -65,5 +93,7 @@ void AExplorationGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AExplorationGameState, ExpeditionDeadline);
 	DOREPLIFETIME(AExplorationGameState, SettlementResult);
+	DOREPLIFETIME(AExplorationGameState, MapQuota);
+	DOREPLIFETIME(AExplorationGameState, RoundDeliveredValue);
 }
 

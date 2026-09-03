@@ -36,6 +36,12 @@ void AExplorationGameMode::BeginPlay()
 		SaveSubsystem->SetTargetMapQuota(Zone->MapQuota);
 	}
 
+	// 라이브 할당량 HUD용 복제 소스
+	if (AExplorationGameState* ExplorationGameState = GetGameState<AExplorationGameState>())
+	{
+		ExplorationGameState->SetMapQuota(Zone->MapQuota);
+	}
+
 	// 정상적으로 타이며가 세팅 되어 있는 경우
 	if (Zone->TimeLimitSeconds > 0.f)
 	{
