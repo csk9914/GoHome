@@ -15,6 +15,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnSettlementReady, const FSettlemen
 // 라이브 할당량 진행도(납품 누적액 / 맵 할당량)가 바뀔 때 브로드캐스트 — 상시 HUD가 바인딩
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnQuotaProgressChanged, int32, DeliveredValue, int32, MapQuota);
 
+// 제한시간 정보(마감 서버시각 + 총 길이)가 복제 도착했을 때 브로드캐스트 — 상시 HUD가 바인딩, 바인딩 직후 Get*()로 초기값 1회
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnTimeLimitChanged);
+
 /**
  *
  */
@@ -34,7 +37,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Expedition")
 	bool HasTimeLimit()const {return ExpeditionDeadline>0.f;}
 
-	void SetExpeditionDeadline(float InDeadlineServerTime);
+	// 총 제한시간(초). 프로그레스 바 비율용. 미설정 시 0.
+	UFUNCTION(BlueprintPure, Category = "Expedition")
+	float GetTotalSeconds() const { return ExpeditionDurationSeconds; }
+
+	// 서버 전용. 마감 서버시각 + 총 제한시간을 복제 필드에 싣는다(AExplorationGameMode::BeginPlay).
+	void SetExpeditionDeadline(float InDeadlineServerTime, float InDurationSeconds);
 	
 	// 서버 전용. FinalizeRound 결과를 복제 필드에 싣고 호스트 로컬에도 즉시 알린다.
 	void SetSettlementResult(const FSettlementResult& InResult);
@@ -67,6 +75,9 @@ protected:
 	UFUNCTION()
 	void OnRep_QuotaProgress();
 
+	UFUNCTION()
+	void OnRep_ExpeditionTime();
+
 public:
 	// 정산/실패 UI가 바인딩 (state 델리게이트와 별개 — 아래 주석 참고)
 	UPROPERTY(BlueprintAssignable, Category = "Expedition")
@@ -76,9 +87,17 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Expedition")
 	FOnQuotaProgressChanged OnQuotaProgressChanged;
 
+	// 상시 제한시간 HUD가 바인딩 — 바인딩 직후 Get*()로 한 번 당겨오도록
+	UPROPERTY(BlueprintAssignable, Category = "Expedition")
+	FOnTimeLimitChanged OnTimeLimitChanged;
+
 private:
-	UPROPERTY(Replicated)
+	UPROPERTY(ReplicatedUsing = OnRep_ExpeditionTime)
 	float ExpeditionDeadline = 0.f;
+
+	// 총 제한시간(초). 마감시각과 함께 1회 세팅, 바 비율 계산용.
+	UPROPERTY(Replicated)
+	float ExpeditionDurationSeconds = 0.f;
 
 	UPROPERTY(ReplicatedUsing = OnRep_SettlementResult, BlueprintReadOnly, Category = "Expedition", meta = (AllowPrivateAccess = "true"))
 	FSettlementResult SettlementResult;

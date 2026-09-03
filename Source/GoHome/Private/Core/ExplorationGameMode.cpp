@@ -48,7 +48,7 @@ void AExplorationGameMode::BeginPlay()
 		if (AExplorationGameState* ExplorationGameState = GetGameState<AExplorationGameState>())
 		{
 			const float Deadline = ExplorationGameState->GetServerWorldTimeSeconds() + Zone->TimeLimitSeconds;
-			ExplorationGameState->SetExpeditionDeadline(Deadline);
+			ExplorationGameState->SetExpeditionDeadline(Deadline, Zone->TimeLimitSeconds);
 		}
 
 		GetWorldTimerManager().SetTimer(TimeLimitTimer, this, &AExplorationGameMode::HandleTimeExpired,
