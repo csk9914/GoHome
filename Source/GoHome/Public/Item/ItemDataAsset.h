@@ -7,6 +7,8 @@
 #include "ItemDataAsset.generated.h"
 
 class UStaticMesh;
+class USoundBase;
+class USoundAttenuation;
 
 /** 아이템 종별 무게/가치/파손·소음 플래그. AItemActorBase가 참조해 종을 구분한다. */
 UCLASS(BlueprintType)
@@ -78,5 +80,27 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item",
 		meta = (ToolTip = "최대 소음 반경", ClampMin = "0.0"))
 	float MaxNoiseRadius = 2000.f;
+
+	// 보유 중 재생할 루프 사운드 + 감쇠 애셋.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item", meta = (ToolTip = "보유 중 재생할 루프 사운드"))
+	TObjectPtr<USoundBase> HeldNoiseSound;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item", meta = (ToolTip = "위 사운드에 적용할 Sound Attenuation 애셋"))
+	TObjectPtr<USoundAttenuation> HeldNoiseAttenuation;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item", meta = (ToolTip = "소음 반경이 최소(BaseNoiseRadius)일 때 볼륨 배율"))
+	float MinNoiseVolumeMultiplier = 0.6f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item", meta = (ToolTip = "소음 반경이 최대(MaxNoiseRadius)일 때 볼륨 배율"))
+	float MaxNoiseVolumeMultiplier = 1.4f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item", meta = (ToolTip = "소음 반경이 최소일 때 피치 배율"))
+	float MinNoisePitchMultiplier = 0.9f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item", meta = (ToolTip = "소음 반경이 최대일 때 피치 배율"))
+	float MaxNoisePitchMultiplier = 1.3f;
+
+
+
 
 };

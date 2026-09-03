@@ -7,6 +7,7 @@
 #include "AI/NoiseType.h"
 #include "TimerManager.h"
 #include "Interaction/InventoryComponent.h"
+#include "Components/AudioComponent.h"
 #include "Player/GoHomeCharacter.h"
 
 AItemActorBase::AItemActorBase()
@@ -23,6 +24,11 @@ AItemActorBase::AItemActorBase()
 	MeshComponent->SetIsReplicated(false);
 	MeshComponent->SetNotifyRigidBodyCollision(true);
 	MeshComponent->SetMobility(EComponentMobility::Movable);
+
+	NoiseAudioComponent = CreateDefaultSubobject<UAudioComponent>(TEXT("NoiseAudioComponent"));
+	NoiseAudioComponent->SetupAttachment(MeshComponent);
+	NoiseAudioComponent->bAutoActivate = false;
+	NoiseAudioComponent->SetIsReplicated(false); // 재생 자체는 각 클라 로컬에서 처리(리플리케이트 안 함).
 
 	// 물속 부유 컨셉 : 중력 off + 감쇠
 	// 물리가 켜진 경우(드롭 및 사망) 바닥으로 가라앉는 대신 던진 방향으로 나아가다 서서히 멈춰 그자리에 떠있게 만듬.
@@ -153,6 +159,19 @@ void AItemActorBase::SyncVisualsFromItemData()
 		MeshComponent->SetStaticMesh(ItemData->Mesh);
 		MeshComponent->SetRelativeScale3D(ItemData->Scale);
 	}
+
+	if (ItemData && ItemData->HeldNoiseSound && NoiseAudioComponent->Sound != ItemData->HeldNoiseSound)
+	{
+		NoiseAudioComponent->SetSound(ItemData->HeldNoiseSound);
+		
+		if (ItemData->HeldNoiseAttenuation)
+		{
+			NoiseAudioComponent->AttenuationSettings = ItemData->HeldNoiseAttenuation;
+		}
+	}
+
+	UpdateNoiseAudio();
+
 }
 
 
@@ -253,6 +272,9 @@ void AItemActorBase::UpdateAttachment(APawn* OldHoldingPawn)
 			PrevCharacter->DetachItemFromRightHand();
 		}
 	}
+
+	// HoldingPawn / bIsActiveHeld 바뀔 때마다 소음 오디오 상태도 같이 갱신.
+	UpdateNoiseAudio();
 }
 
 void AItemActorBase::BeginSinkOrRise()
@@ -413,4 +435,48 @@ void AItemActorBase::GrowNoiseRadius()
 
 	const ENoiseType Type = (CurrentNoiseRadius >= 1500.f) ? ENoiseType::Large : ENoiseType::Medium;
 	UGoHomeNoiseLibrary::GenerateNoise(this, GetActorLocation(), CurrentNoiseRadius, Type, this);
+
+	UpdateNoiseAudio(); // 서버 자신은 OnRep_CurrentNoiseRadius가 안 뜨므로 수동 호출.
 }
+
+void AItemActorBase::OnRep_CurrentNoiseRadius()
+{
+	UpdateNoiseAudio();
+}
+
+void AItemActorBase::UpdateNoiseAudio()
+{
+	if (!NoiseAudioComponent || !ItemData || !ItemData->bMakesNoise || !ItemData->HeldNoiseSound)
+	{
+		if (NoiseAudioComponent && NoiseAudioComponent->IsPlaying())
+		{
+			NoiseAudioComponent->Stop();
+		}
+		return;
+	}
+
+	if (!HoldingPawn)
+	{
+		if (NoiseAudioComponent->IsPlaying())
+		{
+			NoiseAudioComponent->Stop();
+		}
+		return;
+	}
+
+	const float Ratio = FMath::GetMappedRangeValueClamped(FVector2D(ItemData->BaseNoiseRadius,
+		                                                  ItemData->MaxNoiseRadius),
+		                                                  FVector2D(0.f, 1.f), CurrentNoiseRadius);
+
+	NoiseAudioComponent->SetVolumeMultiplier(FMath::Lerp(ItemData->MinNoiseVolumeMultiplier, 
+		                                                 ItemData->MaxNoiseVolumeMultiplier, Ratio));
+	NoiseAudioComponent->SetPitchMultiplier(FMath::Lerp(ItemData->MinNoisePitchMultiplier, 
+		                                                ItemData->MaxNoisePitchMultiplier, Ratio));
+
+	if(!NoiseAudioComponent->IsPlaying())
+	{ 
+		NoiseAudioComponent->Play();
+	}
+}
+
+

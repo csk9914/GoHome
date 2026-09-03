@@ -10,6 +10,7 @@
 
 class UItemDataAsset;
 class UStaticMeshComponent;
+class UAudioComponent;
 
 /**
  * 파손형 충돌 감지, 소음 유발형 누적 타이머는 아이템 자신이 갖는다
@@ -25,6 +26,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, Category = "Item")
 	TObjectPtr<UStaticMeshComponent> MeshComponent;
+
+	UPROPERTY(VisibleAnywhere, Category = "Item")
+	TObjectPtr<UAudioComponent> NoiseAudioComponent;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing = OnRep_ItemData, Category = "Item")
 	TObjectPtr<UItemDataAsset> ItemData;
@@ -141,12 +145,19 @@ protected:
 	int32 BreakCount = 0;
 
 	// 소음 유발형 현재 반경(미보유 시 0).
-	UPROPERTY(Replicated)
+	UPROPERTY(ReplicatedUsing = OnRep_CurrentNoiseRadius)
 	float CurrentNoiseRadius = 0.f;
 
 private:
 
 	void GrowNoiseRadius();
+
+	UFUNCTION()
+	void OnRep_CurrentNoiseRadius();
+
+	// 소음 오디오 재생/정지 + 반경 비율에 따른 볼륨·피치 갱신.
+	// HoldingPawn이 바뀌거나(UpdateAttachment 경유) CurrentNoiseRadius가 바뀔 때(OnRep/서버 직접 호출) 부른다.
+	void UpdateNoiseAudio();
 
 	// Item Data 헬퍼 함수.
 	void SyncVisualsFromItemData();
