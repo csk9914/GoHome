@@ -83,6 +83,9 @@ DerivedDataCache/*
 # Claude Code local (personal) settings
 .claude/settings.local.json
 
+# 개인 작업 문서 (담당자별 스크래치 — 팀 공유 아님)
+/Docs/Dev/_personal/
+
 # Local ThirdPerson test content
 /Content/LocalThirdPerson/
 

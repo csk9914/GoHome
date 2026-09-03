@@ -155,12 +155,32 @@ decisions:
 ```
 
 ### UI
+
+`UI/`는 C++ 베이스 없음(Blueprint 전용). 화면 구조·레이어·카탈로그·연출·네이밍은 [UI_GUIDE.md](UI_GUIDE.md)가 출처(새 화면 만들 때만). 여기엔 코드 경계에 걸리는 규칙만.
+
 ```yaml
 decoupling:
   - >
-    표시 전용 위젯(게이지·인벤토리·카운트다운 등)은 리플리케이티드 프로퍼티/델리게이트를 구독만 한다.
-    입력을 발생시키는 위젯(탐사 지역 선택 확정, 장비 강화 구매)은 서버 RPC(Server_ConfirmZoneSelection 등)만
-    호출하고 로컬 상태를 직접 바꾸지 않는다.
+    표시 전용 위젯(게이지·인벤토리·카운트다운)은 복제 프로퍼티/델리게이트를 구독만 한다.
+    입력 위젯(존 선택 확정, 강화 구매)은 서버 RPC(Server_ConfirmZoneSelection 등)만 호출하고
+    로컬 상태를 직접 바꾸지 않는다.
+  - >
+    화면(정산/게임오버/엔딩 등)은 자기완결 유닛 — 자기 UMG 애니메이션·연출 시퀀스를 소유하고
+    Setup(구조체)로 데이터를 받는다. 라우터/부모는 "어느 화면 + 데이터 전달"만, 연출 로직은 갖지 않는다.
+
+decisions:
+  - name: 정산 UI 바인딩 대상
+    detail: |
+      정산/실패/게임오버/엔딩 UI는 state 델리게이트가 아니라 AExplorationGameState::OnSettlementReady(FSettlementResult)에 바인딩 — CurrentState/SettlementResult OnRep 순서 미보장(Save 절 "정산 결과 복제"). 클라는 OnRep 전에 바인딩이 살아있어야 해 PlayerController BeginPlay에 GameState 유효화 가드 필요.
+      자동복귀 카운트다운은 클라 로컬 타이머 — AutoReturnDelay는 서버 전용이라 복제 안 되고, GetRemainingSeconds()/ExpeditionDeadline은 탐사 제한시간 전용.
+  - name: HUD 위젯 소유
+    detail: |
+      상시 HUD 위젯은 BP PlayerController(또는 그 AHUD) 소유 — Pawn/Character 소유 금지. 폰 스코프 데이터(HP·산소·인벤토리)도 위젯은 뷰라 GetOwningPlayerPawn으로 읽고 OnPossessedPawnChanged에 재바인딩. 폰 소유 불가 이유: 사망 시 부활 없이 관전이 수 분 지속되며 그동안도 목표/타이머 HUD가 필요(폰 소유면 관전 내내 검은 화면), 폰은 로비마다 재생성되는 소모품. per-pawn 패널은 "폰 없음/사망" 상태를 명시.
+      현재 캐릭터 BP·컨트롤러 BP에 흩어짐 → 시스템 PR마다 하나씩 이주(빅뱅 금지). 상세 UI_GUIDE.md.
+
+known_gaps:
+  - name: 할당량 라이브 HUD 데이터 미복제
+    detail: 제한시간 HUD는 ExpeditionDeadline + GetRemainingSeconds()/HasTimeLimit()로 가능. 할당량 HUD("납품 / MapQuota")는 복제 소스 없음 — CurrentMapQuota·CurrentRoundDeliveredValue가 UGoHomeSaveSubsystem(호스트 전용)에만 있고 AddDeliveredValue는 포워드만, FSettlementResult는 정산 시점에만 도착. → AExplorationGameState에 복제 int 2개 + OnRep 필요.
 ```
 
 ### Save
@@ -238,6 +258,7 @@ known_gaps:
   - (`AddDeliveredValue`는 `SaveSubsystem::AccumulateDeliveredValue`로 포워드 완료)
 - **도킹 문 위협 판정** — AI가 `OnDoorStateChanged` 구독해 `Fail(EFailReason::DockThreatened)` 호출하는 코드 없음
 - **정산 배선 나머지** — 복귀 버튼 RPC, DA_EconomyConfig 애셋 생성, 정산/게임오버/엔딩 UI 위젯. (사망자 추적, 실패 경로, 타임오버 경로, 정상복귀 Settlement 경로 `HandleReturn→EnterSettlement`, 자동복귀 타이머, `FSettlementResult` GameState 복제(`AExplorationGameState::SettlementResult`/`OnSettlementReady`)는 구현됨)
+- **할당량 라이브 HUD** — `AExplorationGameState`에 `CurrentMapQuota`/`CurrentRoundDelivered` 복제 필드 없음. 탐사 중 할당량 진행 HUD가 읽을 소스가 없다(UI 절 known_gaps 참고). 제한시간 HUD는 `ExpeditionDeadline`으로 이미 가능.
 - `UI/`는 C++ 베이스 클래스 없음(Blueprint 전용).
 - `Save/` 장비 강화 구매 로직 미구현 — 스키마 필드(`PurchasedUpgrades`)만 있음.
 - 레벨/그레이박스는 `Source/GoHome/` 코드가 아니라 레벨 애셋 작업.
