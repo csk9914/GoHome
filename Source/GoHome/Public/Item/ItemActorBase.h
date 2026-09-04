@@ -85,9 +85,16 @@ public:
 	// 서버 전용: InventoryComponent가 활성 슬롯 전환 시 호출한다.
 	void SetActiveHeld(bool bNewActive);
 
-	virtual FText GetInteractionPromptText_Implementation() const override;
+	// 원거리 회수 등 외부 시스템이 "확보됨" 상태를 걸고 풀 때 사용. 서버 전용.
+	UFUNCTION(BlueprintCallable, Category = "Item")
+	void SetBeingClaimed(bool bNewClaimed);
 
-	
+	// 원거리 회수 등 외부 시스템이 위치를 직접 제어하는 동안 물리를 꺼두고,
+	// 끝나면 "막 드롭된" 상태로 복귀 시킨다. 서버 전용.
+	UFUNCTION(BlueprintCallable, Category = "Item")
+	void SetExternallyPositioned(bool bExternallyPositioned);
+
+	virtual FText GetInteractionPromptText_Implementation() const override;
 
 protected:
 

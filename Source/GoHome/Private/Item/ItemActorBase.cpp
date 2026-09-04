@@ -480,3 +480,25 @@ void AItemActorBase::UpdateNoiseAudio()
 }
 
 
+void AItemActorBase::SetBeingClaimed(bool bNewClaimed)
+{
+	if (!HasAuthority()) return;
+	bIsBeingClaimed = bNewClaimed;
+}
+
+void AItemActorBase::SetExternallyPositioned(bool bExternallyPositioned)
+{
+	if (!HasAuthority()) return;
+
+	if (bExternallyPositioned)
+	{
+		MeshComponent->SetSimulatePhysics(false);
+		CancelFloatCycle();
+	}
+
+	else
+	{
+		MeshComponent->SetSimulatePhysics(true);
+		BeginFloatCycle();
+	}
+}
