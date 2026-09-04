@@ -89,7 +89,11 @@ DerivedDataCache/*
 # Local ThirdPerson test content
 /Content/LocalThirdPerson/
 
-/Content/Diver/
+/Content/Diver/*
+!/Content/Diver/Mesh
+/Content/Diver/Mesh/*
+!/Content/Diver/Mesh/SK_Daiver_Skeleton.uasset
+
 /Content/SwimmingAnimationPack/
 /Content/PopUpRockWorm/
 /Content/Deep_Hunter/
