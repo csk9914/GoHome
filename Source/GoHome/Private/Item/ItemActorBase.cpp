@@ -7,6 +7,7 @@
 #include "AI/NoiseType.h"
 #include "TimerManager.h"
 #include "Interaction/InventoryComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Components/AudioComponent.h"
 #include "Player/GoHomeCharacter.h"
 
@@ -44,6 +45,14 @@ AItemActorBase::AItemActorBase()
 	if (DefaultMeshAsset.Succeeded())
 	{
 		MeshComponent->SetStaticMesh(DefaultMeshAsset.Object);
+	}
+
+	// 경로가 바뀌면 수정.
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DefaultCrackMaterial(
+		TEXT("/Game/GoHome/Developers/THE/M_ItemCrackOverlay.M_ItemCrackOverlay"));
+	if (DefaultCrackMaterial.Succeeded())
+	{
+		CrackOverlayMaterial = DefaultCrackMaterial.Object;
 	}
 }
 
@@ -359,6 +368,7 @@ void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp,
 	if (ImpactSpeed >= ItemData->BreakVelocityThreshold)
 	{
 		++BreakCount;
+		UpdateDamageVisual(); // 서버 자신은 OnRep이 안 뜨므로 수동 호출.
 	}
 }
 
@@ -501,4 +511,29 @@ void AItemActorBase::SetExternallyPositioned(bool bExternallyPositioned)
 		MeshComponent->SetSimulatePhysics(true);
 		BeginFloatCycle();
 	}
+}
+
+
+void AItemActorBase::OnRep_BreakCount()
+{
+	UpdateDamageVisual();
+}
+
+void AItemActorBase::UpdateDamageVisual()
+{
+	if (!ItemData || !ItemData->bCanBreak || BreakCount <= 0 || !CrackOverlayMaterial)
+	{
+		MeshComponent->SetOverlayMaterial(nullptr);
+		return;
+	}
+
+	if (!CrackOverlayMID)
+	{
+		CrackOverlayMID = UMaterialInstanceDynamic::Create(CrackOverlayMaterial, this);
+		MeshComponent->SetOverlayMaterial(CrackOverlayMID);
+	}
+
+	const float DamageAmount = ItemData->MaxBreakCount > 0 ? FMath::Clamp((float)BreakCount / (float)ItemData->MaxBreakCount, 0.f, 1.f) : 0.f;
+
+	CrackOverlayMID->SetScalarParameterValue(TEXT("DamageAmount"), DamageAmount);
 }

@@ -11,6 +11,8 @@
 class UItemDataAsset;
 class UStaticMeshComponent;
 class UAudioComponent;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
 
 /**
  * 파손형 충돌 감지, 소음 유발형 누적 타이머는 아이템 자신이 갖는다
@@ -148,7 +150,7 @@ protected:
 	bool bHasBeenPickedUp = false;
 
 	// 파손형 누적 파손 횟수. ItemData->MaxBreakCount에서 멈춘다.
-	UPROPERTY(Replicated)
+	UPROPERTY(ReplicatedUsing = OnRep_BreakCount)
 	int32 BreakCount = 0;
 
 	// 소음 유발형 현재 반경(미보유 시 0).
@@ -203,4 +205,18 @@ private:
 
 	FTimerHandle NoiseGrowthTimerHandle;
 
+	// 파손형 관련----------
+	UFUNCTION()
+	void OnRep_BreakCount();
+
+	// BreakCount 변화(NotifyHit 직후, 또는 클라 리플리케이션 수신)에 맞춰 균열 오버레이 갱신.
+	void UpdateDamageVisual();
+
+	// 파손 시각효과(균열)용 공유 오버레이 머티리얼 - 전체 파손형 아이템이 공통으로 씀, 아이템별 설정 불필요.
+	UPROPERTY(EditDefaultsOnly, Category = "Item")
+	TObjectPtr<UMaterialInterface> CrackOverlayMaterial;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> CrackOverlayMID;
+	//-----------
 };
