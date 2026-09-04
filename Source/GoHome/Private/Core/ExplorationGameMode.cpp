@@ -31,15 +31,22 @@ void AExplorationGameMode::BeginPlay()
 	}
 
 	// 할당량 세팅
-	if (UGoHomeSaveSubsystem* SaveSubsystem = GetGameInstance()->GetSubsystem<UGoHomeSaveSubsystem>())
+	UGoHomeSaveSubsystem* SaveSubsystem = GetGameInstance()->GetSubsystem<UGoHomeSaveSubsystem>();
+	if (SaveSubsystem)
 	{
 		SaveSubsystem->SetTargetMapQuota(Zone->MapQuota);
 	}
 
-	// 라이브 할당량 HUD용 복제 소스
+	// 라이브 HUD용 복제 소스(할당량·자금)
 	if (AExplorationGameState* ExplorationGameState = GetGameState<AExplorationGameState>())
 	{
 		ExplorationGameState->SetMapQuota(Zone->MapQuota);
+
+		// 납품 전에도 정확한 보유 자금이 HUD에 뜨도록 초기값 1회 push
+		if (SaveSubsystem)
+		{
+			ExplorationGameState->SetCurrentFunds(SaveSubsystem->GetCurrentFunds());
+		}
 	}
 
 	// 정상적으로 타이며가 세팅 되어 있는 경우

@@ -70,6 +70,11 @@ int32 UGoHomeSaveSubsystem::AccumulateDeliveredValue(int32 Value)
 	return SaveGame->CurrentRoundDeliveredValue;
 }
 
+int32 UGoHomeSaveSubsystem::GetCurrentFunds() const
+{
+	return SaveGame ? SaveGame->CurrentFunds : 0;
+}
+
 FSettlementResult UGoHomeSaveSubsystem::FinalizeRound(bool bForfeited, const TArray<FString>& CasualtyNames)
 {
 	if (!SaveGame || !EconomyConfig)

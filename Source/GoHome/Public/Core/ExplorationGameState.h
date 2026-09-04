@@ -63,6 +63,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Expedition")
 	int32 GetRoundDeliveredValue() const { return RoundDeliveredValue; }
 
+	// 서버 전용. 납품/정산 후 세이브의 새 보유 자금 합계를 복제 필드에 싣는다(AGoHomeGameState::AddDeliveredValue).
+	void SetCurrentFunds(int32 InCurrentFunds);
+
+	// 인게임 HUD가 OnQuotaProgressChanged 콜백 안에서 자금 표시값을 꺼내 쓴다(델리게이트 시그니처는 유지).
+	UFUNCTION(BlueprintPure, Category = "Expedition")
+	int32 GetCurrentFunds() const { return CurrentFunds; }
+
 
 protected:
 	virtual void BeginPlay() override;
@@ -109,5 +116,9 @@ private:
 	// 이번 라운드 납품 누적액(세이브 CurrentRoundDeliveredValue 미러). 납품마다 갱신.
 	UPROPERTY(ReplicatedUsing = OnRep_QuotaProgress, BlueprintReadOnly, Category = "Expedition", meta = (AllowPrivateAccess = "true"))
 	int32 RoundDeliveredValue = 0;
+
+	// 보유 자금(세이브 CurrentFunds 미러, 세이브는 호스트 전용 SoT). 납품마다 갱신, 인게임 HUD 표시용.
+	UPROPERTY(ReplicatedUsing = OnRep_QuotaProgress, BlueprintReadOnly, Category = "Expedition", meta = (AllowPrivateAccess = "true"))
+	int32 CurrentFunds = 0;
 
 };

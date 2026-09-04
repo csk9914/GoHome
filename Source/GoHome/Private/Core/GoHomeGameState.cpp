@@ -42,9 +42,11 @@ void AGoHomeGameState::AddDeliveredValue(int32 Value)
 	
 	const int32 RoundDeliveredTotal = SaveSubsystem->AccumulateDeliveredValue(Value);
 
-	// 호스트 전용 세이브 값을 탐사 GameState의 복제 미러로 밀어 라이브 할당량 HUD가 받게 한다
+	// 호스트 전용 세이브 값을 탐사 GameState의 복제 미러로 밀어 라이브 HUD(할당량·자금)가 받게 한다
 	if (AExplorationGameState* ExplorationGameState = Cast<AExplorationGameState>(this))
 	{
+		// 자금을 먼저 실어야 SetRoundDeliveredValue의 호스트 브로드캐스트 시점에 최신 자금이 보인다
+		ExplorationGameState->SetCurrentFunds(SaveSubsystem->GetCurrentFunds());
 		ExplorationGameState->SetRoundDeliveredValue(RoundDeliveredTotal);
 	}
 }

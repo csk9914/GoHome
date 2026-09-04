@@ -42,6 +42,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Save")
 	const UGoHomeSaveGame* GetSaveGame() const { return SaveGame; };
 
+	// 현재 보유 자금(GameState 복제 미러용). 세이브 없으면 0.
+	int32 GetCurrentFunds() const;
+
 	// 출발 시 호출해서 값을 초기화
 	void SetTargetMapQuota(int32 Quota) { CurrentMapQuota = Quota; };
 

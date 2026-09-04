@@ -75,6 +75,18 @@ void AExplorationGameState::SetRoundDeliveredValue(int32 InDeliveredValue)
 	OnQuotaProgressChanged.Broadcast(RoundDeliveredValue, MapQuota);
 }
 
+void AExplorationGameState::SetCurrentFunds(int32 InCurrentFunds)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	CurrentFunds = InCurrentFunds;
+	// 리슨 서버 호스트는 OnRep이 불리지 않으므로 서버에서 직접 브로드캐스트
+	OnQuotaProgressChanged.Broadcast(RoundDeliveredValue, MapQuota);
+}
+
 void AExplorationGameState::OnRep_QuotaProgress()
 {
 	OnQuotaProgressChanged.Broadcast(RoundDeliveredValue, MapQuota);
@@ -105,5 +117,6 @@ void AExplorationGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	DOREPLIFETIME(AExplorationGameState, SettlementResult);
 	DOREPLIFETIME(AExplorationGameState, MapQuota);
 	DOREPLIFETIME(AExplorationGameState, RoundDeliveredValue);
+	DOREPLIFETIME(AExplorationGameState, CurrentFunds);
 }
 
