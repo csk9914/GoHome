@@ -3,6 +3,7 @@
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
 #include "Player/OxygenComponent.h"
+#include "Player/CarryWeightComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Upgrade/EquipmentUpgradeStateActor.h"
 #include "EngineUtils.h"
@@ -93,8 +94,9 @@ EEquipmentUpgradeRequestResult UEquipmentUpgradeSubsystem::RequestUpgrade(
 		return EEquipmentUpgradeRequestResult::UpgradeNotFound;
 	}
 
-	// 지금은 산소만 실제 적용 가능하니까 서버에서도 막기
-	if (UpgradeData->EffectType != EEquipmentUpgradeEffectType::OxygenCapacity)
+	// 무게 업그레이드 부분
+	if (UpgradeData->EffectType != EEquipmentUpgradeEffectType::OxygenCapacity
+		&& UpgradeData->EffectType != EEquipmentUpgradeEffectType::CarryWeightLimit)
 	{
 		return EEquipmentUpgradeRequestResult::NoEffectReceiver;
 	}
@@ -189,8 +191,19 @@ EEquipmentUpgradeRequestResult UEquipmentUpgradeSubsystem::ApplyUpgradeToActor(
 	}
 
 	case EEquipmentUpgradeEffectType::CarryWeightLimit:
-		// 무게 강화는 나중에 CarryWeightComponent 연결할 때 채운다.
-		return EEquipmentUpgradeRequestResult::NoEffectReceiver;
+	{
+		UCarryWeightComponent* CarryWeightComponent =
+			TargetActor->FindComponentByClass<UCarryWeightComponent>();
+
+		if (!CarryWeightComponent)
+		{
+			return EEquipmentUpgradeRequestResult::NoEffectReceiver;
+		}
+
+		CarryWeightComponent->SetMaxCarryWeightBonus(BonusValue);
+
+		return EEquipmentUpgradeRequestResult::Succeeded;
+	}
 
 	default:
 		return EEquipmentUpgradeRequestResult::UpgradeNotFound;
