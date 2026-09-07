@@ -38,6 +38,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Carry Weight")
 	virtual float GetMaxCarryWeight() const override;
 
+	// 기본값에 더한 업그레이드 + 보정(나중에 추가될 경우 생각해서)
+	UFUNCTION(BlueprintPure, Category = "Carry Weight")
+	float GetBaseMaxCarryWeight() const;
+
 	UFUNCTION(BlueprintPure, Category = "Carry Weight")
 	virtual float GetOverweightAmount() const override;
 
@@ -100,6 +104,6 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Carry Weight")
 	void SetMaxCarryWeightBonus(float NewBonus);
 
-	UFUNCTION(BlueprintCallable, Category = "Carry Weight")
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Carry Weight")
 	void SetTemporaryMaxCarryWeightModifier(float NewModifier);
 };

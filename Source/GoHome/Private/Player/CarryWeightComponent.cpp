@@ -37,6 +37,11 @@ float UCarryWeightComponent::GetMaxCarryWeight() const
 	return FMath::Max(0.f, MaxCarryWeight);
 }
 
+float UCarryWeightComponent::GetBaseMaxCarryWeight() const
+{
+	return FMath::Max(0.f, BaseMaxCarryWeight);
+}
+
 // 현재 무게가 최대 무게를 넘은 만큼만 반환한다. 넘지 않으면 0이다.
 float UCarryWeightComponent::GetOverweightAmount() const
 {
@@ -45,6 +50,13 @@ float UCarryWeightComponent::GetOverweightAmount() const
 
 void UCarryWeightComponent::SetMaxCarryWeightBonus(float NewBonus)
 {
+	// 서버
+	const AActor* OwnerActor = GetOwner();
+	if (!OwnerActor || !OwnerActor->HasAuthority())
+	{
+		return;
+	}
+
 	const float ClampedBonus = FMath::Max(0.f, NewBonus);
 
 	if (FMath::IsNearlyEqual(MaxCarryWeightBonus, ClampedBonus))
