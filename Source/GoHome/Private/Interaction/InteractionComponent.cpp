@@ -80,6 +80,17 @@ void UInteractionComponent::SetOutlineEnabled(AActor* Target, bool bEnabled, int
 {
 	if (!Target) return;
 
+	// 조준/근접힌트 강조가 꺼지는 경우, 파손된 아이템이면 그냥 끄지 말고
+	// 자기 파손 상태(스텐실 3/4 또는 off)로 되돌아가게 함.
+	if (!bEnabled)
+	{
+		if (AItemActorBase* Item = Cast<AItemActorBase>(Target))
+		{
+			Item->UpdateDamageVisual();
+			return;
+		}
+	}
+
 	TArray<UPrimitiveComponent*> PrimitiveComponents;
 	Target->GetComponents<UPrimitiveComponent>(PrimitiveComponents);
 

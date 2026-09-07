@@ -33,6 +33,11 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	TObjectPtr<UStaticMesh> Mesh;
 
+	// 파손 단계별 교체용 머터리얼 (인덱스 0 = BreackCount 1, 1=BreakCount 2).
+// 비워두면 그 단계는 교체 안되고 스텐실 틴트만 그대로 유지됨. 안전함.)
+	UPROPERTY(EditAnywhere, Category = "Item")
+	TArray<TObjectPtr<UMaterialInterface>> BreakStageMaterials;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Item")
 	FVector Scale = FVector::OneVector;
 

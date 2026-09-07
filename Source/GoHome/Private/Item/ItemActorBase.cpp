@@ -47,13 +47,6 @@ AItemActorBase::AItemActorBase()
 		MeshComponent->SetStaticMesh(DefaultMeshAsset.Object);
 	}
 
-	// 경로가 바뀌면 수정.
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DefaultCrackMaterial(
-		TEXT("/Game/GoHome/Developers/THE/M_ItemCrackOverlay.M_ItemCrackOverlay"));
-	if (DefaultCrackMaterial.Succeeded())
-	{
-		CrackOverlayMaterial = DefaultCrackMaterial.Object;
-	}
 }
 
 void AItemActorBase::BeginPlay()
@@ -365,6 +358,12 @@ void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp,
 	if (BreakCount >= ItemData->MaxBreakCount) return;
 
 	const float ImpactSpeed = GetVelocity().Size();
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, FString::Printf(TEXT("[Break] Speed=%.1f / Threshold=%.1f / BreakCount=%d"), ImpactSpeed, ItemData->BreakVelocityThreshold, BreakCount));
+	}
+
 	if (ImpactSpeed >= ItemData->BreakVelocityThreshold)
 	{
 		++BreakCount;
@@ -521,19 +520,25 @@ void AItemActorBase::OnRep_BreakCount()
 
 void AItemActorBase::UpdateDamageVisual()
 {
-	if (!ItemData || !ItemData->bCanBreak || BreakCount <= 0 || !CrackOverlayMaterial)
+	const bool bShouldShowDamage = ItemData && ItemData->bCanBreak && BreakCount > 0;
+
+	MeshComponent->SetRenderCustomDepth(bShouldShowDamage);
+
+	if (bShouldShowDamage)
 	{
-		MeshComponent->SetOverlayMaterial(nullptr);
-		return;
+		// BreakCount 1 -> DamageStencilValue(기본 3)
+		// BreakCount 2 이상 -> +1(기본 4)로 고정.
+		// Clamp를 걸어두는 이유 : 나중에 MaxBreakCount가 2보다 커져도 머터리얼이 모르는
+		//                        스탠실 값(5, 6...)이 나가서 틴트가 안보이는 사고를 방지하기 위함.
+
+		const int32 Tier = FMath::Clamp(BreakCount, 1, 2);
+		MeshComponent->SetCustomDepthStencilValue(DamageStencilValue + Tier - 1);
+
+		// 단계별 균열 텍스처 머터리얼로 교체. 해당 단계 머터리얼이 없을 경우(배열이 비어있으면) 건너뜀.
+		if (ItemData->BreakStageMaterials.IsValidIndex(Tier - 1) && ItemData->BreakStageMaterials[Tier - 1])
+		{
+			MeshComponent->SetMaterial(0, ItemData->BreakStageMaterials[Tier - 1]);
+		}
+
 	}
-
-	if (!CrackOverlayMID)
-	{
-		CrackOverlayMID = UMaterialInstanceDynamic::Create(CrackOverlayMaterial, this);
-		MeshComponent->SetOverlayMaterial(CrackOverlayMID);
-	}
-
-	const float DamageAmount = ItemData->MaxBreakCount > 0 ? FMath::Clamp((float)BreakCount / (float)ItemData->MaxBreakCount, 0.f, 1.f) : 0.f;
-
-	CrackOverlayMID->SetScalarParameterValue(TEXT("DamageAmount"), DamageAmount);
 }

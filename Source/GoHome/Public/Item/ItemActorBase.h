@@ -96,6 +96,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Item")
 	void SetExternallyPositioned(bool bExternallyPositioned);
 
+	// BreakCount 변화(NotifyHit 직후, 클라이언트 리플리케이션 수신, 또는 조준/근접힌트 강조가 꺼져서
+	// 원래 상태로 복원해야 할 때)에 맞춰 파손 표시를 갱신.
+	// InteractionComponent도 호출함.
+	void UpdateDamageVisual();
+
 	virtual FText GetInteractionPromptText_Implementation() const override;
 
 protected:
@@ -189,7 +194,7 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Item")
 	float BuoyancyAccelFactor = 180.0f;
 
-	// 부유 단계에서의 흔드림.
+	// 부유 단계에서의 흔들림.
 	UPROPERTY(EditAnywhere, Category = "Item")
 	float DriftForceStrength = 60.0f;
 
@@ -209,9 +214,6 @@ private:
 	UFUNCTION()
 	void OnRep_BreakCount();
 
-	// BreakCount 변화(NotifyHit 직후, 또는 클라 리플리케이션 수신)에 맞춰 균열 오버레이 갱신.
-	void UpdateDamageVisual();
-
 	// 파손 시각효과(균열)용 공유 오버레이 머티리얼 - 전체 파손형 아이템이 공통으로 씀, 아이템별 설정 불필요.
 	UPROPERTY(EditDefaultsOnly, Category = "Item")
 	TObjectPtr<UMaterialInterface> CrackOverlayMaterial;
@@ -219,4 +221,9 @@ private:
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> CrackOverlayMID;
 	//-----------
+
+	// 파손 시각효과용 스텐실 값. 조준(1)/근접힌트(2)와 겹치지 않는 값.
+	UPROPERTY(EditAnywhere, Category = "Item")
+	int32 DamageStencilValue = 3;
+
 };
