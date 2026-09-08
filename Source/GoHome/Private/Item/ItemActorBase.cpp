@@ -359,11 +359,6 @@ void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp,
 
 	const float ImpactSpeed = GetVelocity().Size();
 
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 3.f, FColor::Yellow, FString::Printf(TEXT("[Break] Speed=%.1f / Threshold=%.1f / BreakCount=%d"), ImpactSpeed, ItemData->BreakVelocityThreshold, BreakCount));
-	}
-
 	if (ImpactSpeed >= ItemData->BreakVelocityThreshold)
 	{
 		++BreakCount;

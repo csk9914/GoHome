@@ -7,6 +7,8 @@
 #include "HarpoonCosmeticActor.generated.h"
 
 class UStaticMeshComponent;
+class UCableComponent;
+class USceneComponent;
 
 // 순수 연출용 액터(판정 없음, 리플리케이트 안함).
 // 시작점/끝점을 받아 왕복 이동만 하고 끝나면 스스로 파괴.
@@ -19,14 +21,20 @@ class GOHOME_API AHarpoonCosmeticActor : public AActor
 	
 public:	
 
-	
 	AHarpoonCosmeticActor();
 
-	void Play(const FVector& InStart, const FVector& InEnd, float InOutboundDuration, float InReturnDuration);
+	void Play(const FVector& InStart, const FVector& InEnd, float InOutboundDuration, float InReturnDuration,
+		UStaticMeshComponent* InMuzzleMesh, FName InMuzzleSocket);
 	
+	UPROPERTY(VisibleAnywhere, Category = "Harpoon")
+	TObjectPtr<UCableComponent> Cable;
+
 protected:
 
 	virtual void Tick(float DeltaTime) override;
+
+	UPROPERTY(VisibleAnywhere, Category = "Harpoon")
+	TObjectPtr<USceneComponent> TrajectoryRoot;
 
 	UPROPERTY(VisibleAnywhere, Category = "Harpoon")
 	TObjectPtr<UStaticMeshComponent> HeadMesh;
@@ -38,5 +46,9 @@ private:
 	float OutboundDuration = 0.2f;
 	float ReturnDuration = 0.4f;
 	float Elapsed = 0.f;
+
+	// 로프의 총 쪽 고정점을 매 틱 실시간으로 다시 구하기 위한 참조(발사 시점 스냅샷만으로 부족).
+	TWeakObjectPtr<UStaticMeshComponent> MuzzleMesh;
+	FName MuzzleSocket = NAME_None;
 	
 };

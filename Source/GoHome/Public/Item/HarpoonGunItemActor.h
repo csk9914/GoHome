@@ -50,6 +50,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Harpoon")
 	float DropOffDistance = 150.f;
 
+	// 총구 위치로 쓸 소켓 이름. 총 메쉬에 소켓 만들고 지정할 것 -> 없으면 기존 근사치 사용.
+	UPROPERTY(EditAnywhere, Category = "Harpoon")
+	FName MuzzleSocketName = NAME_None;
 
 private:
 

@@ -18,7 +18,22 @@ void AHarpoonGunItemActor::ServerUseSpecialAction()
 	// 카메라 컴포넌트는 원격 클라이언트 기준으로 서버에서 못 믿음.
 	// 이미 정확히 리플리케이트되는 CurrentPitch + ActorRotation Yaw 조합으로 조준 방향 계산.
 	const FRotator AimRotation(Character->CurrentPitch, Character->GetActorRotation().Yaw, 0.f);
-	const FVector Start = HoldingPawn->GetActorLocation() + FVector::UpVector * 60.f;
+
+	UE_LOG(LogTemp, Warning, TEXT("MuzzleSocketName=%s, HasMesh=%s, SocketExists=%s"),
+		*MuzzleSocketName.ToString(),
+		MeshComponent->GetStaticMesh() ? *MeshComponent->GetStaticMesh()->GetName() : TEXT("NONE"),
+		MeshComponent->DoesSocketExist(MuzzleSocketName) ? TEXT("true") : TEXT("false"));
+
+	FVector Start;
+	if (MuzzleSocketName != NAME_None && MeshComponent->DoesSocketExist(MuzzleSocketName))
+	{
+		Start = MeshComponent->GetSocketLocation(MuzzleSocketName);
+	}
+	else
+	{
+		Start = HoldingPawn->GetActorLocation() + FVector::UpVector * 60.f; // 소켓 미설정 시 임시 근사치.
+	}
+	
 	const FVector End = Start + AimRotation.Vector() * TraceDistance;
 
 	FCollisionQueryParams Params;
@@ -52,6 +67,9 @@ void AHarpoonGunItemActor::ServerUseSpecialAction()
 	RetrievingTarget = Target;
 	RetrieveElapsed = 0.f;
 	bReturnStartCaptured = false;
+
+	// 회수 도중 자기 자신(플레이어)의 콜리전에 막혀 튕기는 것 방지 - 벽/바닥은 그대로 막힘.
+	RetrievingTarget->MeshComponent->IgnoreActorWhenMoving(HoldingPawn, true);
 
 	FireEventStart = Start;
 	FireEventEnd = Hit.Location;
@@ -110,6 +128,7 @@ void AHarpoonGunItemActor::Tick(float DeltaTime)
 
 		if (ReturnAlpha >= 1.f)
 		{
+			RetrievingTarget->MeshComponent->IgnoreActorWhenMoving(HoldingPawn, false); // 무시 해제.
 			RetrievingTarget->SetBeingClaimed(false);
 			RetrievingTarget->SetExternallyPositioned(false);
 			RetrievingTarget = nullptr;
@@ -127,6 +146,7 @@ void AHarpoonGunItemActor::AbortRetrieve()
 {
 	if(RetrievingTarget && IsValid(RetrievingTarget))
 	{ 
+		RetrievingTarget->MeshComponent->IgnoreActorWhenMoving(HoldingPawn, false);
 		RetrievingTarget->SetBeingClaimed(false);
 		RetrievingTarget->SetExternallyPositioned(false);
 	}
@@ -147,7 +167,7 @@ void AHarpoonGunItemActor::PlayFireCosmetic()
 
 	if (AHarpoonCosmeticActor* Cosmetic = GetWorld()->SpawnActor<AHarpoonCosmeticActor>(CosmeticClass, FireEventStart, FRotator::ZeroRotator))
 	{
-		Cosmetic->Play(FireEventStart, FireEventEnd, OutboundDuration, ReturnDuration);
+		Cosmetic->Play(FireEventStart, FireEventEnd, OutboundDuration, ReturnDuration, MeshComponent, MuzzleSocketName);
 	}
 }
 
