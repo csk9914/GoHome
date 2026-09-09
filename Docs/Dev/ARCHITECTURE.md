@@ -173,6 +173,12 @@ decisions:
     detail: |
       정산/실패/게임오버/엔딩 UI는 state 델리게이트가 아니라 AExplorationGameState::OnSettlementReady(FSettlementResult)에 바인딩 — CurrentState/SettlementResult OnRep 순서 미보장(Save 절 "정산 결과 복제"). 클라는 OnRep 전에 바인딩이 살아있어야 해 PlayerController BeginPlay에 GameState 유효화 가드 필요.
       자동복귀 카운트다운은 클라 로컬 타이머 — AutoReturnDelay는 서버 전용이라 복제 안 되고, GetRemainingSeconds()/ExpeditionDeadline은 탐사 제한시간 전용.
+      정산 화면은 라우터가 아니라 스텝 러너(영상 클립 / 페이지 / 전환의 리스트를 상황별 DataAsset에서 뽑아 실행) — UI_GUIDE.md 라우터 패턴 절. 현재는 스텝 리스트 길이 1~2로 기존 동작과 동형.
+  - name: 정산 자동복귀 — 2단계 타임라인 (신설 제안)
+    detail: |
+      현 AExplorationGameMode::AutoReturnDelay(8s 고정, SetSettlementResult 시점 시작)는 연출 길이가 상수일 때만 성립 — 영상/다중 페이지가 붙으면 서버가 모르는 연출 길이를 추측하게 됨.
+      목표: Phase1 연출(가변, 클라 스텝 러너 소유, 서버는 안전 타임아웃만) + Phase2 복귀 창(OnPresentationComplete 후 시작). C++: Server_SettlementReady() RPC + ReturnDeadline(복제, 절대 서버시각) + 안전 타임아웃 → 생존 전원 ready(or 타임아웃)에 deadline 세팅 → 만료 시 ReturnToLobby. AutoReturnTimer 2곳(ExplorationGameMode.cpp:111,244) 교체, AutoReturnDelay는 "읽기 창" 값으로 잔존. 클라 리턴 바가 복제 ReturnDeadline 바인딩 → 드리프트 0.
+      착수 시점: 영상 클립 실제 도입 직전. 그전까진 8s 상향으로 임시 대응.
   - name: HUD 위젯 소유
     detail: |
       상시 HUD 위젯은 BP PlayerController(또는 그 AHUD) 소유 — Pawn/Character 소유 금지. 폰 스코프 데이터(HP·산소·인벤토리)도 위젯은 뷰라 GetOwningPlayerPawn으로 읽고 OnPossessedPawnChanged에 재바인딩. 폰 소유 불가 이유: 사망 시 부활 없이 관전이 수 분 지속되며 그동안도 목표/타이머 HUD가 필요(폰 소유면 관전 내내 검은 화면), 폰은 로비마다 재생성되는 소모품. per-pawn 패널은 "폰 없음/사망" 상태를 명시.
