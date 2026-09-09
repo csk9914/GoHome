@@ -98,6 +98,10 @@ private:
 	UPROPERTY(EditAnywhere, Category = "CoopCarry")
 	float CarrySpeedScale = 1.0f;
 
+	// 두 캐리어를 잇는 축으로 회전을 얼마나 빠르게 따라갈지(회전 보간 속도).
+	UPROPERTY(EditAnywhere, Category = "CoopCarry")
+	float RotationInterpSpeed = 10.0f;
+
 	UPROPERTY(EditAnywhere, Category = "CoopCarry")
 	float MaxCarryDistance = 500.f;
 

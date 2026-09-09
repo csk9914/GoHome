@@ -41,7 +41,9 @@ void ACoopCarryObjectBase::Tick(float DeltaTime)
 	if (!CharacterA || !CharacterB) return;
 
 	// 둘 사이 거리가 너무 벌어지면(한쪽이 억지로 멀어지려 하면) 강제로 놓침.
-	if (FVector::Dist(CharacterA->GetActorLocation(), CharacterB->GetActorLocation()) > MaxCarryDistance)
+	if (FVector::Dist(CharacterA->GetActorLocation(), CharacterB->GetActorLocation()) > MaxCarryDistance ||
+		FVector::Dist(GetActorLocation(), CharacterA->GetActorLocation()) > MaxCarryDistance ||
+		FVector::Dist(GetActorLocation(), CharacterB->GetActorLocation()) > MaxCarryDistance)
 	{
 		ReleaseCarriers();
 		return;
@@ -51,14 +53,24 @@ void ACoopCarryObjectBase::Tick(float DeltaTime)
 	const FVector InputB = CharacterB->GetLastCarryInputWorld();
 	const FVector CombinedInput = (InputA + InputB) * 0.5f;
 	
-	// 두 캐리어 각자의 무브먼트 컴포넌트에 동일한 합산 입력을 그대로 먹임(각자 콜리전/보간은 그대로 유지됨).
-	CharacterA->AddMovementInput(CombinedInput * CarrySpeedScale);
-	CharacterB->AddMovementInput(CombinedInput * CarrySpeedScale);
+	// 두 캐리어 각자의 로컬 폰에서 이 값을 스스로 AddMovementInput 하도록 세팅만 함(직접 이동시키지 않음).
+	CharacterA->SetCombinedCarryInput(CombinedInput * CarrySpeedScale);
+	CharacterB->SetCombinedCarryInput(CombinedInput * CarrySpeedScale);
 
 	// 오브젝트 자신은 두 캐리어의 중간점을 그대로 따라감(회전은 v1에서 고정, 추후 필요시 추가).
 	const FVector Midpoint = (CharacterA->GetActorLocation() + CharacterB->GetActorLocation()) * 0.5f;
 	SetActorLocation(Midpoint, true); // sweep = true -> 벽, 물건 등에 막히면 자연스럽게 안 뚫고 멈춤.
 	ForceNetUpdate(); // 물리 없이 코드로 직접 옮기는 액터라, 다음 정기 갱신 주기를 안 기다리고 바로 리플리케이트 요청.
+
+	// 두 캐리어를 잇는 축을 오브젝트 로컬 X축(HandleA -> HandleB)에 맞춰 회전
+	// -> 누군가 앞서거나 옆으로 빠지면 자연스럽게 따라감.
+	// HandleA : -X, HandleB : +X 배치.
+	const FVector CarrierAxis = CharacterB->GetActorLocation() - CharacterA->GetActorLocation();
+	if (!CarrierAxis.IsNearlyZero())
+	{
+		const FRotator TargetRotation = CarrierAxis.Rotation();
+		SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaTime, RotationInterpSpeed));
+	}
 
 	// 정체(손발 안 맞음) 판정 : 둘 다 뭔가 누르고 있는데 합산 결과는 작은 상태가 일정 시간 지속되면 강제로 놓침.
 	const bool bBothPushing = InputA.SizeSquared() > FMath::Square(StuckInputThreshold) 
@@ -123,6 +135,10 @@ bool ACoopCarryObjectBase::AssignCarrier(APawn* Pawn)
 	}
 
 	MeshComponent->SetSimulatePhysics(false); // 상호작용 동안은 물리 끄고 SetActorLocation으로만 이동.
+	MeshComponent->IgnoreActorWhenMoving(Pawn, true); // 이동 스윕이 캐리어 본인 캡슐에 걸리는 것 방지.
+
+	// 오브젝트가 캐릭터 이동보다 한 틱 늦게 계산되는 것 방지 -> 캐릭터 틱 이후에 실행되도록 순서 강제.
+	AddTickPrerequisiteActor(Pawn);
 
 	if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(Pawn))
 	{
@@ -137,6 +153,18 @@ void ACoopCarryObjectBase::ReleaseCarriers()
 {
 	if (!HasAuthority()) return;
 
+	if (CarrierA)
+	{ 
+		RemoveTickPrerequisiteActor(CarrierA);
+		MeshComponent->IgnoreActorWhenMoving(CarrierA, false); // 무시 해제.
+	}
+
+	if (CarrierB) 
+	{ 
+		RemoveTickPrerequisiteActor(CarrierB);
+		MeshComponent->IgnoreActorWhenMoving(CarrierB, false);
+	}
+
 	if (AGoHomeCharacter* CharacterA = Cast<AGoHomeCharacter>(CarrierA))
 	{
 		CharacterA->SetCoopCarryObject(nullptr);
@@ -149,6 +177,7 @@ void ACoopCarryObjectBase::ReleaseCarriers()
 
 	CarrierA = nullptr;
 	CarrierB = nullptr;
+	TimeStuck = 0.f; // 다음 세션에 잔여 정체시간이 안 넘어가게.
 
 	MeshComponent->SetSimulatePhysics(true); // 아무도 안잡고 있으면 물리 켜서 가라앉음.
 

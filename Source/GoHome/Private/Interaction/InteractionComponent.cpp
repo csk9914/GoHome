@@ -161,10 +161,10 @@ void UInteractionComponent::TryInteract()
 	{
 		if (Character->IsCoopCarrying())
 		{
-			// 운반 중엔 납품 지점을 보고 있을 때만 반응(정산). 그 외엔 아무 것도 안 함(다른 상호작용 차단).
-			if (Cast<ADeliveryPoint>(CurrentTarget))
+			if (ADeliveryPoint* DP = Cast<ADeliveryPoint>(CurrentTarget))
 			{
-				Server_RequestDeliverCarry();
+				Server_RequestDeliverCarry(DP);
+
 			}
 			return;
 		}
@@ -186,9 +186,13 @@ void UInteractionComponent::Server_RequestInteract_Implementation(AActor* Target
 	if (!Interactable) return;
 
 	APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	if (!OwnerPawn) return;
+	if (!OwnerPawn || !Target) return;
 
-	// 서버에서 다시 검증 -> 클라이언트가 보낸 요청을 그대로 신뢰하지 않는다.
+	// 서버에서 거리 재검증 -> 클라이언트가 임의 액터나 멀리 있는 대상을 지정해도 막힘.
+	const float DistSq = Target->GetComponentsBoundingBox().ComputeSquaredDistanceToPoint(OwnerPawn->GetActorLocation());
+	if (DistSq > FMath::Square(MaxInteractDistance)) return;
+
+	// 서버에서 다시 검증 -> 클라이언트가 보낸 요청을 그대로 신뢰하지 않음.
 	if (Interactable->CanInteract(OwnerPawn))
 	{
 		Interactable->OnInteract(OwnerPawn);
@@ -196,16 +200,21 @@ void UInteractionComponent::Server_RequestInteract_Implementation(AActor* Target
 
 }
 
-void UInteractionComponent::Server_RequestDeliverCarry_Implementation()
+void UInteractionComponent::Server_RequestDeliverCarry_Implementation(ADeliveryPoint* DeliveryPoint)
 {
 	APawn* OwnerPawn = Cast<APawn>(GetOwner());
-	if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(OwnerPawn))
-	{
-		if (ACoopCarryObjectBase* CarryObject = Character->GetCurrentCarryObject())
-		{
-			CarryObject->ServerDeliver();
-		}
-	}
+	AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(OwnerPawn);
+
+	if (!Character || !DeliveryPoint) return;
+
+	ACoopCarryObjectBase* CarryObject = Character->GetCurrentCarryObject();
+	if (!CarryObject) return;
+
+	// 서버에서 거리 재검증 -> 실제로 납품 지점 근처에 있는지 확인.
+	const float DistSq = DeliveryPoint->GetComponentsBoundingBox().ComputeSquaredDistanceToPoint(OwnerPawn->GetActorLocation());
+	if (DistSq > FMath::Square(MaxInteractDistance)) return;
+
+	CarryObject->ServerDeliver();
 }
 
 FText UInteractionComponent::GetInteractionPromptTextFor(AActor* Target)

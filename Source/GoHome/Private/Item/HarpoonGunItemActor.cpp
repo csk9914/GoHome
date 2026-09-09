@@ -19,11 +19,6 @@ void AHarpoonGunItemActor::ServerUseSpecialAction()
 	// 이미 정확히 리플리케이트되는 CurrentPitch + ActorRotation Yaw 조합으로 조준 방향 계산.
 	const FRotator AimRotation(Character->CurrentPitch, Character->GetActorRotation().Yaw, 0.f);
 
-	UE_LOG(LogTemp, Warning, TEXT("MuzzleSocketName=%s, HasMesh=%s, SocketExists=%s"),
-		*MuzzleSocketName.ToString(),
-		MeshComponent->GetStaticMesh() ? *MeshComponent->GetStaticMesh()->GetName() : TEXT("NONE"),
-		MeshComponent->DoesSocketExist(MuzzleSocketName) ? TEXT("true") : TEXT("false"));
-
 	FVector Start;
 	if (MuzzleSocketName != NAME_None && MeshComponent->DoesSocketExist(MuzzleSocketName))
 	{
@@ -56,7 +51,7 @@ void AHarpoonGunItemActor::ServerUseSpecialAction()
 	if (!Target || !Target->CanInteract(HoldingPawn))
 	{
 		FireEventStart = Start;
-		FireEventEnd = End; // 헛스윙 - 사거리 끝까지 날아가는 연출.
+		FireEventEnd = bHit ? Hit.Location : End; // 벽/바닥에 막히면 그 지점까지만, 아무것도 없으면 사거리 끝까지.
 		++FireEventId;
 		PlayFireCosmetic(); // 서버 자신은 RepNotify가 안 뜨므로 수동 호출.
 		return;
@@ -153,6 +148,18 @@ void AHarpoonGunItemActor::AbortRetrieve()
 	RetrievingTarget = nullptr;
 	bReturnStartCaptured = false;
 	SetActorTickEnabled(false);
+}
+
+void AHarpoonGunItemActor::ServerDrop()
+{
+	// HoldingPawn이 nullptr 되기 전에 먼저 회수 중단 처리.
+	// -> AbortRetrieve가 진짜 폰 참조로 IgnoreActorWhenMoving를 정확히 해제할 수 있게 함.
+	if (RetrievingTarget)
+	{
+		AbortRetrieve();
+	}
+
+	Super::ServerDrop();
 }
 
 void AHarpoonGunItemActor::OnRep_FireEventId()
