@@ -89,8 +89,4 @@ void AHarpoonCosmeticActor::Tick(float DeltaTime)
 	}
 
 	// Cable->EndLocation / CableLength 수동 계산 삭제 -> SetAttachEndTo가 매 프레임 자동 갱신.
-
-	DrawDebugSphere(GetWorld(), RawMuzzleLocation, 15.f, 12, FColor::Red, false, 0.f);
-	DrawDebugSphere(GetWorld(), GetActorLocation(), 15.f, 12, FColor::Green, false, 0.f);
-
 }
