@@ -66,7 +66,7 @@ public:
 
 	// 서버 권위 : 부착 해제 + 물리/콜리전 복원 + 인벤토리에서 제거.
 	// InventoryComponent::Server_RequestDrop이 소유권 검증 후 호출한다. 서버에서만 호출할 것.
-	void ServerDrop();
+	virtual void ServerDrop();
 
 	// 보유 중 특수 동작( 예 : 손전등 온/오프).
 	// 기본은 아무 것도 안함 -> 필요한 아이템만 오버라이드.

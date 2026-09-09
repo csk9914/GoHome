@@ -39,6 +39,12 @@ void AUsableItemBase::DespawnIfDepleted()
 	{
 		Destroy();
 	}
+	else
+	{
+		// 좌클릭 사용 후 1.2 초 내에 드랍하여 바닥에 닿은 경우 영구히 깜빡이는 버그 방지.
+		// 거의 발생할 일은 없는 버그였음.
+		OnDespawnCanceled();
+	}
 }
 
 void AUsableItemBase::CancelDespawnTimer()

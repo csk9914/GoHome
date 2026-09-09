@@ -41,6 +41,13 @@ void AHarpoonCosmeticActor::Play(const FVector& InStart, const FVector& InEnd,
 	MuzzleSocket = InMuzzleSocket;
 	SetActorLocation(Start);
 	SetActorRotation((End - Start).Rotation());
+
+	// EndLocation 직접 계산 방식은 좌표계 해석이 계속 어긋나서 신뢰 불가 -> 엔진 내장 기능으로 대체.
+	// Cable의 자유단을 총 메쉬의 소켓에 직접 붙여서, 엔진이 알아서 매 프레임 그 위치를 추적하게 함.
+	if (InMuzzleMesh)
+	{
+		Cable->SetAttachEndTo(InMuzzleMesh->GetOwner(), InMuzzleMesh->GetFName(), InMuzzleSocket);
+	}
 }
 
 void AHarpoonCosmeticActor::Tick(float DeltaTime)
@@ -48,32 +55,38 @@ void AHarpoonCosmeticActor::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 	Elapsed += DeltaTime;
 
-	// 총구의 "현재" 위치를 매 틱 다시 읽음 - 발사 후 플레이어가 시점을 바꿔도 따라가야 하므로.
-	FVector CurrentMuzzleLocation = Start;
+	FVector RawMuzzleLocation = Start;
 	if (MuzzleMesh.IsValid() && MuzzleSocket != NAME_None && MuzzleMesh->DoesSocketExist(MuzzleSocket))
 	{
-		CurrentMuzzleLocation = MuzzleMesh->GetSocketLocation(MuzzleSocket);
+		RawMuzzleLocation = MuzzleMesh->GetSocketLocation(MuzzleSocket);
+	}
+
+	if (!bMuzzleLocationInitialized)
+	{
+		SmoothedMuzzleLocation = RawMuzzleLocation;
+		bMuzzleLocationInitialized = true;
+	}
+
+	else
+	{
+		SmoothedMuzzleLocation = FMath::VInterpTo(SmoothedMuzzleLocation, RawMuzzleLocation, DeltaTime, 15.f);
 	}
 
 	if (Elapsed < OutboundDuration)
 	{
 		SetActorLocation(FMath::Lerp(Start, End, Elapsed / OutboundDuration));
 	}
+
 	else if (Elapsed < OutboundDuration + ReturnDuration)
 	{
 		const float ReturnAlpha = (Elapsed - OutboundDuration) / ReturnDuration;
-		// 복귀 목적지도 발사 시점 스냅샷이 아니라 "현재" 총구 위치로 -> 실제로 손에 든 총 자리로 돌아와서 붙음.
-		SetActorLocation(FMath::Lerp(End, CurrentMuzzleLocation, ReturnAlpha));
+		SetActorLocation(FMath::Lerp(End, SmoothedMuzzleLocation, ReturnAlpha));
 	}
+	
 	else
 	{
 		Destroy();
 	}
 
-	const float DistanceToStart = FVector::Dist(Cable->GetComponentLocation(), CurrentMuzzleLocation);
-	Cable->CableLength = DistanceToStart;
-	Cable->EndLocation = CurrentMuzzleLocation - Cable->GetComponentLocation();
-
-	DrawDebugSphere(GetWorld(), CurrentMuzzleLocation, 15.f, 12, FColor::Red, false, 0.f);
-	DrawDebugSphere(GetWorld(), GetActorLocation(), 15.f, 12, FColor::Green, false, 0.f);
+	// Cable->EndLocation / CableLength 수동 계산 삭제 -> SetAttachEndTo가 매 프레임 자동 갱신.
 }
