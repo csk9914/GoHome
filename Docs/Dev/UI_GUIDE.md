@@ -58,21 +58,34 @@
 
 ## 라우터 패턴 (정산 화면)
 
-`WBP_Settlement`는 화면이 아니라 라우터. `OnSettlementReady(FSettlementResult Result)`:
+`WBP_Settlement`는 화면이 아니라 **스텝 러너**. `OnSettlementReady(FSettlementResult Result)`를 받으면 상황에 맞는 **스텝 리스트**를 데이터에서 뽑아 순서대로 실행한다.
+
+**스텝 = 영상 클립 | 페이지 | 전환연출.** `bForfeited` + `Outcome` → 스텝 리스트 매핑은 데이터 주도(DataAsset) — 라우터에 하드코딩 `switch`를 두지 않는다. 새 연출 시퀀스 추가 = 데이터 행 추가, 라우터·페이지 코드 불변.
 
 ```
-if Result.bForfeited:
-    → 임무 실패 페이지 (정산표 없음)
-    if Result.Outcome ∈ {GameOver_Strike, GameOver_CheckPoint, Ending}:
-        임무 실패 페이지 hold 끝 → 같은 게임오버/엔딩 페이지로 자동 전환
-else switch Result.Outcome:
-    Normal / CheckPointPassed             → 정산표 페이지
-    GameOver_Strike / GameOver_CheckPoint → 게임오버 페이지
-    Ending                                → 엔딩 페이지
-켜는 페이지마다 Setup(Result) → 라우터 Visible → 페이지 인트로 연출 → (연출 끝난 뒤) 자동복귀 카운트다운
+ShowSettlement(Result):
+    Steps = PresentationConfig.Resolve(Result)      // bForfeited + Outcome 판정
+    for each step:
+        Clip → 풀스크린 미디어 레이어 재생 → (EndReached | Skip) → 다음
+        Page → Create Widget → SetContent → page.Setup(Result) → page.PlayIntro()
+               → page.OnIntroComplete → 다음
+    마지막 스텝 후 → OnPresentationComplete 발행 → 자동복귀 창 시작
 ```
 
-`FSettlementResult` 하나가 `bForfeited`와 `Outcome`을 둘 다 싣고 `DetermineOutcome`은 forfeit와 무관하게 돈다(`GoHomeSaveSubsystem.cpp`) → forfeit→게임오버 연쇄에 추가 이벤트 불필요, 게임오버 페이지는 정상복귀·forfeit 경로 공용. forfeit인데 `Outcome`이 terminal 아니면 임무 실패 페이지만 뜨고 로비로.
+현재 스텝 리스트 (전부 길이 1~2, 확장 여지):
+
+| 상황 | 스텝 |
+|---|---|
+| `Normal` / `CheckPointPassed` | `[정산표]` |
+| `GameOver_Strike` / `GameOver_CheckPoint` | `[게임오버]` |
+| `Ending` | `[엔딩]` |
+| `bForfeited` (`Outcome` 무시하고 선점) | `[임무 실패]`, `Outcome`이 terminal이면 `+ [게임오버/엔딩]` |
+
+> 확장 예: `GameOver_Strike` → `[정산표, 영상, 게임오버]`(미달·3스트라이크를 정산표에서 보여준 뒤 게임오버로), `Ending` → `[영상, 엔딩]`. 데이터만 바꾸면 됨.
+
+**페이지 위젯 계약**: 각 페이지는 `Setup(FSettlementResult)` / `PlayIntro()` / `OnIntroComplete`(이벤트)만 구현하면 스텝 러너가 종류를 안 가린다. `Setup` 밖에서 게임 상태 조회 금지 — `Result`만 읽는다(`FinalizeRound`가 `ResetSave()` 전에 전부 스냅샷하므로 세이브가 리셋돼도 표시값은 살아있음).
+
+`FSettlementResult` 하나가 `bForfeited` + `Outcome` + 파생값을 모두 실어 다중 페이지 시퀀스도 추가 이벤트 없이 같은 Result로 구동. `DetermineOutcome`은 forfeit와 무관하게 돈다(`GoHomeSaveSubsystem.cpp`) → 3스트라이크·체크포인트 판정이 실패 턴에도 정상 수행되고, 게임오버 페이지는 정상복귀·forfeit 경로 공용.
 
 **체크포인트 레일 데이터**: 정산표가 상시 표시하는 진행도 레일(턴 3/6/9 관문)은 전체 스케줄이 필요하다. `FSettlementResult::CheckPointSchedule`(`TArray<FCheckPoint>`)이 정산 시점에 `UEconomyConfigDataAsset::CheckPoints`를 스냅샷 복사해 싣는다 — 레일은 이 배열 + `ExpeditionProgress`(`CurrentRound`/`FinalRound`/`CurrentFunds`)만으로 그린다.
 
@@ -84,12 +97,18 @@ else switch Result.Outcome:
 
 **클라 바인딩 타이밍**: 클라는 `OnSettlementReady`(→ `OnRep_SettlementResult`) 전에 바인딩이 살아있어야 한다. PlayerController BeginPlay에 `AExplorationGameState`가 null일 수 있어 유효화 대기 가드 필요. state 델리게이트가 아니라 `OnSettlementReady`에 바인딩 — CurrentState/SettlementResult OnRep 순서 미보장(ARCHITECTURE.md Save 절 "정산 결과 복제").
 
-**자동복귀 카운트다운**: `AExplorationGameMode::AutoReturnDelay`(현재 8초)는 서버 전용·복제 안 됨. `GetRemainingSeconds()` / `ExpeditionDeadline`은 탐사 제한시간 전용이라 재사용 불가 → 위젯이 클라 로컬 타이머로 카운트다운(트래블은 서버 권한, 드리프트 무해). `AutoReturnDelay` 값만 BP 노출.
+**자동복귀 — 2단계 타임라인**: 정산 타임라인은 **연출(가변, 클라 소유) + 복귀 창(고정)** 으로 나뉜다. 서버가 "연출이 얼마나 걸리는지" 모른 채 복귀 시각을 정하면 영상·다중 페이지가 붙는 순간 깨지므로, 연출 길이 결정권은 그걸 아는 스텝 러너에 두고 서버엔 복귀 창 + 안전망만 남긴다.
 
-- **페이지 연출이 전부 끝난 뒤 시작** (`OnSettlementReady` 수신 즉시가 아님) — 연출 중엔 바 꽉 참 + 숫자 라벨 고정. 카운트다운 시작 = "이제 읽고 나갈 시간".
-- **스킵 없음** — 입력 경로 없음. 타이머 만료 = 유일한 복귀 트리거.
-- **모든 Outcome은 로비로 복귀** — `ReturnToLobby` → `ServerTravelViaLoadingScreen(로비맵)` 공통. 게임오버/엔딩은 `FinalizeRound`가 `ResetSave()`한 상태로 도착 → 로비가 새 런 허브. "타이틀로" 버튼 없음.
-- **forfeit 2페이지는 `AutoReturnDelay` 안에 들어가야** 함 — 두 hold 합이 넘으면 트래블이 두 번째 페이지를 자른다. hold를 튜너블로 두고 필요 시 `AutoReturnDelay` 상향.
+- **Phase 1 연출** — 스텝 러너 소유. 길이는 클립·페이지 수에 따라 가변. 서버는 이 동안 복귀 타이머를 걸지 않고 **안전 타임아웃**(넉넉히)만 유지.
+- **Phase 2 복귀 창** — `OnPresentationComplete` 시점부터 `AutoReturnDelay` 만큼. "이제 읽고 나갈 시간". 만료 시 서버 트래블(`ReturnToLobby` → `ServerTravelViaLoadingScreen(로비맵)`).
+- 리턴 바는 **`OnPresentationComplete`에서 시작**(위젯 Construct도, `OnSettlementReady` 수신 즉시도 아님) — 연출 중엔 바 꽉 참 + 라벨 고정. 시작 타이밍·지속시간을 한 곳에서 받아, 나중에 그 소스를 복제 deadline으로 바꿔도 바 로직 불변.
+
+**현재 구현 (단순화, 테스트용)** — 스텝 리스트 전부 길이 1~2. 서버 `AExplorationGameMode::AutoReturnDelay`(8초) 고정 타이머 그대로(`SetSettlementResult` 시점 시작, 복제 안 됨, `GetRemainingSeconds()`/`ExpeditionDeadline`은 탐사 제한시간 전용이라 재사용 불가 → 클라 바는 로컬 타이머 미러, 드리프트 무해). forfeit 2페이지 등 hold 합이 8초를 넘으면 잘림 → `AutoReturnDelay` 상향으로 임시 대응.
+
+**Phase 2 착수 = 영상 클립 실제 도입 직전.** C++ 세부(`Server_SettlementReady` RPC / `ReturnDeadline` 복제 / `AutoReturnTimer` 교체)는 [ARCHITECTURE.md](ARCHITECTURE.md#ui) "정산 자동복귀 — 2단계 타임라인" 절.
+
+- **스킵**: 현재 없음(입력 경로 없음, 타이머 만료가 유일한 복귀 트리거). 긴 영상이 붙으면 "영상만 스킵 → 다음 스텝"(로비 스킵 아님)을 스텝의 `bSkippable` 플래그로 허용 검토.
+- **모든 Outcome은 로비로 복귀** — 게임오버/엔딩은 `FinalizeRound`가 `ResetSave()`한 상태로 도착 → 로비가 새 런 허브. "타이틀로" 버튼 없음.
 
 ## 연출 규칙
 
