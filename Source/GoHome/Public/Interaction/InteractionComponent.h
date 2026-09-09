@@ -8,6 +8,7 @@
 #include "InteractionComponent.generated.h"
 
 class UCameraComponent;
+class ADeliveryPoint;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInteractableTargetChanged, AActor*, NewTarget);
 
@@ -33,10 +34,16 @@ public:
 	void Server_RequestInteract(AActor* Target);
 
 	UFUNCTION(Server, Reliable)
-	void Server_RequestDeliverCarry();
+	void Server_RequestDeliverCarry(ADeliveryPoint* DeliveryPoint);
 
 	UPROPERTY(EditAnywhere, Category = "Interaction")
 	float TraceDistance = 200.f;
+
+	// 서버 측 거리 재검증용 최대 상호작용 거리.
+	// TraceDistance보다 살짝 여유를 둠.
+	// (카메라-폰 위치 오프셋 + 핑으로 인한 위치 오차 보정).
+	UPROPERTY(EditAnywhere, Category = "Interaction")
+	float MaxInteractDistance = 300.f;
 
 	UPROPERTY(EditAnywhere, Category = "Interaction")
 	float TraceInterval = 0.1f;
@@ -61,6 +68,10 @@ public:
 	// 블루프린트에서 인터페이스 "메시지" 노드를 직접 찾기 애매할 때 쓰라고 만든 함수.
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	static FText GetInteractionPromptTextFor(AActor* Target);
+
+
+
+
 
 
 protected:

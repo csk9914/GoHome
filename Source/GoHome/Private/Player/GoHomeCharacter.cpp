@@ -48,6 +48,14 @@ AGoHomeCharacter::AGoHomeCharacter()
 
 void AGoHomeCharacter::BeginPlay()
 {
+	// UHealthComponent::BeginPlay()가 Super::BeginPlay() 안에서 곧바로 초기 HP 브로드캐스트를 쏘기 때문에,
+	// 구독을 그 전에 먼저 걸어야 첫 브로드캐스트를 놓치지 않는다(안 그러면 LastKnownHP가 -1로 남아
+	// 첫 데미지를 초기화 호출로 오인해서 그때만 강제 운반 해제가 안 걸림).
+	if (UHealthComponent* Health = FindComponentByClass<UHealthComponent>())
+	{
+		Health->OnHPChanged.AddDynamic(this, &AGoHomeCharacter::HandleHPChanged);
+	}
+
 	Super::BeginPlay();
 
 	FirstPersonArmsMesh->SetLeaderPoseComponent(GetMesh());
@@ -61,24 +69,19 @@ void AGoHomeCharacter::BeginPlay()
 
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
-		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem< UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
 		{
 			if (DefaultMappingContext)
 			{
 				Subsystem->AddMappingContext(DefaultMappingContext, 0);
 			}
 		}
-		
+
 		if (PC->IsLocalController())
 		{
 			PC->SetInputMode(FInputModeGameOnly());
 			PC->bShowMouseCursor = false;
 		}
-	}
-
-	if (UHealthComponent* Health = FindComponentByClass<UHealthComponent>())
-	{
-		Health->OnHPChanged.AddDynamic(this, &AGoHomeCharacter::HandleHPChanged);
 	}
 
 	if (IDeathNotifier* DeathNotifier = FindComponentByInterface<IDeathNotifier>())

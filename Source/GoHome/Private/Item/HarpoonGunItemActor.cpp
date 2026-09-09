@@ -150,6 +150,18 @@ void AHarpoonGunItemActor::AbortRetrieve()
 	SetActorTickEnabled(false);
 }
 
+void AHarpoonGunItemActor::ServerDrop()
+{
+	// HoldingPawn이 nullptr 되기 전에 먼저 회수 중단 처리.
+	// -> AbortRetrieve가 진짜 폰 참조로 IgnoreActorWhenMoving를 정확히 해제할 수 있게 함.
+	if (RetrievingTarget)
+	{
+		AbortRetrieve();
+	}
+
+	Super::ServerDrop();
+}
+
 void AHarpoonGunItemActor::OnRep_FireEventId()
 {
 	PlayFireCosmetic();

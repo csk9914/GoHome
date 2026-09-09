@@ -30,6 +30,7 @@ public:
 protected:
 
 	virtual void Tick(float DeltaTime) override;
+	virtual void ServerDrop() override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	UPROPERTY(EditAnywhere, Category = "Harpoon")
