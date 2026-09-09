@@ -51,4 +51,7 @@ private:
 	TWeakObjectPtr<UStaticMeshComponent> MuzzleMesh;
 	FName MuzzleSocket = NAME_None;
 	
+	FVector SmoothedMuzzleLocation = FVector::ZeroVector;
+	bool bMuzzleLocationInitialized = false;
+
 };
