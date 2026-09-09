@@ -103,6 +103,11 @@ void AGoHomeCharacter::Tick(float DeltaTime)
 	// 블랜더로 메시를 자체 수정함에 따라 해당 코드 불필요, 주석처리
 	if (IsLocallyControlled())
 	{
+		if (CurrentCarryObject)
+		{
+			// 서버가 평균 낸 합산 입력을 "내 로컬 폰"에 직접 적용 -> 표준 예측/ServerMove 흐름 그대로.
+			AddMovementInput(CombinedCarryInput);
+		}
 		//GetMesh()->HideBoneByName(TEXT("Head"), EPhysBodyOp::PBO_None);
 
 		//const float Pitch = FRotator::NormalizeAxis(GetControlRotation().Pitch);
@@ -186,14 +191,11 @@ void AGoHomeCharacter::Move(const FInputActionValue& Value)
 
 	const FVector ForwardDirection = FRotationMatrix(FullRotation).GetUnitAxis(EAxis::X);
 	const FVector RightDirection = FRotationMatrix(FullRotation).GetUnitAxis(EAxis::Y);
-
-	AddMovementInput(ForwardDirection, MovementVector.Y);
-	AddMovementInput(RightDirection, MovementVector.X);
-
+	const FVector WorldIntent = ForwardDirection * MovementVector.Y + RightDirection * MovementVector.X;
+	
 	if (CurrentCarryObject)
 	{
 		// 협동 운반 중이면 서버가 두 캐리어 입력을 평균 낼 수 있게 월드 스페이스 이동 의도를 알려줌.
-		const FVector WorldIntent = ForwardDirection * MovementVector.Y + RightDirection * MovementVector.X;
 		if (HasAuthority())
 		{
 			// 호스트 자기 자신이면 굳이 RPC 안 거치고 바로 반영.
@@ -203,7 +205,11 @@ void AGoHomeCharacter::Move(const FInputActionValue& Value)
 		{
 			Server_UpdateCarryInput(WorldIntent);
 		}
+		return;
 	}
+
+	AddMovementInput(ForwardDirection, MovementVector.Y);
+	AddMovementInput(RightDirection, MovementVector.X);	
 }
 
 void AGoHomeCharacter::StopCarryInput()
@@ -355,6 +361,8 @@ void AGoHomeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AGoHomeCharacter, bIsHoldingItem);
 	DOREPLIFETIME_CONDITION(AGoHomeCharacter, ReplicatedPitch, COND_SkipOwner);
 	DOREPLIFETIME(AGoHomeCharacter, bIsHoldingFlashlight);
+	DOREPLIFETIME(AGoHomeCharacter, CurrentCarryObject);
+	DOREPLIFETIME_CONDITION(AGoHomeCharacter, CombinedCarryInput, COND_OwnerOnly);
 }
 
 void AGoHomeCharacter::OnRep_ReplicatedPitch()
@@ -375,11 +383,11 @@ void AGoHomeCharacter::Server_UpdateCarryInput_Implementation(FVector WorldInten
 void AGoHomeCharacter::SetCoopCarryObject(ACoopCarryObjectBase* NewCarryObject)
 {
 	CurrentCarryObject = NewCarryObject;
-	if (!NewCarryObject)
-	{
-		// 놓는 순간 묵은 입력값도 같이 리셋 -> 다음에 다시 잡을 때 재생되는 것 방지.
-		LastCarryInputWorld = FVector::ZeroVector;
-	}
+	
+	// 놓을 때든 새로 잡을 때든 잔여 입력값 리셋 -> 이전 세션 값이 새 세션에 넘어가지 않게.
+	LastCarryInputWorld = FVector::ZeroVector;
+	CombinedCarryInput = FVector::ZeroVector;
+	
 	OnRep_CurrentCarryObject(); // 서버 자신에게는 RepNotify가 안 뜨므로 직접 호출 -> 호스트 로컬도 즉시 반영.
 }
 
@@ -426,3 +434,7 @@ void AGoHomeCharacter::HandleForcedCarryRelease()
 }
 
 
+void AGoHomeCharacter::SetCombinedCarryInput(const FVector& NewInput)
+{
+	CombinedCarryInput = NewInput; 
+}

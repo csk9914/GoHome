@@ -124,6 +124,8 @@ public:
 	// ACoopCarryObjectBase가 잡기/놓기 시 호출(서버 권위).
 	void SetCoopCarryObject(ACoopCarryObjectBase* NewCarryObject);
 
+	// 서버 전용 : ACoopCarryObjectBase가 매 틱 평균 낸 이동 벡터를 세팅.
+	void SetCombinedCarryInput(const FVector& NewInput);
 
 	// 협동 운반 중 서버가 두 캐리어 입력을 평균 낼 때 사용할, 이 캐릭터의 최신 월드 스페이스 이동 의도.
 	FVector GetLastCarryInputWorld() const { return LastCarryInputWorld; }
@@ -156,6 +158,11 @@ protected:
 	// ---------------------------------------------------
 	UPROPERTY(ReplicatedUsing = OnRep_CurrentCarryObject, BlueprintReadOnly, Category = "Interaction")
 	TObjectPtr<ACoopCarryObjectBase> CurrentCarryObject;
+
+	// 협동 운반 중 서버가 계산한 "이미 CarrySpeedScale까지 반영된" 합산 이동 벡터.
+	// 각 캐릭터가 이 값을 자기 자신에게 로컬로 AddMovementInput 하는 방식 -> ServerMove 충돌 회피.
+	UPROPERTY(Replicated)
+	FVector CombinedCarryInput = FVector::ZeroVector;
 
 	UFUNCTION()
 	void OnRep_CurrentCarryObject();
