@@ -8,9 +8,20 @@ public class GoHome : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "Niagara", "CableComponent" });
+        PublicDependencyModuleNames.AddRange(new string[] 
+		{
+			"Core",
+			"CoreUObject",
+			"Engine",
+			"InputCore",
+			"EnhancedInput",
+			"Niagara",
+			"CableComponent",
+			"GeometryCollectionEngine",
+			"NavigationSystem"
+		});
 
-		PrivateDependencyModuleNames.AddRange(new string[]
+        PrivateDependencyModuleNames.AddRange(new string[]
 		{
 			"OnlineSubsystem", 
 			"OnlineSubsystemUtils",
