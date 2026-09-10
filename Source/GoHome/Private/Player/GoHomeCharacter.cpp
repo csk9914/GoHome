@@ -323,7 +323,8 @@ void AGoHomeCharacter::AttachItemToRightHand(UStaticMeshComponent* ItemMeshCompo
 		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
 		RightHandSocketName);
 
-	bIsHoldingItem = true;
+	// bIsHoldingItem = true; 는
+	// UInventoryComponent(SetActiveSlot/RemoveItem)가 단일 소스로 관리함 -> 여기선 안건드림.
 }
 
 void AGoHomeCharacter::AttachFlashlightToChest(UStaticMeshComponent* FlashlightMeshComponent)
@@ -359,7 +360,7 @@ void AGoHomeCharacter::SetHoldingItem(bool bHolding)
 
 void AGoHomeCharacter::DetachItemFromRightHand()
 {
-	bIsHoldingItem = false;
+	// bIsHoldingItem은 UInventoryComponent(SetActiveSlot/RemoveItem)가 단일 소스로 관리함 - 여기선 안 건드림.
 	// 실제 Detach(월드에 다시 떨어뜨리는 것)는 ItemActorBase 쪽에서
 	// 자기 자신을 Detach + 위치 지정하는 게 자연스러움 (소유권 문제라).
 }

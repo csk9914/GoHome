@@ -94,6 +94,18 @@ void ACoopCarryObjectBase::Tick(float DeltaTime)
 	}
 }
 
+void ACoopCarryObjectBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	// ServerDeliver()처럼 이미 정상적으로 놓아준 경우(CarrierA/B가 이미 nullptr)엔 중복 호출 안 됨.
+	// 레벨 스트리밍 언로드/추락 등 예외적인 파괴 경로로도 캐리어 상태가 영구히 안 풀리는 것 방지.
+	if (HasAuthority() && (CarrierA || CarrierB))
+	{
+		ReleaseCarriers();
+	}
+
+	Super::EndPlay(EndPlayReason);
+}
+
 bool ACoopCarryObjectBase::CanInteract(APawn* InstigatorPawn) const
 {
 	if (!InstigatorPawn) return false;
