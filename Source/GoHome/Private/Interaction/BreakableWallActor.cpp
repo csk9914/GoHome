@@ -96,6 +96,8 @@ void ABreakableWallActor::ApplyBrokenState(bool bPlayEffects)
 		{
 			if (UGeometryCollectionComponent* GCC = Shatter->GetGeometryCollectionComponent())
 			{
+
+				GCC->CrumbleActiveClusters(); // 모든 클러스터 연결 해제 -> 벽 전체가 조각남.
 				GCC->AddRadialImpulse(GetActorLocation(), 500.f, ShatterImpulseStrength, RIF_Linear, true);
 			}
 			Shatter->SetLifeSpan(ShatterLifespan);
