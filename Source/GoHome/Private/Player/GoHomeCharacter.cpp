@@ -237,6 +237,9 @@ void AGoHomeCharacter::MoveUpDown(const FInputActionValue& Value)
 
 void AGoHomeCharacter::StartSprint()
 {
+	// 협동 운반 중엔 스프린트 불가 -> 캐리어 간 속도 차이로 이탈되는 것 방지.
+	if (CurrentCarryObject) return;
+
 	ApplySprintState(true);
 
 	if (!HasAuthority())
@@ -257,6 +260,9 @@ void AGoHomeCharacter::StopSprint()
 
 void AGoHomeCharacter::ServerSetSprinting_Implementation(bool bNewSprinting)
 {
+	// 협동 운반 중엔 서버도 스프린트 요청 무시.
+	if (bNewSprinting && CurrentCarryObject) return;
+
 	ApplySprintState(bNewSprinting);
 }
 
@@ -278,6 +284,11 @@ void AGoHomeCharacter::ApplySprintState(bool bNewSprinting)
 	{
 		CachedOxygenComponent->SetSprintDrainMultiplier(bIsSprinting ? SprintOxygenDrainMultiplier : 1.f);
 	}
+}
+
+void AGoHomeCharacter::Client_ForceStopSprint_Implementation()
+{
+	ApplySprintState(false);
 }
 
 void AGoHomeCharacter::Look(const FInputActionValue& Value)
@@ -387,9 +398,23 @@ void AGoHomeCharacter::SetCoopCarryObject(ACoopCarryObjectBase* NewCarryObject)
 {
 	CurrentCarryObject = NewCarryObject;
 	
-	// 놓을 때든 새로 잡을 때든 잔여 입력값 리셋 -> 이전 세션 값이 새 세션에 넘어가지 않게.
-	LastCarryInputWorld = FVector::ZeroVector;
-	CombinedCarryInput = FVector::ZeroVector;
+	if (!NewCarryObject)
+	{
+		// 놓을 때든 새로 잡을 때든 잔여 입력값 리셋 -> 이전 세션 값이 새 세션에 넘어가지 않게.
+		LastCarryInputWorld = FVector::ZeroVector;
+		CombinedCarryInput = FVector::ZeroVector;
+	}
+
+	else
+	{
+		// 운반 시작 지점에 스프린트 중이었을 수 있으니 강제로 끔.
+		// 서버 + 원격 클라 둘다.
+		ApplySprintState(false);
+		if (!IsLocallyControlled())
+		{
+			Client_ForceStopSprint();
+		}
+	}
 	
 	OnRep_CurrentCarryObject(); // 서버 자신에게는 RepNotify가 안 뜨므로 직접 호출 -> 호스트 로컬도 즉시 반영.
 }
@@ -408,6 +433,9 @@ void AGoHomeCharacter::OnRep_CurrentCarryObject()
 		FirstPersonArmsMesh->SetVisibility(!bIsCarrying);
 	}
 }
+
+
+
 
 void AGoHomeCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {

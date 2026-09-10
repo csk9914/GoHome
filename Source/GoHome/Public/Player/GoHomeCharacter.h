@@ -42,6 +42,11 @@ protected:
 	void ServerSetSprinting(bool bNewSprinting);
 	void ApplySprintState(bool bNewSprinting);
 
+	// 협동 운반 시작 시 원격 클라이언트에게 스프린트를 강제로 끄라고 알림.
+    // 서버 상태만 바꿔선 클라 로컬 예측이 안 따라옴.
+	UFUNCTION(Client, Reliable)
+	void Client_ForceStopSprint();
+
 	void Look(const FInputActionValue& Value);
 	void StartTalking();
 	void StopTalking();
