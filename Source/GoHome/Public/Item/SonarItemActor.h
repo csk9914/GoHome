@@ -7,6 +7,7 @@
 #include "SonarItemActor.generated.h"
 
 class ASonarPingMarkerActor;
+class USoundBase;
 
 UCLASS()
 class GOHOME_API ASonarItemActor : public AUsableItemBase
@@ -48,6 +49,10 @@ protected:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
+	// 탐지 실패 시 재생. 소음은 이미 지불했는데 소득이 없는 상황을 플레이어가 "고장"이 아니라 "없음"으로 읽게 하기 위한 피드백
+	UPROPERTY(EditDefaultsOnly, Category = "Sonar")
+	TObjectPtr<USoundBase> FailSound;
+
 private:
 
 	// 탐지 조건에 맞는 것 중 가장 가까운 하나를 고름(서버 전용)
@@ -75,4 +80,7 @@ private:
 
 	// 로컬 연출. 서버와 각 클라이언트가 각자 실행
 	void PlayPingCosmetic();
+
+	// 이 화면의 주인이 소나를 들고 있는(=발사한) 사람인지
+	bool IsLocallyHeld() const;
 };

@@ -8,6 +8,7 @@
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
+#include "Kismet/GameplayStatics.h"
 
 ASonarItemActor::ASonarItemActor()
 {
@@ -127,7 +128,10 @@ void ASonarItemActor::PlayPingCosmetic()
 {
 	if (!bPingFound)
 	{
-		// 탐지 실패 - 나중에 실패 사운드 부착 자리
+		if (FailSound && IsLocallyHeld())
+		{
+			UGameplayStatics::PlaySound2D(this, FailSound);
+		}
 		return;
 	}
 
@@ -141,4 +145,12 @@ void ASonarItemActor::PlayPingCosmetic()
 	{
 		Marker->InitMarker(MarkerLifetime);
 	}
+}
+
+bool ASonarItemActor::IsLocallyHeld() const
+{
+	const APlayerController* LocalPC = GetWorld()->GetFirstPlayerController();
+	if (!LocalPC) return false;
+
+	return LocalPC->GetPawn() == HoldingPawn;
 }
