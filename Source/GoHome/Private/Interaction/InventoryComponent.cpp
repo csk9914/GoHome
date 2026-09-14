@@ -299,3 +299,18 @@ void UInventoryComponent::Server_RequestUseActiveItem_Implementation()
 		}
 	}
 }
+
+void UInventoryComponent::TryCancelUseActiveItem()
+{
+	Server_RequestCancelUseActiveItem();
+}
+
+void UInventoryComponent::Server_RequestCancelUseActiveItem_Implementation()
+{
+	// 취소는 CanUse() 검사를 하지 않는다.
+	// 채널링 중엔 CanUse()가 false라서(중복 시작 방지) 검사하면 취소가 막힌다.
+	if (AUsableItemBase* UsableItem = Cast<AUsableItemBase>(GetActiveItem()))
+	{
+		UsableItem->ServerCancelSpecialAction();
+	}
+}
