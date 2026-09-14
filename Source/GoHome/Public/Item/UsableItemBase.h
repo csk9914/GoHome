@@ -26,6 +26,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Item")
 	virtual bool CanUse() const { return true; }
 
+	// 사용(좌클릭) 중단 요청 -> 홀드형 아이템만 오버라이드.
+	// 기본은 아무것도 안함 -> 즉발형 아이템은 뗌 신호를 무시
+	virtual void ServerCancelSpecialAction() {}
+
 protected:
 
 	virtual void UpdateAttachment(APawn* OldHoldingPawn = nullptr) override;

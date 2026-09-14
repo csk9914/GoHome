@@ -108,6 +108,12 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Server_RequestUseActiveItem();
 
+	// 좌클릭 뗌: 홀드형 아이템의 진행 중인 사용을 취소. 즉발형 아이템은 무시
+	UFUNCTION(BlueprintCallable, Category = "Interaction")
+	void TryCancelUseActiveItem();
+
+	UFUNCTION(Server, Reliable)
+	void Server_RequestCancelUseActiveItem();
 
 protected:
 
