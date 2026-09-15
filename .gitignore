@@ -86,6 +86,9 @@ DerivedDataCache/*
 # 개인 작업 문서 (담당자별 스크래치 — 팀 공유 아님)
 /Docs/Dev/_personal/
 
+# 문서 검색 인덱스 캐시 (로컬 생성 아티팩트, 소스 아님)
+/Docs/index.bleve/
+
 # Local ThirdPerson test content
 /Content/LocalThirdPerson/
 
