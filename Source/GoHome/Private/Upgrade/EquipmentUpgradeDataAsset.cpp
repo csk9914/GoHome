@@ -116,3 +116,13 @@ FEquipmentUpgradePreview UEquipmentUpgradeDataAsset::BuildPreview(int32 CurrentL
 
 	return Preview;
 }
+
+FText UEquipmentUpgradeDataAsset::GetDetailBonusTextForLevel(int32 Level) const
+{
+	if (Level < 1 || Level > GetMaxLevel())
+	{
+		return FText::GetEmpty();
+	}
+
+	return LevelDefinitions[Level - 1].DetailBonusText;
+}

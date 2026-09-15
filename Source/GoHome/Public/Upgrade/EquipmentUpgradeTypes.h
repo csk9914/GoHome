@@ -21,10 +21,29 @@ enum class EEquipmentUpgradeRequestResult : uint8
 {
 	Succeeded UMETA(DisplayName = "Succeeded"),
 	UpgradeNotFound UMETA(DisplayName = "Upgrade Not Found"),
+	UpgradeLocked UMETA(DisplayName = "Upgrade Locked"),
 	AlreadyMaxLevel UMETA(DisplayName = "Already Max Level"),
 	NotEnoughCurrency UMETA(DisplayName = "Not Enough Currency"),
 	InvalidRequester UMETA(DisplayName = "Invalid Requester"),
 	NoEffectReceiver UMETA(DisplayName = "No Effect Receiver")
+};
+
+
+// 다른 강화가 특정 레벨에 도달해야 열리는 조건.
+// RequiredUpgradeId가 None이면 처음부터 해금 상태다.
+USTRUCT(BlueprintType)
+struct GOHOME_API FEquipmentUpgradeUnlockRequirement
+{
+	GENERATED_BODY()
+
+	// 선행 강화의 ID.
+	// 예: OxygenCapacity
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Equipment Upgrade")
+	FName RequiredUpgradeId = NAME_None;
+
+	// 선행 강화가 이 레벨 이상이어야 한다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Equipment Upgrade", meta = (ClampMin = "1"))
+	int32 RequiredLevel = 1;
 };
 
 
