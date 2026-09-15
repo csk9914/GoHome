@@ -88,6 +88,9 @@ AActor* ASonarItemActor::FindNearestDetectable(const FVector& Origin) const
 		// 한 번이라도 주운 아이템은 이미 발견된 것 - 근접 힌트와 동일 규칙
 		if (Item->HasBeenPickedUp()) continue;
 
+		// 장비류는 탐지 제외 - 소나는 납품 가치가 있는 아이템을 찾는 도구
+		if (!Item->IsDeliverable()) continue;
+
 		const float DistSq = FVector::DistSquared(Origin, Item->GetActorLocation());
 
 		// 근접 힌트(NearbyHintRadius) 안쪽은 이미 알려주고 있으므로 제외
