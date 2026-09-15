@@ -7,6 +7,7 @@
 #include "InputActionValue.h"
 #include "Player/SocketProvider.h"
 #include "AI/NoiseType.h"
+#include "Player/Stunnable.h"
 #include "GoHomeCharacter.generated.h"
 
 class UInputAction;
@@ -15,9 +16,10 @@ class UCameraComponent;
 class USkeletalMeshComponent;
 class UOxygenComponent;
 class ACoopCarryObjectBase;
+class AElectricSwitchboardActor;
 
 UCLASS()
-class GOHOME_API AGoHomeCharacter : public ACharacter, public ISocketProvider
+class GOHOME_API AGoHomeCharacter : public ACharacter, public ISocketProvider, public IStunnable
 {
 	GENERATED_BODY()
 
@@ -46,6 +48,21 @@ protected:
     // 서버 상태만 바꿔선 클라 로컬 예측이 안 따라옴.
 	UFUNCTION(Client, Reliable)
 	void Client_ForceStopSprint();
+
+	// 스턴을 로컬 클라에 강제 -> 서버 상태만 바꾸면 이동 입력 예측이 안 멈춤.
+	UFUNCTION(Client, Reliable)
+	void Client_ApplyStun(float Duration, FVector KnockbackImpulse);
+
+	void EndStun();
+
+	UFUNCTION()
+	void OnRep_IsStunned();
+
+	// MoveAction의 Started(눌리는 순간 1회) 이벤트 전용 - 포커스 중 커서 이동/예-아니오 토글.
+	void HandleFocusMoveStarted(const FInputActionValue& Value);
+
+	void CycleHighlightedWire(int32 Delta);
+
 
 	void Look(const FInputActionValue& Value);
 	void StartTalking();
@@ -110,6 +127,12 @@ public:
 
 	virtual void SetHoldingItem(bool bHolding) override;
 
+	// 스턴 + 넉백 적용 (IStunnable 구현). 배전반 등 환경 위해요소가 캐릭터 타입을 몰라도 호출 가능.
+	virtual void ApplyStun_Implementation(float Duration, FVector KnockbackImpulse, AActor* InInstigator) override;
+
+	UFUNCTION(BlueprintPure, Category = "Stun")
+	bool IsStunned() const { return bIsStunned; }
+
 	// 아이템을 오른손에서 떼고 애니메이션 상태를 원복
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void DetachItemFromRightHand();
@@ -135,6 +158,22 @@ public:
 	// 협동 운반 중 서버가 두 캐리어 입력을 평균 낼 때 사용할, 이 캐릭터의 최신 월드 스페이스 이동 의도.
 	FVector GetLastCarryInputWorld() const { return LastCarryInputWorld; }
 
+	UFUNCTION(BlueprintPure, Category = "Switchboard")
+	bool IsFocusingSwitchboard() const { return FocusedSwitchboard != nullptr; }
+
+	// 배전반 OnInteract(서버)에서 호출. 호스트/원격 공용 실제 처리부.
+	void EnterSwitchboardFocus(AElectricSwitchboardActor* Switchboard);
+	void ExitSwitchboardFocus();
+
+	// TryInteract가 포커스 중일 때 리다이렉트하는 진입점 (전선 선택 -> 확인 -> 확정).
+	void ConfirmFocusedSelection();
+
+	UFUNCTION(Client, Reliable)
+	void Client_EnterSwitchboardFocus(AElectricSwitchboardActor* Switchboard);
+
+	UFUNCTION(Client, Reliable)
+	void Client_ExitSwitchboardFocus();
+
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	
@@ -153,6 +192,18 @@ protected:
 	UPROPERTY(ReplicatedUsing = OnRep_IsHoldingItem, BlueprintReadOnly, Category = "Interaction")
 	bool bIsHoldingItem = false;
 	
+	UPROPERTY(ReplicatedUsing = OnRep_IsStunned, BlueprintReadOnly, Category = "Stun")
+	bool bIsStunned = false;
+
+	FTimerHandle StunTimerHandle;
+
+	UPROPERTY()
+	TObjectPtr<AElectricSwitchboardActor> FocusedSwitchboard;
+
+	int32 HighlightedWireIndex = -1;
+	bool bAwaitingConfirmation = false;
+	bool bConfirmYesHighlighted = false;
+
 	UPROPERTY(ReplicatedUsing = OnRep_IsHoldingFlashlight, BlueprintReadOnly, Category = "Interaction")
 	bool bIsHoldingFlashlight = false;
 	
@@ -183,6 +234,8 @@ protected:
     // ---------------------------------------------------
 
 
+	void UpdateWireHighlight(int32 OldIndex, int32 NewIndex);
+
 	// 수영, 소음 등급
 	UPROPERTY(EditDefaultsOnly, Category = "Noise")
 	ENoiseType SwimNoiseType = ENoiseType::Small;
@@ -199,20 +252,21 @@ protected:
 	float TimeSinceLastSwimNoise = 0.f;
 
 	// 스프린트 관련
-	private:
-		UPROPERTY(EditDefaultsOnly, Category = "Movement", meta = (ClampMin = "1.0", UIMin = "1.0"))
-		float SprintSpeedMultiplier = 1.5f;
+private:
 
-		UPROPERTY(EditDefaultsOnly, Category = "Movement", meta = (ClampMin = "1.0", UIMin = "1.0"))
-		float SprintOxygenDrainMultiplier = 1.5f;
+	UPROPERTY(EditDefaultsOnly, Category = "Movement", meta = (ClampMin = "1.0", UIMin = "1.0"))
+	float SprintSpeedMultiplier = 1.5f;
 
-		bool bIsSprinting = false;
-		float DefaultMaxSwimSpeed = 0.f;
+	UPROPERTY(EditDefaultsOnly, Category = "Movement", meta = (ClampMin = "1.0", UIMin = "1.0"))
+	float SprintOxygenDrainMultiplier = 1.5f;
 
-		UPROPERTY()
-		TObjectPtr<UOxygenComponent> CachedOxygenComponent;
+	bool bIsSprinting = false;
+	float DefaultMaxSwimSpeed = 0.f;
 
-		FVector LastCarryInputWorld = FVector::ZeroVector;
-		float LastKnownHP = -1.f; // -1 = 아직 초기화 안됨(최초 값으로는 감소 판정 안 하기 위함).
+	UPROPERTY()
+	TObjectPtr<UOxygenComponent> CachedOxygenComponent;
+
+	FVector LastCarryInputWorld = FVector::ZeroVector;
+	float LastKnownHP = -1.f; // -1 = 아직 초기화 안됨(최초 값으로는 감소 판정 안 하기 위함).
 };
 

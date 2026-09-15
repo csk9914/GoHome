@@ -12,6 +12,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Interaction/ElectricSwitchboardActor.h"
 #include "Net/UnrealNetwork.h"
 #include "Player/OxygenComponent.h"
 
@@ -178,6 +179,7 @@ void AGoHomeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(MoveAction, ETriggerEvent::Canceled, this, &ThisClass::StopCarryInput);
 		EIC->BindAction(MoveUpDownAction, ETriggerEvent::Triggered, this, &ThisClass::MoveUpDown);
 		EIC->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Look);
+		EIC->BindAction(MoveAction, ETriggerEvent::Started, this, &ThisClass::HandleFocusMoveStarted);
 		EIC->BindAction(SprintAction, ETriggerEvent::Started, this, &ThisClass::StartSprint);
 		EIC->BindAction(SprintAction, ETriggerEvent::Completed, this, &ThisClass::StopSprint);
 		EIC->BindAction(SprintAction, ETriggerEvent::Canceled, this, &ThisClass::StopSprint);
@@ -189,6 +191,9 @@ void AGoHomeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
 void AGoHomeCharacter::Move(const FInputActionValue& Value)
 {
+	if (bIsStunned) return;
+	if (FocusedSwitchboard) return;
+
 	const FVector2D MovementVector = Value.Get<FVector2D>();
 	const FRotator FullRotation = GetControlRotation();
 
@@ -231,12 +236,16 @@ void AGoHomeCharacter::StopCarryInput()
 
 void AGoHomeCharacter::MoveUpDown(const FInputActionValue& Value)
 {
+	if (bIsStunned) return;
+
 	const float UpDownValue = Value.Get<float>();
 	AddMovementInput(FVector::UpVector, UpDownValue);
 }
 
 void AGoHomeCharacter::StartSprint()
 {
+	if (bIsStunned) return;
+
 	// 협동 운반 중엔 스프린트 불가 -> 캐리어 간 속도 차이로 이탈되는 것 방지.
 	if (CurrentCarryObject) return;
 
@@ -293,6 +302,8 @@ void AGoHomeCharacter::Client_ForceStopSprint_Implementation()
 
 void AGoHomeCharacter::Look(const FInputActionValue& Value)
 {
+	if (bIsStunned) { return; }
+
 	const FVector2D LookVector = Value.Get<FVector2D>();
 	AddControllerYawInput(LookVector.X);
 	AddControllerPitchInput(LookVector.Y);
@@ -378,6 +389,7 @@ void AGoHomeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AGoHomeCharacter, bIsHoldingFlashlight);
 	DOREPLIFETIME(AGoHomeCharacter, CurrentCarryObject);
 	DOREPLIFETIME_CONDITION(AGoHomeCharacter, CombinedCarryInput, COND_OwnerOnly);
+	DOREPLIFETIME(AGoHomeCharacter, bIsStunned);
 }
 
 void AGoHomeCharacter::OnRep_ReplicatedPitch()
@@ -469,4 +481,150 @@ void AGoHomeCharacter::HandleForcedCarryRelease()
 void AGoHomeCharacter::SetCombinedCarryInput(const FVector& NewInput)
 {
 	CombinedCarryInput = NewInput; 
+}
+
+
+void AGoHomeCharacter::ApplyStun_Implementation(float Duration, FVector KnockbackImpulse, AActor* InInstigator)
+{
+	if (!HasAuthority()) return;
+
+	bIsStunned = true;
+	LaunchCharacter(KnockbackImpulse, true, true);
+
+	if (IsLocallyControlled())
+	{
+		OnRep_IsStunned(); // 서버 자신은 RepNotify 안 뜸.
+	}
+	else
+	{
+		Client_ApplyStun(Duration, KnockbackImpulse);
+	}
+
+	GetWorldTimerManager().SetTimer(StunTimerHandle, this, &AGoHomeCharacter::EndStun, Duration, false);
+}
+
+void AGoHomeCharacter::Client_ApplyStun_Implementation(float Duration, FVector KnockbackImpulse)
+{
+	// 로컬 예측을 이 프레임에 바로 멈추기 위해 직접 반영.
+	bIsStunned = true;
+	LaunchCharacter(KnockbackImpulse, true, true);
+}
+
+void AGoHomeCharacter::EndStun()
+{
+	if (!HasAuthority()) return;
+
+	bIsStunned = false;
+
+	if (IsLocallyControlled())
+	{
+		OnRep_IsStunned();
+	}
+}
+
+void AGoHomeCharacter::OnRep_IsStunned()
+{
+	// 필요한 경우 여기서 스턴 사운드/이펙트 등 클라 전용 후처리.
+}
+
+void AGoHomeCharacter::EnterSwitchboardFocus(AElectricSwitchboardActor* Switchboard)
+{
+	FocusedSwitchboard = Switchboard;
+	HighlightedWireIndex = 0;
+	bAwaitingConfirmation = false;
+
+	UpdateWireHighlight(-1, HighlightedWireIndex);
+	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 포커스 진입"));
+}
+
+void AGoHomeCharacter::ExitSwitchboardFocus()
+{
+	UpdateWireHighlight(HighlightedWireIndex, -1);
+
+	FocusedSwitchboard = nullptr;
+	HighlightedWireIndex = -1;
+	bAwaitingConfirmation = false;
+
+	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 포커스 종료"));
+}
+
+void AGoHomeCharacter::Client_EnterSwitchboardFocus_Implementation(AElectricSwitchboardActor* Switchboard)
+{
+	EnterSwitchboardFocus(Switchboard);
+}
+
+void AGoHomeCharacter::Client_ExitSwitchboardFocus_Implementation()
+{
+	ExitSwitchboardFocus();
+}
+
+void AGoHomeCharacter::HandleFocusMoveStarted(const FInputActionValue& Value)
+{
+	if (!FocusedSwitchboard) return;
+
+	const FVector2D MovementVector = Value.Get<FVector2D>();
+
+	if (bAwaitingConfirmation)
+	{
+		if (FMath::Abs(MovementVector.X) > 0.5f)
+		{
+			bConfirmYesHighlighted = !bConfirmYesHighlighted;
+		}
+	}
+	
+	else
+	{
+		if (MovementVector.X > 0.5f) CycleHighlightedWire(1);
+		else if (MovementVector.X < -0.5f) CycleHighlightedWire(-1);
+	}
+}
+
+void AGoHomeCharacter::CycleHighlightedWire(int32 Delta)
+{
+	if (!FocusedSwitchboard) return;
+
+	const int32 WireTargetCount = FocusedSwitchboard->GetWireTargetCount();
+	if (WireTargetCount <= 0) return;
+
+	const int32 OldIndex = HighlightedWireIndex;
+	HighlightedWireIndex = (HighlightedWireIndex + Delta + WireTargetCount) % WireTargetCount;
+
+	UpdateWireHighlight(OldIndex, HighlightedWireIndex);
+	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 전선 커서: %d"), HighlightedWireIndex);
+}
+
+void AGoHomeCharacter::ConfirmFocusedSelection()
+{
+	if (!FocusedSwitchboard) return;
+
+	if (!bAwaitingConfirmation)
+	{
+		bAwaitingConfirmation = true;
+		bConfirmYesHighlighted = true;
+		UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 확인창 - 전선 %d"), HighlightedWireIndex);
+		return;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 확정: %s"), bConfirmYesHighlighted ? TEXT("예") : TEXT("아니오"));
+
+	if (bConfirmYesHighlighted)
+	{
+		FocusedSwitchboard->ServerRemoveWire(HighlightedWireIndex, this);
+	}
+	bAwaitingConfirmation = false;
+}
+
+void AGoHomeCharacter::UpdateWireHighlight(int32 OldIndex, int32 NewIndex)
+{
+	if (!FocusedSwitchboard) return;
+
+	if (UPrimitiveComponent* OldWire = FocusedSwitchboard->GetWireTarget(OldIndex))
+	{
+		OldWire->SetRenderCustomDepth(false);
+	}
+	if (UPrimitiveComponent* NewWire = FocusedSwitchboard->GetWireTarget(NewIndex))
+	{
+		NewWire->SetRenderCustomDepth(true);
+		NewWire->SetCustomDepthStencilValue(1); // 기존 아이템 조준 강조와 같은 값 재사용.
+	}
 }

@@ -168,6 +168,12 @@ void UInteractionComponent::TryInteract()
 			}
 			return;
 		}
+
+		if (Character->IsFocusingSwitchboard())
+		{
+			Character->ConfirmFocusedSelection();
+			return;
+		}
 	}
 
 	IInteractable* Interactable = Cast<IInteractable>(CurrentTarget);
