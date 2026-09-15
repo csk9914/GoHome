@@ -24,6 +24,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Equipment Upgrade")
 	int32 GetUpgradeLevel(FName UpgradeId) const;
 
+	// 이 강화가 선행 강화 조건을 만족해서 열려 있는지 확인한다.
+	UFUNCTION(BlueprintPure, Category = "Equipment Upgrade")
+	bool IsUpgradeUnlocked(UEquipmentUpgradeDataAsset* UpgradeData) const;
+
 	UFUNCTION(BlueprintCallable, Category = "Equipment Upgrade")
 	FEquipmentUpgradePreview BuildUpgradePreview(UEquipmentUpgradeDataAsset* UpgradeData, float BaseValue) const;
 
