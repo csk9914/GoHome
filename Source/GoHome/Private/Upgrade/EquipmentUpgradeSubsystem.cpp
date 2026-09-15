@@ -25,6 +25,29 @@ int32 UEquipmentUpgradeSubsystem::GetUpgradeLevel(FName UpgradeId) const
 	return State ? FMath::Max(1, State->CurrentLevel) : 1;
 }
 
+bool UEquipmentUpgradeSubsystem::IsUpgradeUnlocked(UEquipmentUpgradeDataAsset* UpgradeData) const
+{
+	// DA가 없거나 ID가 비어 있으면 안전하게 잠금 처리.
+	if (!UpgradeData || UpgradeData->UpgradeId.IsNone())
+	{
+		return false;
+	}
+
+	const FEquipmentUpgradeUnlockRequirement& Requirement =
+		UpgradeData->UnlockRequirement;
+
+	// RequiredUpgradeId가 None이면 선행 조건 없음 = 처음부터 해금.
+	if (Requirement.RequiredUpgradeId.IsNone())
+	{
+		return true;
+	}
+
+	const int32 RequiredCurrentLevel =
+		GetUpgradeLevel(Requirement.RequiredUpgradeId);
+
+	return RequiredCurrentLevel >= Requirement.RequiredLevel;
+}
+
 FEquipmentUpgradePreview UEquipmentUpgradeSubsystem::BuildUpgradePreview(
 	UEquipmentUpgradeDataAsset* UpgradeData,
 	float BaseValue
@@ -49,6 +72,11 @@ EEquipmentUpgradeRequestResult UEquipmentUpgradeSubsystem::UpgradeOnce(UEquipmen
 	if (!UpgradeData || UpgradeData->UpgradeId.IsNone())
 	{
 		return EEquipmentUpgradeRequestResult::UpgradeNotFound;
+	}
+
+	if (!IsUpgradeUnlocked(UpgradeData))
+	{
+		return EEquipmentUpgradeRequestResult::UpgradeLocked;
 	}
 
 	const int32 CurrentLevel = GetUpgradeLevel(UpgradeData->UpgradeId);

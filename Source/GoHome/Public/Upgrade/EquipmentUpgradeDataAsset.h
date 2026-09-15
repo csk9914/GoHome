@@ -28,6 +28,11 @@ struct GOHOME_API FEquipmentUpgradeLevelDefinition
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Equipment Upgrade")
 	FText ResultValueTextOverride;
 
+	// 이 레벨에 도달했을 때 오른쪽 상세에 보여줄 보너스 문구.
+	// 예: "산소 2개 증가", "무게 2kg 증가"
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Equipment Upgrade")
+	FText DetailBonusText;
+
 	// 현재 레벨에서 이 레벨로 올릴 때 필요한 비용
 	// 예: 1레벨 -> 2레벨 비용 150
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Equipment Upgrade", meta = (ClampMin = "0"))
@@ -71,6 +76,22 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment Upgrade")
 	TObjectPtr<UTexture2D> Icon;
 
+	// 오른쪽 상세 패널에 표시할 큰 아이콘.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment Upgrade")
+	TObjectPtr<UTexture2D> DetailIcon;
+
+	// 예: "다음 산소 보너스"
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment Upgrade")
+	FText NextBonusTitle;
+
+	// 예: "산소 탱크의 최대 용량이 증가합니다."
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment Upgrade")
+	FText NextBonusDescription;
+
+	// 이 강화가 열리기 위한 선행 강화 조건.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment Upgrade")
+	FEquipmentUpgradeUnlockRequirement UnlockRequirement;
+
 	// 레벨별 강화표
 	// 예: 1레벨 15칸, 2레벨 18칸, 3레벨 20칸
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Equipment Upgrade")
@@ -110,4 +131,8 @@ public:
 	// 예: 현재값, 다음값, 비용, 현재레벨, 최대레벨
 	UFUNCTION(BlueprintPure, Category = "Equipment Upgrade")
 	FEquipmentUpgradePreview BuildPreview(int32 CurrentLevel, float BaseValue) const;
+
+	// 특정 레벨에 도달했을 때 표시할 상세 보너스 문구.
+	UFUNCTION(BlueprintPure, Category = "Equipment Upgrade")
+	FText GetDetailBonusTextForLevel(int32 Level) const;
 };
