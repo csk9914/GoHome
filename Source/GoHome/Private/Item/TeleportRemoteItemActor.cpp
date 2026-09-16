@@ -22,7 +22,7 @@ void ATeleportRemoteItemActor::ServerUseSpecialAction()
 
 	GetWorldTimerManager().SetTimer(ChannelTimerHandle, this, &ATeleportRemoteItemActor::OnChannelComplete, HoldDuration, false);
 
-	Station->SetCharging(true);
+	Station->SetCharging(true, HoldDuration);
 
 	OnRep_ChannelEndServerTime(); // 서버 자신에게는 RepNotify가 안 뜨므로 직접 호출
 }
