@@ -112,7 +112,7 @@ FEquipmentUpgradePreview UEquipmentUpgradeDataAsset::BuildPreview(int32 CurrentL
 	const int32 Cost = GetCostToUpgradeFromLevel(Preview.CurrentLevel);
 	Preview.CostText = Preview.bIsMaxLevel
 		? FText::GetEmpty()
-		: FText::Format(NSLOCTEXT("EquipmentUpgrade", "CostFormat", "{0} CREDITS"), FText::AsNumber(Cost));
+		: FText::Format(NSLOCTEXT("EquipmentUpgrade", "CostFormat", "{0} Coin"), FText::AsNumber(Cost));
 
 	return Preview;
 }
