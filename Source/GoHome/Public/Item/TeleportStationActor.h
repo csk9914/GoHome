@@ -24,7 +24,7 @@ public:
 	FTransform GetTeleportTransform() const;
 
 	// 서버 전용. 리모컨이 채널 시작/취소 시 호출
-	void SetCharging(bool bNewCharging);
+	void SetCharging(bool bNewCharging, float InDuration = 0.f);
 
 	UFUNCTION(BlueprintPure, Category = "Teleport")
 	bool IsCharging() const { return bIsCharging; }
@@ -32,6 +32,10 @@ public:
 	// 도착 순간 1회 연출. 서버에서 호출 -> 전원 재생
 	UFUNCTION(NetMulticast, Unreliable)
 	void Multicast_PlayArrivalBurst();
+
+	// 충전 시작~완료까지의 총 시간(초). 연출 속도를 맞추는 데 쓰임
+	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Teleport")
+	float ChargeDuration = 0.f;
 
 protected:
 	UPROPERTY(VisibleAnywhere, Category = "Teleport")
