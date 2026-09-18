@@ -19,6 +19,13 @@
 //     주어진(exec) 노드 집합의 모든 data 입력 핀을 역추적해 의존 노드 목록을 출력.
 //   diff <cacheBefore.json> <cacheAfter.json>
 //     두 캐시의 노드 id 집합을 비교해 삭제/추가된 노드 수와 목록을 출력(삭제+추가 산수 검증용).
+//   layout <cache.json> [--colspacing 260] [--rowspacing 160] [--startx 0] [--starty 0]
+//     모든 핀 링크(exec+data 둘 다) 기준 위상정렬로 각 노드의 "열"(선행 노드가 없으면 0열,
+//     있으면 그 선행 노드들 중 가장 큰 열+1)을 계산하고, 같은 열 안에서는 등장 순서대로 행을
+//     배정해 (node_id, pos_x, pos_y) 배열을 stdout에 JSON으로 찍는다 —
+//     `blueprint_modify(operation:"move_nodes", moves:<이 출력>)`에 그대로 넣으면 됨.
+//     `EdGraphNode_Comment`는 레이아웃 대상에서 제외(원래 위치 유지) — 그래프 구조와 무관한
+//     주석 상자를 위상정렬에 섞으면 전부 0열로 쏠려서 의미가 없음.
 //
 // 각 서브커맨드는 node_id를 8자 접두어만 줘도 매칭됨(get_graph가 매번 전체 32자 GUID를
 // 주지만, 사람이 다루기엔 앞 8자로 충분 — mcp-unreal 자체도 접두어 매칭을 지원함).
@@ -178,11 +185,82 @@ function cmdDiff(args) {
   for (const n of added) console.log(`${short(n.id)} [${n.class}] ${JSON.stringify(n.title || '')}`);
 }
 
-const SUBCOMMANDS = { dump: cmdDump, find: cmdFind, trace: cmdTrace, datatrace: cmdDatatrace, diff: cmdDiff };
+function getOpt(args, flag, def) {
+  const idx = args.indexOf(flag);
+  if (idx === -1) return def;
+  return parseFloat(args[idx + 1]);
+}
+
+function cmdLayout(args) {
+  const cacheFile = args[0];
+  if (!cacheFile) throw new Error('usage: layout <cache.json> [--colspacing 260] [--rowspacing 160] [--startx 0] [--starty 0]');
+  const colSpacing = getOpt(args, '--colspacing', 260);
+  const rowSpacing = getOpt(args, '--rowspacing', 160);
+  const startX = getOpt(args, '--startx', 0);
+  const startY = getOpt(args, '--starty', 0);
+
+  const nodes = loadCache(cacheFile);
+  const byId = {};
+  for (const n of nodes) byId[n.id] = n;
+
+  // Predecessors: for each node, the set of node ids feeding into ANY of its input pins
+  // (exec and data links both count — an exec predecessor and a data predecessor both
+  // belong to the left of their consumer in a left-to-right flow reading).
+  const preds = {};
+  for (const n of nodes) preds[n.id] = new Set();
+  for (const n of nodes) {
+    for (const pin of (n.pins || [])) {
+      if (pin.direction === 'input') {
+        for (const link of (pin.links || [])) {
+          if (preds[n.id]) preds[n.id].add(link.node_id);
+        }
+      }
+    }
+  }
+
+  // Longest-path layering, memoized, with a cycle guard (BP graphs shouldn't have true
+  // dependency cycles, but a defensive guard beats an infinite loop if one slips through).
+  const layer = {};
+  const visiting = new Set();
+  function computeLayer(id) {
+    if (layer[id] !== undefined) return layer[id];
+    if (visiting.has(id)) return 0;
+    visiting.add(id);
+    let maxP = -1;
+    for (const p of preds[id] || []) {
+      if (!byId[p]) continue;
+      maxP = Math.max(maxP, computeLayer(p));
+    }
+    visiting.delete(id);
+    return (layer[id] = maxP + 1);
+  }
+
+  const layoutable = nodes.filter(n => n.class !== 'EdGraphNode_Comment');
+  for (const n of layoutable) computeLayer(n.id);
+
+  const byLayer = {};
+  for (const n of layoutable) {
+    const L = layer[n.id];
+    (byLayer[L] = byLayer[L] || []).push(n);
+  }
+
+  const moves = [];
+  const layers = Object.keys(byLayer).map(Number).sort((a, b) => a - b);
+  for (const L of layers) {
+    byLayer[L].forEach((n, i) => {
+      moves.push({ node_id: n.id, pos_x: startX + L * colSpacing, pos_y: startY + i * rowSpacing });
+    });
+  }
+
+  console.log(JSON.stringify(moves));
+  console.error(`layout: ${moves.length} nodes across ${layers.length} columns (${nodes.length - layoutable.length} comment box(es) excluded, left in place)`);
+}
+
+const SUBCOMMANDS = { dump: cmdDump, find: cmdFind, trace: cmdTrace, datatrace: cmdDatatrace, diff: cmdDiff, layout: cmdLayout };
 
 const [, , sub, ...rest] = process.argv;
 if (!SUBCOMMANDS[sub]) {
-  console.error('usage: node Docs/tools/bp_graph_tool.js <dump|find|trace|datatrace|diff> ...');
+  console.error('usage: node Docs/tools/bp_graph_tool.js <dump|find|trace|datatrace|diff|layout> ...');
   process.exit(1);
 }
 try {
