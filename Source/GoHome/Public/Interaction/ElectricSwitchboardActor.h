@@ -10,6 +10,11 @@
 class UBoxComponent;
 class UStaticMeshComponent;
 class ACharacter;
+class UMeshComponent;
+class UCameraComponent;
+class UWidgetComponent;
+class USwitchboardPasswordWidget;
+class USwitchboardScreenWidget;
 
 UENUM(BlueprintType)
 enum class ESwitchboardState : uint8
@@ -44,17 +49,41 @@ public:
 	// AElectricBreakerActor::OnInteract에서 호출.
 	bool TryResolveViaBreaker();
 
-	// 포커스 모드에서 전선 하나를 제거 시도할 때 호출.
 	UFUNCTION(Server, Reliable)
-	void ServerRemoveWire(int32 WireIndex, AActor* InInstigator);
+	void ServerSubmitPassword(const TArray<int32>& EnteredDigits, AActor* InInstigator);
+
+	int32 GetPasswordLength() const { return PasswordLength; }
+	int32 GetKeypadElementCount() const { return WireTargets.Num() + 2; } // 숫자 10 + Back + Enter
+	UMeshComponent* GetKeypadElementMesh(int32 Index) const;
+	void UpdatePasswordDisplay(const TArray<int32>& EnteredDigits);
+
+
 
 	virtual bool CanInteract(APawn* InstigatorPawn) const override;
 	virtual void OnInteract(APawn* InstigatorPawn) override; // 포커스 모드 진입 트리거
 	virtual FText GetInteractionPromptText_Implementation() const override;
 
 	int32 GetWireTargetCount() const { return WireTargets.Num(); }
-	
-	UPrimitiveComponent* GetWireTarget(int32 Index) const { return WireTargets.IsValidIndex(Index) ? WireTargets[Index] : nullptr; }
+
+	UMeshComponent* GetWireTarget(int32 Index) const { return WireTargets.IsValidIndex(Index) ? WireTargets[Index] : nullptr; }
+
+	const TArray<FLinearColor>& GetHintColorPalette() const { return HintColorPalette; }
+	float GetHintRoundDuration() const { return HintRoundDuration; }
+	float GetHintGapDuration() const { return HintGapDuration; }
+	int32 GetCorrectWireIndexForStep(int32 Step) const { return PasswordDigits.IsValidIndex(Step) ? PasswordDigits[Step] : -1; }
+
+	// 힌트 설정값
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Puzzle|Hint")
+	TArray<FLinearColor> HintColorPalette = { FLinearColor::Red, FLinearColor::Blue, FLinearColor::Green, FLinearColor::Yellow, FLinearColor::White };
+
+	UPROPERTY(EditAnywhere, Category ="Switchboard|Puzzle|Hint")
+	float HintRoundDuration = 1.f;
+
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Puzzle|Hint")
+	float HintGapDuration = 0.5f;
+
+
+
 
 protected:
 
@@ -82,7 +111,7 @@ protected:
 	void GenerateWirePuzzle();
 	void HandlePuzzleFailed();
 	void HandlePuzzleSucceeded();
-	void CollectWireTargets();
+	void CollectKeypadComponents();
 
 	UFUNCTION()
 	void OnRep_DangerGauge();
@@ -96,12 +125,12 @@ protected:
 	UFUNCTION()
 	void OnRep_FocusingPawn();
 
+	UPROPERTY(VisibleAnywhere, Category = "Switchboard")
+	TObjectPtr<UCameraComponent> FocusCamera;
+
 	// 퍼즐 종결(성공/실패) 시 호출 - 포커스 중이던 플레이어를 로컬 UX까지 정리해서 풀어줌.
 	void ReleaseFocus();
 
-
-	UFUNCTION()
-	void OnRep_NextCorrectStep();
 
 	// --- 컴포넌트 ---
 	UPROPERTY(VisibleAnywhere, Category = "Switchboard")
@@ -112,7 +141,7 @@ protected:
 
 	// --- 게이지 ---
 	UPROPERTY(EditAnywhere, Category = "Switchboard|Gauge")
-	float GaugeRisePerSecond = 5.f;
+	float GaugeRisePerSecond = 1.f;
 
 	UPROPERTY(EditAnywhere, Category = "Switchboard|Gauge")
 	float MaxGauge = 100.f;
@@ -137,23 +166,37 @@ protected:
 	// --- 퍼즐 ---
 // LD가 "Wire0", "Wire1"... 이름으로 자식 컴포넌트를 만들면 BeginPlay에서 자동 수집됨.
 	UPROPERTY(VisibleAnywhere, Category = "Switchboard|Puzzle")
-	TArray<TObjectPtr<UPrimitiveComponent>> WireTargets;
-
-	
+	TArray<TObjectPtr<UMeshComponent>> WireTargets;
 
 	// 정답 순서. 힌트가 이미 정답을 보여주는 방식이라 클라에 노출해도 무방 (BeginPlay에서 서버가 셔플).
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Switchboard|Puzzle")
-	TArray<int32> WireRemovalOrder;
+	TArray<int32> PasswordDigits;
+
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Puzzle")
+	int32 PasswordLength = 5;
+
+	UPROPERTY(VisibleAnywhere, Category = "Switchboard")
+	TObjectPtr<UMeshComponent> BackButtonMesh;
+
+	UPROPERTY(VisibleAnywhere, Category = "Switchboard")
+	TObjectPtr<UMeshComponent> EnterButtonMesh;
+
+	UPROPERTY(VisibleAnywhere, Category = "Switchboard")
+	TObjectPtr<UWidgetComponent> MainScreenWidget;
+	
+	UPROPERTY(VisibleAnywhere, Category = "Switchboard")
+	TObjectPtr<UWidgetComponent> PasswordDisplayWidget;
 
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Switchboard|Puzzle")
 	EWireHintMode HintMode = EWireHintMode::FlashSequence;
 
-	// WireRemovalOrder 중 다음에 맞혀야 할 인덱스 (진행도 표시용).
-	UPROPERTY(ReplicatedUsing = OnRep_NextCorrectStep, BlueprintReadOnly, Category = "Switchboard|Puzzle")
-	int32 NextCorrectStep = 0;
-
 	UPROPERTY(ReplicatedUsing = OnRep_SwitchboardState, BlueprintReadOnly, Category = "Switchboard")
 	ESwitchboardState SwitchboardState = ESwitchboardState::PuzzleActive;
+
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Puzzle")
+	float LockedResetDuration = 30.f;
+
+	void ResetPuzzle();
 
 private:
 	UPROPERTY()
@@ -163,5 +206,7 @@ private:
 	TMap < TWeakObjectPtr<ACharacter>, float> NextPenaltyEligibleTime;
 
 	float PenaltyTickAccumulator = 0.f;
+
+	FTimerHandle LockedResetTimerHandle;
 
 };

@@ -10,7 +10,6 @@
 class UStaticMeshComponent;
 class AElectricSwitchboardActor;
 
-
 // 배전반과 짝지어 배치하는 원거리 차단기.
 // 기존 E키 상호작용 파이프라인(IInteractable) 그대로 재사용.
 UCLASS()
@@ -34,5 +33,6 @@ protected:
 	// 레벨 디자이너가 배치 시 연결 (BreakableWallActor::PassageNavLink와 동일 관용구 - 같은 방/다른 방 무관).
 	UPROPERTY(EditInstanceOnly, Category = "Breaker")
 	TObjectPtr<AElectricSwitchboardActor> LinkedSwitchboard;
+
 
 };

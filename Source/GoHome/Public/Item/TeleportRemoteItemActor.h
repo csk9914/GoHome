@@ -18,6 +18,7 @@ class GOHOME_API ATeleportRemoteItemActor : public AUsableItemBase
 	GENERATED_BODY()
 
 public:
+
 	// 좌클릭 눌림 -> 채널링 시작
 	virtual void ServerUseSpecialAction() override;
 

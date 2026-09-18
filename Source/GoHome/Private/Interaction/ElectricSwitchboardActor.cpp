@@ -7,6 +7,10 @@
 #include "Net/UnrealNetwork.h"
 #include "Player/Stunnable.h"
 #include "Player/GoHomeCharacter.h"
+#include "Camera/CameraComponent.h"
+#include "Components/WidgetComponent.h"
+#include "Interaction/SwitchboardPasswordWidget.h"
+#include "Interaction/SwitchboardScreenWidget.h"
 #include "Player/Damageable.h"
 
 AElectricSwitchboardActor::AElectricSwitchboardActor()
@@ -14,15 +18,28 @@ AElectricSwitchboardActor::AElectricSwitchboardActor()
 	PrimaryActorTick.bCanEverTick = true;
 	bReplicates = true;
 
+	SwitchboardMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SwitchboardMesh"));
+	SetRootComponent(SwitchboardMesh);
+	SwitchboardMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+
 	EffectArea = CreateDefaultSubobject<UBoxComponent>(TEXT("EffectArea"));
-	SetRootComponent(EffectArea);
+	EffectArea->SetupAttachment(SwitchboardMesh);
 	EffectArea->SetBoxExtent(FVector(300.f, 300.f, 300.f));
 	EffectArea->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
 	EffectArea->SetGenerateOverlapEvents(true);
 
-	SwitchboardMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SwitchboardMesh"));
-	SwitchboardMesh->SetupAttachment(EffectArea);
-	SwitchboardMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	FocusCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FocusCamera"));
+	FocusCamera->SetupAttachment(SwitchboardMesh);
+
+	MainScreenWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("MainScreenWidget"));
+	MainScreenWidget->SetupAttachment(SwitchboardMesh);
+	MainScreenWidget->SetWidgetSpace(EWidgetSpace::World);
+
+	PasswordDisplayWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("PasswordDisplayWidget"));
+	PasswordDisplayWidget->SetupAttachment(SwitchboardMesh);
+	PasswordDisplayWidget->SetWidgetSpace(EWidgetSpace::World);
+
+
 }
 
 
@@ -33,7 +50,18 @@ void AElectricSwitchboardActor::BeginPlay()
 	EffectArea->OnComponentBeginOverlap.AddDynamic(this, &AElectricSwitchboardActor::OnEffectAreaBeginOverlap);
 	EffectArea->OnComponentEndOverlap.AddDynamic(this, &AElectricSwitchboardActor::OnEffectAreaEndOverlap);
 	
-	CollectWireTargets();
+	CollectKeypadComponents();
+
+	if (USwitchboardScreenWidget* ScreenWidget = Cast<USwitchboardScreenWidget>(MainScreenWidget->GetUserWidgetObject()))
+	{
+		ScreenWidget->OwningSwitchboard = this;
+		UE_LOG(LogTemp, Warning, TEXT("[Switchboard] MainScreenWidget 참조 연결 성공"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[Switchboard] MainScreenWidget 참조 연결 실패 - GetUserWidgetObject: %s"),
+			MainScreenWidget->GetUserWidgetObject() ? TEXT("존재하지만 Cast 실패") : TEXT("null"));
+	}
 
 	if (HasAuthority())
 	{
@@ -50,9 +78,13 @@ void AElectricSwitchboardActor::Tick(float DeltaTime)
 		return;
 	}
 
-	if (OverlappingCharacters.Num() == 0)
+	const bool bShouldRiseGauge = (SwitchboardState == ESwitchboardState::Locked)
+                            	   || (OverlappingCharacters.Num() > 0)
+	                               || (FocusingPawn != nullptr);
+
+	if (!bShouldRiseGauge)
 	{
-		return; // 아무도 없으면 게이지도 안 오르고 페널티도 없음.
+		return;
 	}
 
 	DangerGauge = FMath::Clamp(DangerGauge + GaugeRisePerSecond * DeltaTime, 0.f, MaxGauge);
@@ -143,48 +175,34 @@ void AElectricSwitchboardActor::TickPenalizeOverlappingCharacters(float DeltaTim
 
 void AElectricSwitchboardActor::GenerateWirePuzzle()
 {
-	WireRemovalOrder.Reset();
-	for (int32 i = 0; i < WireTargets.Num(); ++i)
-	{
-		WireRemovalOrder.Add(i);
-	}
+	PasswordDigits.Reset();
 
-	for (int32 i = WireRemovalOrder.Num() - 1; i > 0; --i)
-	{
-		const int32 j = FMath::RandRange(0, i);
-		WireRemovalOrder.Swap(i, j);
-	}
+	const int32 DigitRange = WireTargets.Num(); // 10.
 
-	HintMode = FMath::RandBool() ? EWireHintMode::FlashSequence : EWireHintMode::ColorIndexClue;
-	NextCorrectStep = 0;
+	for (int32 i = 0; i < PasswordLength; ++i)
+	{
+		PasswordDigits.Add(FMath::RandRange(0, DigitRange - 1));
+	}
 }
 
-void AElectricSwitchboardActor::ServerRemoveWire_Implementation(int32 WireIndex, AActor* InInstigator)
+void AElectricSwitchboardActor::ServerSubmitPassword_Implementation(const TArray<int32>& EnterDigits, AActor* InInstigator)
 {
 	if (InInstigator != FocusingPawn) return;
+	if (SwitchboardState != ESwitchboardState::PuzzleActive) return;
 
-	if (SwitchboardState != ESwitchboardState::PuzzleActive || !WireRemovalOrder.IsValidIndex(NextCorrectStep))
+	if (EnterDigits == PasswordDigits)
 	{
-		return;
-	}
-
-	if (WireIndex == WireRemovalOrder[NextCorrectStep])
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 정답! (%d/%d)"), NextCorrectStep + 1, WireRemovalOrder.Num());
-		++NextCorrectStep;
-		OnRep_NextCorrectStep();
-
-		if (NextCorrectStep >= WireRemovalOrder.Num())
-		{
-			HandlePuzzleSucceeded();
-		}
+		UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 비밀번호 일치 - 성공"));
+		HandlePuzzleSucceeded();
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 오답! 정답 %d / 선택 %d"), WireRemovalOrder[NextCorrectStep], WireIndex);
+		UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 비밀번호 불일치 - 실패"));
 		HandlePuzzleFailed();
 	}
 }
+
+
 
 void AElectricSwitchboardActor::HandlePuzzleFailed()
 {
@@ -192,6 +210,10 @@ void AElectricSwitchboardActor::HandlePuzzleFailed()
 	ReleaseFocus();
 	SwitchboardState = ESwitchboardState::Locked;
 	OnRep_SwitchboardState();
+
+	// 자동 리셋 없음 - 실패하면 이 스테이지 안에서는 끝. 고위험 루트로만 보상 획득 가능.
+	// (스테이지/라운드 재시작 시스템이 생기면 그때 ResetPuzzle()을 거기서 수동 호출)
+
 	// TODO: 고위험 입구 오픈 로직 - 다음 라운드.
 }
 
@@ -254,16 +276,14 @@ FText AElectricSwitchboardActor::GetInteractionPromptText_Implementation() const
 
 void AElectricSwitchboardActor::OnRep_DangerGauge() {}
 void AElectricSwitchboardActor::OnRep_SwitchboardState() {}
-void AElectricSwitchboardActor::OnRep_NextCorrectStep() {}
 
 void AElectricSwitchboardActor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AElectricSwitchboardActor, DangerGauge);
 	DOREPLIFETIME(AElectricSwitchboardActor, SwitchboardState);
-	DOREPLIFETIME(AElectricSwitchboardActor, WireRemovalOrder);
+	DOREPLIFETIME(AElectricSwitchboardActor, PasswordDigits);
 	DOREPLIFETIME(AElectricSwitchboardActor, HintMode);
-	DOREPLIFETIME(AElectricSwitchboardActor, NextCorrectStep);
 	DOREPLIFETIME(AElectricSwitchboardActor, FocusingPawn);
 }
 
@@ -289,7 +309,7 @@ void AElectricSwitchboardActor::OnRep_FocusingPawn()
 {
 }
 
-void AElectricSwitchboardActor::CollectWireTargets()
+void AElectricSwitchboardActor::CollectKeypadComponents()
 {
 	WireTargets.Reset();
 
@@ -300,9 +320,18 @@ void AElectricSwitchboardActor::CollectWireTargets()
 	for (UStaticMeshComponent* Mesh : Meshes)
 	{
 		const FString Name = Mesh->GetName();
+
 		if (Name.StartsWith(TEXT("Wire")))
 		{
 			Indexed.Add({ FCString::Atoi(*Name.RightChop(4)), Mesh });
+		}
+		else if (Name == TEXT("KeypadBack"))
+		{
+			BackButtonMesh = Mesh;
+		}
+		else if (Name == TEXT("KeypadEnter"))
+		{
+			EnterButtonMesh = Mesh;
 		}
 	}
 
@@ -314,5 +343,36 @@ void AElectricSwitchboardActor::CollectWireTargets()
 	for (const TPair<int32, UStaticMeshComponent*>& Pair : Indexed)
 	{
 		WireTargets.Add(Pair.Value);
+	}
+}
+
+
+void AElectricSwitchboardActor::ResetPuzzle()
+{
+	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 리셋 - 다시 도전 가능"));
+
+	DangerGauge = 0.f;
+	SwitchboardState = ESwitchboardState::PuzzleActive;
+	OnRep_SwitchboardState();
+
+	GenerateWirePuzzle();
+
+}
+
+UMeshComponent* AElectricSwitchboardActor::GetKeypadElementMesh(int32 Index) const
+{
+	if(WireTargets.IsValidIndex(Index)) return WireTargets[Index];
+	if (Index == WireTargets.Num()) return BackButtonMesh;
+	if (Index == WireTargets.Num() + 1) return EnterButtonMesh;
+	return nullptr;
+}
+
+void AElectricSwitchboardActor::UpdatePasswordDisplay(const TArray<int32>& EnteredDigits)
+{
+	if (!PasswordDisplayWidget) return;
+
+	if (USwitchboardPasswordWidget* Widget = Cast<USwitchboardPasswordWidget>(PasswordDisplayWidget->GetUserWidgetObject()))
+	{
+		Widget->SetEnteredDigits(EnteredDigits);
 	}
 }

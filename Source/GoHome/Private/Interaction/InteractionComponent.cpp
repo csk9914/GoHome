@@ -50,19 +50,30 @@ void UInteractionComponent::PerformTrace()
 {
 	if (!CachedCamera) return;
 
-	const FVector Start = CachedCamera->GetComponentLocation();
-	const FVector End = Start + CachedCamera->GetForwardVector() * TraceDistance;
-
-	FHitResult Hit;
-	FCollisionQueryParams Params;
-	Params.AddIgnoredActor(GetOwner()); // 자기 자신은 무시.
-
 	AActor* NewTarget = nullptr;
-	if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+
+	bool bIsFocusing = false;
+	if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(GetOwner()))
 	{
-		if (Hit.GetActor() && Hit.GetActor()->Implements<UInteractable>())
+		bIsFocusing = Character->IsFocusingSwitchboard();
+	}
+
+	// 포커스 모드 중엔 일반 조준 트레이스/아웃라인을 끄고 전선 하이라이트에 양보함.
+	if (!bIsFocusing)
+	{
+		const FVector Start = CachedCamera->GetComponentLocation();
+		const FVector End = Start + CachedCamera->GetForwardVector() * TraceDistance;
+
+		FHitResult Hit;
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(GetOwner()); // 자기 자신은 무시.
+
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
 		{
-			NewTarget = Hit.GetActor();
+			if (Hit.GetActor() && Hit.GetActor()->Implements<UInteractable>())
+			{
+				NewTarget = Hit.GetActor();
+			}
 		}
 	}
 
@@ -171,7 +182,7 @@ void UInteractionComponent::TryInteract()
 
 		if (Character->IsFocusingSwitchboard())
 		{
-			Character->ConfirmFocusedSelection();
+			Character->PressHighlightedKey();
 			return;
 		}
 	}
