@@ -14,6 +14,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Interaction/ElectricSwitchboardActor.h"
 #include "Net/UnrealNetwork.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Player/OxygenComponent.h"
 
 AGoHomeCharacter::AGoHomeCharacter()
@@ -531,19 +532,34 @@ void AGoHomeCharacter::EnterSwitchboardFocus(AElectricSwitchboardActor* Switchbo
 {
 	FocusedSwitchboard = Switchboard;
 	HighlightedWireIndex = 0;
-	bAwaitingConfirmation = false;
+	EnteredPasswordDigits.Reset();
 
 	UpdateWireHighlight(-1, HighlightedWireIndex);
 	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 포커스 진입"));
+
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		PC->SetViewTargetWithBlend(Switchboard, 0.3f);
+	}
+
+	StartHintPlayback();
 }
 
 void AGoHomeCharacter::ExitSwitchboardFocus()
 {
+	GetWorld()->GetTimerManager().ClearTimer(HintPlaybackTimerHandle);
+	bPlayingHint = false;
+	HintPlaybackStep = -1;
+
 	UpdateWireHighlight(HighlightedWireIndex, -1);
+
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		PC->SetViewTargetWithBlend(this, 0.3f);
+	}
 
 	FocusedSwitchboard = nullptr;
 	HighlightedWireIndex = -1;
-	bAwaitingConfirmation = false;
 
 	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 포커스 종료"));
 }
@@ -560,71 +576,201 @@ void AGoHomeCharacter::Client_ExitSwitchboardFocus_Implementation()
 
 void AGoHomeCharacter::HandleFocusMoveStarted(const FInputActionValue& Value)
 {
-	if (!FocusedSwitchboard) return;
+	if (!FocusedSwitchboard || bPlayingHint) return;
 
 	const FVector2D MovementVector = Value.Get<FVector2D>();
 
-	if (bAwaitingConfirmation)
+	int32 RowDelta = 0;
+	int32 ColDelta = 0;
+
+	if (MovementVector.X > 0.5f) ColDelta = 1;
+	else if (MovementVector.X < -0.5f) ColDelta = -1;
+
+	if (MovementVector.Y > 0.5f) RowDelta = -1; // W = 위.
+	else if (MovementVector.Y < -0.5f) RowDelta = 1; // S = 아래.
+
+	if (RowDelta != 0 || ColDelta != 0)
 	{
-		if (FMath::Abs(MovementVector.X) > 0.5f)
-		{
-			bConfirmYesHighlighted = !bConfirmYesHighlighted;
-		}
+		MoveHighlightedKey(RowDelta, ColDelta);
 	}
-	
+}
+
+static void IndexToRowCol(int32 Index, int32& OutRow, int32& OutCol)
+{
+	if (Index == 10) { OutRow = 0; OutCol = 0; return; } // Back
+	if (Index == 11) { OutRow = 0; OutCol = 4; return; } // Enter
+	if (Index >= 5) { OutRow = 1; OutCol = Index - 5; return; } // Wire5~9 = 윗줄
+	OutRow = 2; OutCol = Index; // Wire0~4 = 아랫줄
+}
+
+static int32 RowColToIndex(int32 Row, int32 Col)
+{
+	if (Row <= 0)
+	{
+		return (Col <= 2) ? 10 : 11; // 왼쪽 절반 = Back, 오른쪽 절반 = Enter
+	}
+
+	const int32 ClampedCol = FMath::Clamp(Col, 0, 4);
+
+	if (Row == 1)
+	{
+		return 5 + ClampedCol; // Wire5~9 (윗줄)
+	}
+
+	return ClampedCol; // Wire0~4 (아랫줄)
+}
+
+void AGoHomeCharacter::MoveHighlightedKey(int32 RowDelta, int32 ColDelta)
+{
+	if (!FocusedSwitchboard) return;
+
+	int32 Row, Col;
+	IndexToRowCol(HighlightedWireIndex, Row, Col);
+
+	const int32 NewRow = FMath::Clamp(Row + RowDelta, 0, 2);
+
+	int32 NewCol;
+	if (NewRow == 0)
+	{
+		// Back/Enter 두 칸뿐 -> 좌우 입력 한번으로 바로 토글.
+		if (ColDelta > 0) NewCol = 4; // Enter.
+		else if (ColDelta < 0) NewCol = 0; // Back.
+		else NewCol = (Col <= 2) ? 0 : 4; // 위/아래로 넘어온 경우 가까운 쪽 유지.
+	}
 	else
 	{
-		if (MovementVector.X > 0.5f) CycleHighlightedWire(1);
-		else if (MovementVector.X < -0.5f) CycleHighlightedWire(-1);
+		NewCol = FMath::Clamp(Col + ColDelta, 0, 4);
 	}
-}
-
-void AGoHomeCharacter::CycleHighlightedWire(int32 Delta)
-{
-	if (!FocusedSwitchboard) return;
-
-	const int32 WireTargetCount = FocusedSwitchboard->GetWireTargetCount();
-	if (WireTargetCount <= 0) return;
 
 	const int32 OldIndex = HighlightedWireIndex;
-	HighlightedWireIndex = (HighlightedWireIndex + Delta + WireTargetCount) % WireTargetCount;
+	HighlightedWireIndex = RowColToIndex(NewRow, NewCol);
 
 	UpdateWireHighlight(OldIndex, HighlightedWireIndex);
-	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 전선 커서: %d"), HighlightedWireIndex);
+	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 커서: %d"), HighlightedWireIndex);
 }
 
-void AGoHomeCharacter::ConfirmFocusedSelection()
+
+
+void AGoHomeCharacter::PressHighlightedKey()
 {
-	if (!FocusedSwitchboard) return;
+	if (!FocusedSwitchboard || bPlayingHint) return;
 
-	if (!bAwaitingConfirmation)
+	const int32 DigitCount = FocusedSwitchboard->GetWireTargetCount(); // 10
+
+	if (HighlightedWireIndex < DigitCount)
 	{
-		bAwaitingConfirmation = true;
-		bConfirmYesHighlighted = true;
-		UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 확인창 - 전선 %d"), HighlightedWireIndex);
-		return;
+		if (EnteredPasswordDigits.Num() < FocusedSwitchboard->GetPasswordLength())
+		{
+			EnteredPasswordDigits.Add(HighlightedWireIndex);
+			FocusedSwitchboard->UpdatePasswordDisplay(EnteredPasswordDigits);
+		}
 	}
-
-	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 확정: %s"), bConfirmYesHighlighted ? TEXT("예") : TEXT("아니오"));
-
-	if (bConfirmYesHighlighted)
+	else if (HighlightedWireIndex == DigitCount) // Back
 	{
-		FocusedSwitchboard->ServerRemoveWire(HighlightedWireIndex, this);
+		if (EnteredPasswordDigits.Num() > 0)
+		{
+			EnteredPasswordDigits.Pop();
+			FocusedSwitchboard->UpdatePasswordDisplay(EnteredPasswordDigits);
+		}
 	}
-	bAwaitingConfirmation = false;
+	else // Enter
+	{
+		FocusedSwitchboard->ServerSubmitPassword(EnteredPasswordDigits, this);
+	}
 }
 
 void AGoHomeCharacter::UpdateWireHighlight(int32 OldIndex, int32 NewIndex)
 {
 	if (!FocusedSwitchboard) return;
 
-	if (UPrimitiveComponent* OldWire = FocusedSwitchboard->GetWireTarget(OldIndex))
+	if (UPrimitiveComponent* OldWire = FocusedSwitchboard->GetKeypadElementMesh(OldIndex))
 	{
 		OldWire->SetRenderCustomDepth(false);
 	}
-	if (UPrimitiveComponent* NewWire = FocusedSwitchboard->GetWireTarget(NewIndex))
+	if (UPrimitiveComponent* NewWire = FocusedSwitchboard->GetKeypadElementMesh(NewIndex))
 	{
 		NewWire->SetRenderCustomDepth(true);
-		NewWire->SetCustomDepthStencilValue(1); // 기존 아이템 조준 강조와 같은 값 재사용.
+		NewWire->SetCustomDepthStencilValue(1);
+	}
+}
+
+void AGoHomeCharacter::StartHintPlayback()
+{
+	if (!FocusedSwitchboard) return;
+
+	bPlayingHint = true;
+	HintPlaybackStep = 0;
+	bHintShowingGap = true;
+
+	SetAllWiresOff();
+	GetWorld()->GetTimerManager().SetTimer(HintPlaybackTimerHandle, this, 
+		                                   &AGoHomeCharacter::AdvanceHintPlayback, 
+		                                   FocusedSwitchboard->GetHintGapDuration(), false);
+}
+
+void AGoHomeCharacter::AdvanceHintPlayback()
+{
+	if (!FocusedSwitchboard) return;
+
+	if (bHintShowingGap)
+	{
+		// 갭 끝남 -> 이번 라운드 색 패턴 표시.
+		bHintShowingGap = false;
+
+		const TArray<FLinearColor>& Palette = FocusedSwitchboard->GetHintColorPalette();
+		if (Palette.Num() < 2) return;
+
+		const int32 MajorIdx = FMath::RandRange(0, Palette.Num() - 1);
+		int32 MinorIdx;
+		do { MinorIdx = FMath::RandRange(0, Palette.Num() - 1); } while (MinorIdx == MajorIdx);
+
+		const int32 CorrectIndex = FocusedSwitchboard->GetCorrectWireIndexForStep(HintPlaybackStep);
+
+		for (int32 i = 0; i < FocusedSwitchboard->GetWireTargetCount(); ++i)
+		{
+			const FLinearColor& Color = (i == CorrectIndex) ? Palette[MinorIdx] : Palette[MajorIdx];
+			SetWireColor(FocusedSwitchboard->GetWireTarget(i), Color);
+		}
+
+		GetWorld()->GetTimerManager().SetTimer(HintPlaybackTimerHandle, this,
+			&AGoHomeCharacter::AdvanceHintPlayback, FocusedSwitchboard->GetHintRoundDuration(), false);
+	}
+	else
+	{
+		// 이번 라운드 표시 끝 -> 다음 라운드로.
+		++HintPlaybackStep;
+
+		if (HintPlaybackStep >= FocusedSwitchboard->GetPasswordLength())
+		{
+			SetAllWiresOff();
+			bPlayingHint = false;
+			HintPlaybackStep = -1;
+			return; // 힌트 재생 끝 - 이제 조작 가능.
+		}
+
+		bHintShowingGap = true;
+		SetAllWiresOff();
+		GetWorld()->GetTimerManager().SetTimer(HintPlaybackTimerHandle, this,
+			&AGoHomeCharacter::AdvanceHintPlayback, FocusedSwitchboard->GetHintGapDuration(), false);
+	}
+}
+
+void AGoHomeCharacter::SetWireColor(UMeshComponent* Wire, const FLinearColor& Color)
+{
+	if (!Wire) return;
+
+	if (UMaterialInstanceDynamic* MID = Wire->CreateAndSetMaterialInstanceDynamic(0))
+	{
+		MID->SetVectorParameterValue(TEXT("Color"), Color);
+	}
+}
+
+void AGoHomeCharacter::SetAllWiresOff()
+{
+	if (!FocusedSwitchboard) return;
+
+	for (int32 i = 0; i < FocusedSwitchboard->GetWireTargetCount(); ++i)
+	{
+		SetWireColor(FocusedSwitchboard->GetWireTarget(i), FLinearColor::Black);
 	}
 }

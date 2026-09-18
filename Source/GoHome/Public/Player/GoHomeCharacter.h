@@ -61,7 +61,7 @@ protected:
 	// MoveAction의 Started(눌리는 순간 1회) 이벤트 전용 - 포커스 중 커서 이동/예-아니오 토글.
 	void HandleFocusMoveStarted(const FInputActionValue& Value);
 
-	void CycleHighlightedWire(int32 Delta);
+	void MoveHighlightedKey(int32 RowDelta, int32 ColDelta);
 
 
 	void Look(const FInputActionValue& Value);
@@ -165,14 +165,14 @@ public:
 	void EnterSwitchboardFocus(AElectricSwitchboardActor* Switchboard);
 	void ExitSwitchboardFocus();
 
-	// TryInteract가 포커스 중일 때 리다이렉트하는 진입점 (전선 선택 -> 확인 -> 확정).
-	void ConfirmFocusedSelection();
-
 	UFUNCTION(Client, Reliable)
 	void Client_EnterSwitchboardFocus(AElectricSwitchboardActor* Switchboard);
 
 	UFUNCTION(Client, Reliable)
 	void Client_ExitSwitchboardFocus();
+
+	void PressHighlightedKey();
+	TArray<int32> EnteredPasswordDigits;
 
 protected:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
@@ -201,8 +201,7 @@ protected:
 	TObjectPtr<AElectricSwitchboardActor> FocusedSwitchboard;
 
 	int32 HighlightedWireIndex = -1;
-	bool bAwaitingConfirmation = false;
-	bool bConfirmYesHighlighted = false;
+
 
 	UPROPERTY(ReplicatedUsing = OnRep_IsHoldingFlashlight, BlueprintReadOnly, Category = "Interaction")
 	bool bIsHoldingFlashlight = false;
@@ -250,6 +249,17 @@ protected:
 
 	// 마지막 소음 발생 이후 누적 시간
 	float TimeSinceLastSwimNoise = 0.f;
+
+	void StartHintPlayback();
+	void AdvanceHintPlayback();
+	void SetWireColor(UMeshComponent* Wire, const FLinearColor& Color);
+	void SetAllWiresOff();
+
+	bool bPlayingHint = false;
+	int32 HintPlaybackStep = -1;
+	bool bHintShowingGap = false;
+	FTimerHandle HintPlaybackTimerHandle;
+
 
 	// 스프린트 관련
 private:

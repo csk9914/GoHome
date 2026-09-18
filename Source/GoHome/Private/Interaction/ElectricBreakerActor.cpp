@@ -21,9 +21,12 @@ bool AElectricBreakerActor::CanInteract(APawn* InstigatorPawn) const
 
 void AElectricBreakerActor::OnInteract(APawn* InstigatorPawn)
 {
+	UE_LOG(LogTemp, Warning, TEXT("[Breaker] OnInteract 호출됨. LinkedSwitchboard=%s"), LinkedSwitchboard ? TEXT("있음") : TEXT("없음"));
+
 	if (LinkedSwitchboard)
 	{
-		LinkedSwitchboard->TryResolveViaBreaker();
+		const bool bResolved = LinkedSwitchboard->TryResolveViaBreaker();
+		UE_LOG(LogTemp, Warning, TEXT("[Breaker] TryResolveViaBreaker 결과: %s"), bResolved ? TEXT("성공") : TEXT("실패(퍼즐 미해결 상태)"));
 	}
 }
 
