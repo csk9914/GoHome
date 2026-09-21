@@ -16,7 +16,7 @@ AElectricBreakerActor::AElectricBreakerActor()
 
 bool AElectricBreakerActor::CanInteract(APawn* InstigatorPawn) const
 {
-	return LinkedSwitchboard != nullptr;
+	return LinkedSwitchboard != nullptr && LinkedSwitchboard->CanFlipBreaker();
 }
 
 void AElectricBreakerActor::OnInteract(APawn* InstigatorPawn)
@@ -26,11 +26,21 @@ void AElectricBreakerActor::OnInteract(APawn* InstigatorPawn)
 	if (LinkedSwitchboard)
 	{
 		const bool bResolved = LinkedSwitchboard->TryResolveViaBreaker();
-		UE_LOG(LogTemp, Warning, TEXT("[Breaker] TryResolveViaBreaker 결과: %s"), bResolved ? TEXT("성공") : TEXT("실패(퍼즐 미해결 상태)"));
+		UE_LOG(LogTemp, Warning, TEXT("[Breaker] TryResolveViaBreaker 결과: %s"), bResolved ? TEXT("성공") : TEXT("실패(퍼즐 미해결 또는 이미 조작됨)"));
 	}
 }
 
 FText AElectricBreakerActor::GetInteractionPromptText_Implementation() const
 {
-	return FText::FromString(TEXT("차단기 내리기"));
+	if (LinkedSwitchboard && LinkedSwitchboard->CanFlipBreaker())
+	{
+		return FText::FromString(TEXT("차단기 내리기"));
+	}
+
+	if (LinkedSwitchboard && LinkedSwitchboard->IsBreakerFlipped())
+	{
+		return FText::FromString(TEXT("차단기 (내려감)"));
+	}
+
+	return FText::FromString(TEXT("차단기 (전원 잠김)"));
 }

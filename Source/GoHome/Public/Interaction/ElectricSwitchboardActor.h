@@ -50,7 +50,9 @@ public:
 
 	AElectricSwitchboardActor();
 
-	bool IsBreakerUnlocked() const { return SwitchboardState == ESwitchboardState::Resolved; }
+	// 퍼즐 성공 상태이고 아직 차단기를 안 내렸을 때만 true (차단기 액터가 클라에서도 읽으므로 bBreakerFlipped는 복제).
+	bool CanFlipBreaker() const { return SwitchboardState == ESwitchboardState::Resolved && !bBreakerFlipped; }
+	bool IsBreakerFlipped() const { return bBreakerFlipped; }
 
 	// AElectricBreakerActor::OnInteract에서 호출.
 	bool TryResolveViaBreaker();
@@ -198,6 +200,9 @@ protected:
 
 	UPROPERTY(ReplicatedUsing = OnRep_SwitchboardState, BlueprintReadOnly, Category = "Switchboard")
 	ESwitchboardState SwitchboardState = ESwitchboardState::PuzzleActive;
+
+	UPROPERTY(Replicated)
+	bool bBreakerFlipped = false;
 
 	UPROPERTY(EditAnywhere, Category = "Switchboard|Puzzle")
 	float LockedResetDuration = 30.f;

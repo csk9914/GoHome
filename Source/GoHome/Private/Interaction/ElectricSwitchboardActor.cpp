@@ -224,7 +224,6 @@ void AElectricSwitchboardActor::ServerSubmitPassword_Implementation(const TArray
 }
 
 
-
 void AElectricSwitchboardActor::HandlePuzzleFailed()
 {
 	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 퍼즐 실패"));
@@ -255,11 +254,12 @@ void AElectricSwitchboardActor::HandlePuzzleSucceeded()
 
 bool AElectricSwitchboardActor::TryResolveViaBreaker()
 {
-	if (SwitchboardState != ESwitchboardState::Resolved)
+	if (!CanFlipBreaker())
 	{
 		return false;
 	}
 
+	bBreakerFlipped = true; // 1회용 - 이후 차단기의 CanInteract가 false가 된다.
 	DangerGauge = 0.f;
 
 	// 성공: 차단기를 내리면 위험 해제 + 최고 등급 입구 오픈 (ServerOpen은 1회만 동작하므로 중복 조작에 안전).
@@ -272,7 +272,6 @@ bool AElectricSwitchboardActor::TryResolveViaBreaker()
 	}
 	return true;
 }
-
 
 bool AElectricSwitchboardActor::CanInteract(APawn* InstigatorPawn) const
 {
@@ -321,6 +320,7 @@ void AElectricSwitchboardActor::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 	DOREPLIFETIME(AElectricSwitchboardActor, PasswordDigits);
 	DOREPLIFETIME(AElectricSwitchboardActor, HintMode);
 	DOREPLIFETIME(AElectricSwitchboardActor, FocusingPawn);
+	DOREPLIFETIME(AElectricSwitchboardActor, bBreakerFlipped);
 }
 
 void AElectricSwitchboardActor::ReleaseFocus()
@@ -388,6 +388,7 @@ void AElectricSwitchboardActor::ResetPuzzle()
 	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 리셋 - 다시 도전 가능"));
 
 	DangerGauge = 0.f;
+	bBreakerFlipped = false;
 	SwitchboardState = ESwitchboardState::PuzzleActive;
 	OnRep_SwitchboardState();
 
