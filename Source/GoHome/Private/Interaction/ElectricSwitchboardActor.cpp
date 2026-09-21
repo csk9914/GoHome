@@ -12,6 +12,7 @@
 #include "Interaction/SwitchboardPasswordWidget.h"
 #include "Interaction/SwitchboardScreenWidget.h"
 #include "Player/Damageable.h"
+#include "Interaction/RewardEntranceActor.h"
 
 AElectricSwitchboardActor::AElectricSwitchboardActor()
 {
@@ -214,7 +215,14 @@ void AElectricSwitchboardActor::HandlePuzzleFailed()
 	// 자동 리셋 없음 - 실패하면 이 스테이지 안에서는 끝. 고위험 루트로만 보상 획득 가능.
 	// (스테이지/라운드 재시작 시스템이 생기면 그때 ResetPuzzle()을 거기서 수동 호출)
 
-	// TODO: 고위험 입구 오픈 로직 - 다음 라운드.
+	// 실패: 입구는 즉시 열리지만 게이지는 계속 오르고 구역 내 페널티도 계속됨 (Risky 등급 보상).
+	for (ARewardEntranceActor* Entrance : LinkedEntrances)
+	{
+		if (Entrance)
+		{
+			Entrance->ServerOpen(ERewardGrade::Risky);
+		}
+	}
 }
 
 void AElectricSwitchboardActor::HandlePuzzleSucceeded()
@@ -233,7 +241,15 @@ bool AElectricSwitchboardActor::TryResolveViaBreaker()
 	}
 
 	DangerGauge = 0.f;
-	// TODO: 최고 보상 입구 오픈 로직 - 다음 라운드.
+
+	// 성공: 차단기를 내리면 위험 해제 + 최고 등급 입구 오픈 (ServerOpen은 1회만 동작하므로 중복 조작에 안전).
+	for (ARewardEntranceActor* Entrance : LinkedEntrances)
+	{
+		if (Entrance)
+		{
+			Entrance->ServerOpen(ERewardGrade::High);
+		}
+	}
 	return true;
 }
 

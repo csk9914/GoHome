@@ -15,6 +15,7 @@ class UCameraComponent;
 class UWidgetComponent;
 class USwitchboardPasswordWidget;
 class USwitchboardScreenWidget;
+class ARewardEntranceActor;
 
 UENUM(BlueprintType)
 enum class ESwitchboardState : uint8
@@ -195,6 +196,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Switchboard|Puzzle")
 	float LockedResetDuration = 30.f;
+
+	// 퍼즐 결과에 따라 열어줄 보상 입구. 레벨에서 연결 (다른 방/여러 개 가능).
+	UPROPERTY(EditInstanceOnly, Category = "Switchboard|Reward")
+	TArray<TObjectPtr<ARewardEntranceActor>> LinkedEntrances;
 
 	void ResetPuzzle();
 
