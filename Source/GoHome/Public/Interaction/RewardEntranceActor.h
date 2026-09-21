@@ -62,11 +62,17 @@ public:
 protected:
 
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaTime) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
-	// 입구를 막는 문/셔터. 틈(slit)이 뚫린 메시를 넣고, 콜리전은 틈까지 막히게 단순 박스로 - 빛만 새어 나오게.
+	// 루트(앵커). GapGlow/Reward*가 이 아래에 붙으므로 움직이지 않는다 - 메시는 비워 둘 것(문은 DoorMesh).
 	UPROPERTY(VisibleAnywhere, Category = "RewardEntrance")
 	TObjectPtr<UStaticMeshComponent> BlockerMesh;
+
+	// 실제 문. 열릴 때 이 컴포넌트만 움직인다 (루트를 움직이면 빛과 보상 스폰 위치까지 딸려감).
+	// 틈(slit)이 뚫린 메시를 넣고, 콜리전은 틈까지 막히게 단순 박스로 - 빛만 새어 나오게.
+	UPROPERTY(VisibleAnywhere, Category = "RewardEntrance")
+	TObjectPtr<UStaticMeshComponent> DoorMesh;
 
 	// 틈으로 새어 나오는 빛. 위치는 BP에서 문 안쪽에 배치. 컴포넌트의 Intensity가 배율 1.0의 기준.
 	UPROPERTY(VisibleAnywhere, Category = "RewardEntrance")
@@ -111,6 +117,26 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "RewardEntrance|FX")
 	TObjectPtr<USoundBase> RiskyOpenSound;
 
+	// --- 문 개방 연출 (입구별로 BP에서 조정) ---
+// 닫힌 자세 기준 이동량 (위로 밀기: +Z 문 높이만큼). 부모(루트) 스케일이 1이 아니면 그 배율로 움직임.
+	UPROPERTY(EditAnywhere, Category = "RewardEntrance|Door")
+	FVector DoorOpenLocationOffset = FVector::ZeroVector;
+
+	// 닫힌 자세 기준 로컬 회전량 (경첩식: 피벗이 경첩 위치일 때 Yaw = 90 또는 -90).
+	UPROPERTY(EditAnywhere, Category = "RewardEntrance|Door")
+	FRotator DoorOpenRotationOffset = FRotator::ZeroRotator;
+
+	UPROPERTY(EditAnywhere, Category = "RewardEntrance|Door", meta = (ClampMin = "0.0"))
+	float DoorOpenDuration = 1.2f;
+
+	// 이징 세기: 1 = 선형, 2 = 부드러운 가감속, 클수록 시작/끝이 더 완만.
+	UPROPERTY(EditAnywhere, Category = "RewardEntrance|Door", meta = (ClampMin = "1.0"))
+	float DoorEaseExponent = 2.f;
+
+	// 연출이 끝난 뒤 문을 숨길지. 콜리전은 문과 함께 남으므로, 열린 자세가 벽/천장 속일 때만 true (아니면 보이지 않는 벽이 됨).
+	UPROPERTY(EditAnywhere, Category = "RewardEntrance|Door")
+	bool bHideDoorAfterOpen = false;
+
 private:	
 
 	UPROPERTY(ReplicatedUsing = OnRep_EntranceState)
@@ -127,5 +153,16 @@ private:
 
 	// GapGlow의 원본 Intensity (첫 ApplyEntranceState에서 캡처). -1 = 아직 캡처 전.
 	float BaseGlowIntensity = -1.f;
+
+	// 닫힌 문 자세를 첫 ApplyEntranceState에서 캡처 (문이 한 번도 안 움직인 시점).
+	void CaptureDoorClosedPose();
+
+	// 0~1 진행도에 맞춰 문의 상대 위치/회전을 설정.
+	void SetDoorOpenAlpha(float Alpha);
+
+	FVector DoorClosedLocation = FVector::ZeroVector;
+	FQuat DoorClosedRotation = FQuat::Identity;
+	bool bDoorClosedPoseCaptured = false;
+	float DoorOpenElapsed = 0.f;
 
 };

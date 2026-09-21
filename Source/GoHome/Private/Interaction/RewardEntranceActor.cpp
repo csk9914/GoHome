@@ -12,13 +12,20 @@
 
 ARewardEntranceActor::ARewardEntranceActor()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false; // 문 개방 연출 동안에만 켠다.
 	bReplicates = true;
 
 	BlockerMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BlockerMesh"));
 	SetRootComponent(BlockerMesh);
 	BlockerMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	BlockerMesh->SetCollisionObjectType(ECC_WorldStatic);
+
+	DoorMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DoorMesh"));
+	DoorMesh->SetupAttachment(BlockerMesh);
+	DoorMesh->SetMobility(EComponentMobility::Movable); // 런타임에 움직이므로.
+	DoorMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	DoorMesh->SetCollisionObjectType(ECC_WorldStatic);
 
 	GapGlow = CreateDefaultSubobject<UPointLightComponent>(TEXT("GapGlow"));
 	GapGlow->SetupAttachment(BlockerMesh);
@@ -47,7 +54,7 @@ void ARewardEntranceActor::ServerOpen(ERewardGrade Grade)
 
 	ApplyEntranceState(true); // 서버 자신은 OnRep이 안 뜨므로 수동 호출.
 
-	// 블로커 콜리전이 꺼진 뒤에 스폰해야 아이템의 SnapToGround 트레이스가 문에 안 걸린다.
+	// 문 콜리전은 열린 뒤에도 문과 함께 남는다 - 보상 위치(Reward*)는 닫힌 문 콜리전에서 충분히 떨어져 있어야 SnapToGround 트레이스가 문에 안 걸림(LD 규칙).
 	SpawnRewards(Grade == ERewardGrade::High ? HighReward : RiskyReward);
 }
 
@@ -59,6 +66,8 @@ void ARewardEntranceActor::OnRep_EntranceState()
 
 void ARewardEntranceActor::ApplyEntranceState(bool bPlayEffects)
 {
+	CaptureDoorClosedPose(); // 문이 한 번도 안 움직인 첫 호출에서 닫힌 자세를 캡처.
+
 	if (BaseGlowIntensity < 0.f)
 	{
 		BaseGlowIntensity = GapGlow->Intensity;
@@ -92,12 +101,17 @@ void ARewardEntranceActor::ApplyEntranceState(bool bPlayEffects)
 
 	if (EntranceState == EEntranceState::Sealed) return;
 
-	// 열림: 문 숨김 + 통행 허용.
-	BlockerMesh->SetVisibility(false);
-	BlockerMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	BlockerMesh->SetCanEverAffectNavigation(false);
+	if (!bPlayEffects)
+	{
+		// 늦게 접속한 클라의 동기화 - 연출 없이 열린 최종 자세로.
+		SetDoorOpenAlpha(1.f);
+		DoorMesh->SetVisibility(!bHideDoorAfterOpen);
+		return;
+	}
 
-	if (!bPlayEffects) return;
+	// 문 개방 연출 시작 (Tick이 DoorOpenDuration 동안만 돈다).
+	DoorOpenElapsed = 0.f;
+	SetActorTickEnabled(true);
 
 	if (Effect)
 	{
@@ -170,4 +184,34 @@ void ARewardEntranceActor::SpawnRewards(const FRewardTierConfig& Config)
 	}
 
 	UE_LOG(LogTemp, Warning, TEXT("[RewardEntrance] 보상 %d개 스폰"), SpawnCount);
+}
+
+void ARewardEntranceActor::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	DoorOpenElapsed += DeltaTime;
+	const float RawAlpha = (DoorOpenDuration > 0.f) ? FMath::Clamp(DoorOpenElapsed / DoorOpenDuration, 0.f, 1.f) : 1.f;
+	SetDoorOpenAlpha(FMath::InterpEaseInOut(0.f, 1.f, RawAlpha, DoorEaseExponent));
+
+	if (RawAlpha >= 1.f)
+	{
+		SetActorTickEnabled(false);
+		DoorMesh->SetVisibility(!bHideDoorAfterOpen);
+	}
+}
+
+void ARewardEntranceActor::CaptureDoorClosedPose()
+{
+	if (bDoorClosedPoseCaptured) return;
+
+	bDoorClosedPoseCaptured = true;
+	DoorClosedLocation = DoorMesh->GetRelativeLocation();
+	DoorClosedRotation = DoorMesh->GetRelativeRotation().Quaternion();
+}
+
+void ARewardEntranceActor::SetDoorOpenAlpha(float Alpha)
+{
+	DoorMesh->SetRelativeLocation(DoorClosedLocation + DoorOpenLocationOffset * Alpha);
+	DoorMesh->SetRelativeRotation(DoorClosedRotation * (DoorOpenRotationOffset * Alpha).Quaternion());
 }
