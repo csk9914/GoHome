@@ -11,11 +11,11 @@ AItemSpawnManager::AItemSpawnManager()
  	
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = true;   // 클라에서 Role이 제대로 SimulatedProxy로 내려감
+	bAlwaysRelevant = true; // 루트 컴포넌트가 없어 IsNetRelevantFor가 경고를 반복 출력하며 항상 false를 반환하던 문제 회피.
 
 	TargetCountPerTier.Add(ESpawnDangerTier::Near, 4);
 	TargetCountPerTier.Add(ESpawnDangerTier::Mid, 5);
 	TargetCountPerTier.Add(ESpawnDangerTier::Far, 6);
-
 }
 
 
