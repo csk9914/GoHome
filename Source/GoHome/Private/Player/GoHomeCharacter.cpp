@@ -535,7 +535,6 @@ void AGoHomeCharacter::EnterSwitchboardFocus(AElectricSwitchboardActor* Switchbo
 	EnteredPasswordDigits.Reset();
 
 	UpdateWireHighlight(-1, HighlightedWireIndex);
-	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 포커스 진입"));
 
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
@@ -561,7 +560,6 @@ void AGoHomeCharacter::ExitSwitchboardFocus()
 	FocusedSwitchboard = nullptr;
 	HighlightedWireIndex = -1;
 
-	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 포커스 종료"));
 }
 
 void AGoHomeCharacter::Client_EnterSwitchboardFocus_Implementation(AElectricSwitchboardActor* Switchboard)
@@ -646,7 +644,6 @@ void AGoHomeCharacter::MoveHighlightedKey(int32 RowDelta, int32 ColDelta)
 	HighlightedWireIndex = RowColToIndex(NewRow, NewCol);
 
 	UpdateWireHighlight(OldIndex, HighlightedWireIndex);
-	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 커서: %d"), HighlightedWireIndex);
 }
 
 
