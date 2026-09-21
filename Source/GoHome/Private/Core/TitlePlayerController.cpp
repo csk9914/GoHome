@@ -18,10 +18,22 @@ void ATitlePlayerController::CreateGameSession(int32 NumPublicConnections)
 
 void ATitlePlayerController::FindGameSessions(int32 MaxSearchResults)
 {
-	if (CachedSessionSubsystem.IsValid())                                                                     
-	{                                                                                                         
-		CachedSessionSubsystem->FindSessions(MaxSearchResults);                                           
+	if (bFindSessionsInFlight)
+	{
+		// 이전 검색이 아직 안 끝났음 - 여기서 또 호출하면 SessionSubsystem에 델리게이트가 중첩 등록됨
+		return;
 	}
+
+	if (CachedSessionSubsystem.IsValid())
+	{
+		bFindSessionsInFlight = true;
+		CachedSessionSubsystem->FindSessions(MaxSearchResults);
+	}
+}
+
+void ATitlePlayerController::AutoRefreshFindSessions()
+{
+	FindGameSessions(SessionListMaxSearchResults);
 }
 
 void ATitlePlayerController::JoinSessionByIndex(int32 Index)
@@ -60,18 +72,27 @@ void ATitlePlayerController::BeginPlay()
 	{
 		SetViewTargetWithBlend(Camera, 0.f);
 	}
+
+	if (IsLocalController() && SessionListAutoRefreshInterval > 0.f)
+	{
+		// 진입 즉시 1회 조회 + 이후 주기 반복
+		AutoRefreshFindSessions();
+		GetWorldTimerManager().SetTimer(SessionListAutoRefreshTimerHandle, this, &ThisClass::AutoRefreshFindSessions, SessionListAutoRefreshInterval, true);
+	}
 }
 
 void ATitlePlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	GetWorldTimerManager().ClearTimer(SessionListAutoRefreshTimerHandle);
+
 	if (CachedSessionSubsystem.IsValid())
 	{
 		CachedSessionSubsystem->OnCreateComplete.RemoveDynamic(this, &ThisClass::HandleCreateComplete);
-		
-		CachedSessionSubsystem->OnFindComplete.RemoveAll(this);                                           
-		CachedSessionSubsystem->OnJoinComplete.RemoveAll(this);  
+
+		CachedSessionSubsystem->OnFindComplete.RemoveAll(this);
+		CachedSessionSubsystem->OnJoinComplete.RemoveAll(this);
 	}
-	
+
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -88,7 +109,9 @@ void ATitlePlayerController::HandleCreateComplete(bool bWasSuccessful)
 
 void ATitlePlayerController::HandleFindComplete(const TArray<FOnlineSessionSearchResult>& SessionResults, bool bWasSuccessful)
 {
-	CachedSearchResults = SessionResults; 
+	bFindSessionsInFlight = false;
+
+	CachedSearchResults = SessionResults;
 	
 	TArray<FString> DisplayNames; 
 	for (const FOnlineSessionSearchResult& Result : CachedSearchResults)

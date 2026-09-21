@@ -43,12 +43,15 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
-	UFUNCTION()                                                                                               
+	UFUNCTION()
 	void HandleCreateComplete(bool bWasSuccessful);
-	
+
 	void HandleFindComplete(const TArray<FOnlineSessionSearchResult>& SessionResults, bool bWasSuccessful);
 	void HandleJoinComplete(EOnJoinSessionCompleteResult::Type Result);
-	
+
+	// 자동 새로고침 타이머가 호출하는 진입점 (SessionListMaxSearchResults 고정값 사용)
+	void AutoRefreshFindSessions();
+
 public:
 	UPROPERTY(BlueprintAssignable, category = "Title")
 	FGoHomeTitleOnFindComplete OnFindComplete;
@@ -59,11 +62,24 @@ public:
 	// CineCameraActor는 AutoActivateForPlayer 카테고리를 숨기므로 여기서 명시적으로 뷰타겟을 지정
 	UPROPERTY(EditAnywhere, Category = "Title")
 	TSoftObjectPtr<ACineCameraActor> TitleCamera;
-	
+
+	// 타이틀 화면 진입 시 자동 새로고침 주기(초). BeginPlay에서 즉시 1회 + 이 주기로 반복 조회.
+	UPROPERTY(EditAnywhere, Category = "Title")
+	float SessionListAutoRefreshInterval = 5.f;
+
+	// 자동 새로고침이 사용하는 MaxSearchResults (수동 "방 찾기" 버튼은 BP에서 별도 값을 넘김)
+	UPROPERTY(EditAnywhere, Category = "Title")
+	int32 SessionListMaxSearchResults = 50;
+
 private:
 	TWeakObjectPtr<USessionSubsystem> CachedSessionSubsystem;
-	
-	// HandleFindComplete에서 받은 원본 결과를 보관 — BP가 "몇 번째 항목 선택"으로 알려주면                   
-	// 이 배열의 같은 인덱스를 SessionSubsystem::JoinSession에 넘기기 위함                                    
+
+	// HandleFindComplete에서 받은 원본 결과를 보관 — BP가 "몇 번째 항목 선택"으로 알려주면
+	// 이 배열의 같은 인덱스를 SessionSubsystem::JoinSession에 넘기기 위함
 	TArray<FOnlineSessionSearchResult> CachedSearchResults;
+
+	FTimerHandle SessionListAutoRefreshTimerHandle;
+
+	// FindGameSessions 진행 중 타이머/수동클릭이 겹쳐 SessionSubsystem에 델리게이트가 중첩 등록되는 것을 방지
+	bool bFindSessionsInFlight = false;
 };
