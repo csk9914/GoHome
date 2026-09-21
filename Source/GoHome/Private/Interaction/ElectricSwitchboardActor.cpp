@@ -13,6 +13,11 @@
 #include "Interaction/SwitchboardScreenWidget.h"
 #include "Player/Damageable.h"
 #include "Interaction/RewardEntranceActor.h"
+#include "Components/AudioComponent.h"
+#include "Components/PointLightComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundAttenuation.h"
 
 AElectricSwitchboardActor::AElectricSwitchboardActor()
 {
@@ -40,6 +45,15 @@ AElectricSwitchboardActor::AElectricSwitchboardActor()
 	PasswordDisplayWidget->SetupAttachment(SwitchboardMesh);
 	PasswordDisplayWidget->SetWidgetSpace(EWidgetSpace::World);
 
+	HumAudio = CreateDefaultSubobject<UAudioComponent>(TEXT("HumAudio"));
+	HumAudio->SetupAttachment(SwitchboardMesh);
+	HumAudio->bAutoActivate = false;
+	HumAudio->SetIsReplicated(false); // 재생은 각 머신이 게이지 비율로 로컬 처리.
+
+	WarningLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("WarningLight"));
+	WarningLight->SetupAttachment(SwitchboardMesh);
+	WarningLight->SetMobility(EComponentMobility::Movable); // 런타임에 색/세기를 바꾸므로.
+
 
 }
 
@@ -47,6 +61,10 @@ AElectricSwitchboardActor::AElectricSwitchboardActor()
 void AElectricSwitchboardActor::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// 조명은 에디터에서 위치/세기를 잡을 수 있게 켜둔 채로 두고, 시작 시 기준 세기를 캡처한 뒤 끈다.
+	BaseLightIntensity = WarningLight->Intensity;
+	WarningLight->SetVisibility(false);
 
 	EffectArea->OnComponentBeginOverlap.AddDynamic(this, &AElectricSwitchboardActor::OnEffectAreaBeginOverlap);
 	EffectArea->OnComponentEndOverlap.AddDynamic(this, &AElectricSwitchboardActor::OnEffectAreaEndOverlap);
@@ -74,13 +92,15 @@ void AElectricSwitchboardActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	UpdateDangerFeedback(DeltaTime); // 코스메틱: 서버/클라 모두 (전용 서버는 내부에서 제외).
+
 	if (!HasAuthority() || SwitchboardState == ESwitchboardState::Resolved)
 	{
 		return;
 	}
 
 	const bool bShouldRiseGauge = (SwitchboardState == ESwitchboardState::Locked)
-                            	   || (OverlappingCharacters.Num() > 0)
+		                           || (OverlappingCharacters.Num() > 0)
 	                               || (FocusingPawn != nullptr);
 
 	if (!bShouldRiseGauge)
@@ -390,5 +410,94 @@ void AElectricSwitchboardActor::UpdatePasswordDisplay(const TArray<int32>& Enter
 	if (USwitchboardPasswordWidget* Widget = Cast<USwitchboardPasswordWidget>(PasswordDisplayWidget->GetUserWidgetObject()))
 	{
 		Widget->SetEnteredDigits(EnteredDigits);
+	}
+}
+
+void AElectricSwitchboardActor::UpdateDangerFeedback(float DeltaTime)
+{
+	if (IsNetMode(NM_DedicatedServer)) return; // 보고 들을 사람이 없음.
+
+	// 효과 세기 = 실제 위험. Resolved는 게이지/페널티가 멈춘 상태라 0으로 간주.
+	const float TargetRatio = (SwitchboardState == ESwitchboardState::Resolved || MaxGauge <= 0.f)
+		? 0.f
+		: FMath::Clamp(DangerGauge / MaxGauge, 0.f, 1.f);
+
+	SmoothedFeedbackRatio = FMath::FInterpTo(SmoothedFeedbackRatio, TargetRatio, DeltaTime, FeedbackRatioInterpSpeed);
+	if (TargetRatio <= 0.f && SmoothedFeedbackRatio < 0.01f)
+	{
+		SmoothedFeedbackRatio = 0.f; // 보간 꼬리를 잘라 완전히 꺼지게.
+	}
+
+	const float Ratio = SmoothedFeedbackRatio;
+	const bool bActive = Ratio > 0.f;
+
+	// 경고 조명
+	if (WarningLight)
+	{
+		WarningLight->SetVisibility(bActive);
+
+		if (bActive)
+		{
+			LightFlickerTimer -= DeltaTime;
+			if (LightFlickerTimer <= 0.f)
+			{
+				LightFlickerTimer = FMath::FRandRange(0.02f, 0.12f);
+				LightFlickerFactor = FMath::FRandRange(1.f - LightFlickerDepth * Ratio, 1.f);
+			}
+
+			WarningLight->SetLightColor((WarningLightColorLow * (1.f - Ratio)) + (WarningLightColorHigh * Ratio));
+			WarningLight->SetIntensity(BaseLightIntensity * FMath::Lerp(WarningLightScaleMin, WarningLightScaleMax, Ratio) * LightFlickerFactor);
+		}
+	}
+
+	// 험 루프
+	if (HumAudio && HumAudio->Sound)
+	{
+		if (Ratio >= HumStartRatio)
+		{
+			const float HumAlpha = FMath::GetMappedRangeValueClamped(FVector2D(HumStartRatio, 1.f), FVector2D(0.f, 1.f), Ratio);
+			HumAudio->SetVolumeMultiplier(FMath::Lerp(HumVolumeMin, HumVolumeMax, HumAlpha));
+			HumAudio->SetPitchMultiplier(FMath::Lerp(HumPitchMin, HumPitchMax, HumAlpha));
+
+			if (!HumAudio->IsPlaying())
+			{
+				HumAudio->Play();
+			}
+		}
+		else if (HumAudio->IsPlaying())
+		{
+			HumAudio->Stop();
+		}
+	}
+
+	// 스파크: 게이지가 높을수록 간격이 짧아짐.
+	if (bActive)
+	{
+		SparkTimer -= DeltaTime;
+		if (SparkTimer <= 0.f)
+		{
+			SparkTimer = FMath::Lerp(SparkIntervalMax, SparkIntervalMin, Ratio) * FMath::FRandRange(0.7f, 1.3f);
+			SpawnSpark(Ratio);
+		}
+	}
+}
+
+void AElectricSwitchboardActor::SpawnSpark(float Ratio)
+{
+	const FVector Origin = SwitchboardMesh->Bounds.Origin;
+	const FVector Extent = SwitchboardMesh->Bounds.BoxExtent * SparkAreaScale;
+	const FVector Location = Origin + FVector(FMath::FRandRange(-Extent.X, Extent.X),
+		FMath::FRandRange(-Extent.Y, Extent.Y),
+		FMath::FRandRange(-Extent.Z, Extent.Z));
+
+	if (SparkEffect)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(this, SparkEffect, Location, GetActorRotation());
+	}
+
+	if (SparkSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, SparkSound, Location,
+			FMath::Lerp(SparkVolumeMin, SparkVolumeMax, Ratio), FMath::FRandRange(0.9f, 1.1f), 0.f, SparkSoundAttenuation);
 	}
 }
