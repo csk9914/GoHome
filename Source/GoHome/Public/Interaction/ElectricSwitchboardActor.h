@@ -172,7 +172,7 @@ protected:
 	float PostStunGracePeriod = 1.f;
 
 	// --- 퍼즐 ---
-// LD가 "Wire0", "Wire1"... 이름으로 자식 컴포넌트를 만들면 BeginPlay에서 자동 수집됨.
+    // LD가 "Wire0", "Wire1"... 이름으로 자식 컴포넌트를 만들면 BeginPlay에서 자동 수집됨.
 	UPROPERTY(VisibleAnywhere, Category = "Switchboard|Puzzle")
 	TArray<TObjectPtr<UMeshComponent>> WireTargets;
 
@@ -290,7 +290,76 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Switchboard|Feedback|Light", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float LightFlickerDepth = 0.8f;
 
+	// --- 알람 소음 (서버 전용): 게이지가 오르는 동안 몬스터를 끌어들임 ---
+    // 서버 권위 Tick에서 호출. 게이지 비율이 시작 임계값 이상이면 주기적으로 GenerateNoise 발생.
+    // 누적 알람 시간이 MaxAlarmSeconds에 닿으면 이후 무음(회로 소손) - 실패 후 무한 사이렌으로 몬스터를 붙잡아 두는 어뷰징 방지.
+	void TickAlarmNoise(float DeltaTime);
 
+	// 이 비율 이상일 때만 소음 발생.
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float AlarmStartRatio = 0.3f;
+
+	// 이 비율 이상이면 Large 등급.
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float AlarmLargeRatio = 0.6f;
+
+	// 이 비율 이상이면 Alarm 등급.
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float AlarmPeakRatio = 0.9f;
+
+	// 등급별 소음 반경. ENoiseType 문서 범위: Medium 800~1200, Large 1500~2000, Alarm 2500~3000.
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm")
+	float AlarmRadiusMedium = 1000.f;
+
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm")
+	float AlarmRadiusLarge = 2000.f;
+
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm")
+	float AlarmRadiusPeak = 3500.f;
+
+	// 발생 간격: 게이지가 낮을 때(Max) -> 높을 때(Min).
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm")
+	float AlarmIntervalMax = 4.f;
+
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm")
+	float AlarmIntervalMin = 1.2f;
+
+	// 누적 알람 상한(초). 알람이 실제로 활성인 시간만큼 소진되고, 0이 되면 이후 소음 없음. 0 이하 = 소음 끔.
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm")
+	float MaxAlarmSeconds = 60.f;
+
+	// --- 알람 사운드: 소음이 발생하는 순간 모든 머신에서 재생 ---
+    // 소음은 서버에서만 발생하고 알람 예산도 서버 전용이라, 서버가 발생 시점에 Multicast로 알린다
+    // (클라가 자체 타이머로 재생하면 예산 소진 시점을 몰라 어긋남).
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayAlarmSound(float VolumeMultiplier, float PitchMultiplier);
+
+	// 짧은 원샷 사운드 (Sound Wave의 Looping은 꺼둘 것).
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm|Sound")
+	TObjectPtr<USoundBase> AlarmSound;
+
+	// 가청 거리를 소음 반경(Peak 기준)에 맞춘 감쇠 에셋.
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm|Sound")
+	TObjectPtr<USoundAttenuation> AlarmSoundAttenuation;
+
+	// 등급별 볼륨/피치 배율 (사운드 에셋 하나를 공유).
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm|Sound")
+	float AlarmVolumeMedium = 0.6f;
+
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm|Sound")
+	float AlarmPitchMedium = 1.f;
+
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm|Sound")
+	float AlarmVolumeLarge = 0.85f;
+
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm|Sound")
+	float AlarmPitchLarge = 1.1f;
+
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm|Sound")
+	float AlarmVolumePeak = 1.f;
+
+	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm|Sound")
+	float AlarmPitchPeak = 1.25f;
 
 	void ResetPuzzle();
 
@@ -311,5 +380,9 @@ private:
 	float LightFlickerTimer = 0.f;
 	float LightFlickerFactor = 1.f;
 	float BaseLightIntensity = 1.f;
+
+	// 알람 소음 상태 (서버 전용)
+	float AlarmTimer = 0.f;
+	float AlarmSecondsUsed = 0.f;
 
 };

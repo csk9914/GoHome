@@ -18,6 +18,7 @@
 #include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundAttenuation.h"
+#include "AI/NoiseType.h"
 
 AElectricSwitchboardActor::AElectricSwitchboardActor()
 {
@@ -109,6 +110,8 @@ void AElectricSwitchboardActor::Tick(float DeltaTime)
 	}
 
 	DangerGauge = FMath::Clamp(DangerGauge + GaugeRisePerSecond * DeltaTime, 0.f, MaxGauge);
+
+	TickAlarmNoise(DeltaTime);
 
 	PenaltyTickAccumulator += DeltaTime;
 	if (PenaltyTickAccumulator >= PenaltyTickInterval)
@@ -389,6 +392,8 @@ void AElectricSwitchboardActor::ResetPuzzle()
 
 	DangerGauge = 0.f;
 	bBreakerFlipped = false;
+	AlarmTimer = 0.f;
+	AlarmSecondsUsed = 0.f;
 	SwitchboardState = ESwitchboardState::PuzzleActive;
 	OnRep_SwitchboardState();
 
@@ -501,4 +506,58 @@ void AElectricSwitchboardActor::SpawnSpark(float Ratio)
 		UGameplayStatics::PlaySoundAtLocation(this, SparkSound, Location,
 			FMath::Lerp(SparkVolumeMin, SparkVolumeMax, Ratio), FMath::FRandRange(0.9f, 1.1f), 0.f, SparkSoundAttenuation);
 	}
+}
+
+
+void AElectricSwitchboardActor::TickAlarmNoise(float DeltaTime)
+{
+	if (MaxGauge <= 0.f) return;
+
+	const float Ratio = FMath::Clamp(DangerGauge / MaxGauge, 0.f, 1.f);
+	if (Ratio < AlarmStartRatio) return;
+
+	// 누적 알람 상한: 소진되면 회로가 타서 이후 무음 (게이지/페널티는 그대로 유지).
+	if (AlarmSecondsUsed >= MaxAlarmSeconds) return;
+	AlarmSecondsUsed += DeltaTime;
+
+	AlarmTimer -= DeltaTime;
+	if (AlarmTimer > 0.f) return;
+
+	AlarmTimer = FMath::Lerp(AlarmIntervalMax, AlarmIntervalMin, Ratio);
+
+	ENoiseType Type = ENoiseType::Medium;
+	float Radius = AlarmRadiusMedium;
+	float Volume = AlarmVolumeMedium;
+	float Pitch = AlarmPitchMedium;
+
+	if (Ratio >= AlarmPeakRatio)
+	{
+		Type = ENoiseType::Alarm;
+		Radius = AlarmRadiusPeak;
+		Volume = AlarmVolumePeak;
+		Pitch = AlarmPitchPeak;
+	}
+	else if (Ratio >= AlarmLargeRatio)
+	{
+		Type = ENoiseType::Large;
+		Radius = AlarmRadiusLarge;
+		Volume = AlarmVolumeLarge;
+		Pitch = AlarmPitchLarge;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 알람 소음: Ratio=%.2f Type=%d Radius=%.0f 예산=%.1f/%.1f"),
+		Ratio, static_cast<int32>(Type), Radius, AlarmSecondsUsed, MaxAlarmSeconds);
+
+	UGoHomeNoiseLibrary::GenerateNoise(this, GetActorLocation(), Radius, Type, this);
+
+	// 소음이 발생하는 이 순간에 모든 머신이 같은 소리를 듣는다 (몬스터가 듣는 시점과 동기화).
+	Multicast_PlayAlarmSound(Volume, Pitch);
+}
+
+void AElectricSwitchboardActor::Multicast_PlayAlarmSound_Implementation(float VolumeMultiplier, float PitchMultiplier)
+{
+	if (!AlarmSound || IsNetMode(NM_DedicatedServer)) return;
+
+	UGameplayStatics::PlaySoundAtLocation(this, AlarmSound, GetActorLocation(),
+		VolumeMultiplier, PitchMultiplier, 0.f, AlarmSoundAttenuation);
 }
