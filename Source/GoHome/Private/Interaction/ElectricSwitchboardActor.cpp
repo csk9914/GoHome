@@ -75,7 +75,6 @@ void AElectricSwitchboardActor::BeginPlay()
 	if (USwitchboardScreenWidget* ScreenWidget = Cast<USwitchboardScreenWidget>(MainScreenWidget->GetUserWidgetObject()))
 	{
 		ScreenWidget->OwningSwitchboard = this;
-		UE_LOG(LogTemp, Warning, TEXT("[Switchboard] MainScreenWidget 참조 연결 성공"));
 	}
 	else
 	{
@@ -177,7 +176,6 @@ void AElectricSwitchboardActor::TickPenalizeOverlappingCharacters(float DeltaTim
 		}
 
 		const float Roll = FMath::FRand();
-		UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 판정: Gauge=%.1f Roll=%.2f Death=%.2f Stun=%.2f"), DangerGauge, Roll, DeathChance, StunChance);
 		const FVector KnockbackDir = (Character->GetActorLocation() - GetActorLocation()).GetSafeNormal();
 
 		if (Roll < DeathChance)
@@ -216,12 +214,10 @@ void AElectricSwitchboardActor::ServerSubmitPassword_Implementation(const TArray
 
 	if (EnterDigits == PasswordDigits)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 비밀번호 일치 - 성공"));
 		HandlePuzzleSucceeded();
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 비밀번호 불일치 - 실패"));
 		HandlePuzzleFailed();
 	}
 }
@@ -229,7 +225,6 @@ void AElectricSwitchboardActor::ServerSubmitPassword_Implementation(const TArray
 
 void AElectricSwitchboardActor::HandlePuzzleFailed()
 {
-	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 퍼즐 실패"));
 	ReleaseFocus();
 	SwitchboardState = ESwitchboardState::Locked;
 	OnRep_SwitchboardState();
@@ -249,7 +244,6 @@ void AElectricSwitchboardActor::HandlePuzzleFailed()
 
 void AElectricSwitchboardActor::HandlePuzzleSucceeded()
 {
-	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 퍼즐 성공"));
 	ReleaseFocus();
 	SwitchboardState = ESwitchboardState::Resolved;
 	OnRep_SwitchboardState();
@@ -287,7 +281,7 @@ void AElectricSwitchboardActor::OnInteract(APawn* InstigatorPawn)
 	if (!FocusingPawn)
 	{
 		FocusingPawn = InstigatorPawn;
-		SetOwner(InstigatorPawn); // ServerRemoveWire RPC 라우팅에 필요.
+		SetOwner(InstigatorPawn); // ServerSubmitPassword RPC 라우팅에 필요.
 	}
 
 	if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(InstigatorPawn))
@@ -321,7 +315,6 @@ void AElectricSwitchboardActor::GetLifetimeReplicatedProps(TArray<FLifetimePrope
 	DOREPLIFETIME(AElectricSwitchboardActor, DangerGauge);
 	DOREPLIFETIME(AElectricSwitchboardActor, SwitchboardState);
 	DOREPLIFETIME(AElectricSwitchboardActor, PasswordDigits);
-	DOREPLIFETIME(AElectricSwitchboardActor, HintMode);
 	DOREPLIFETIME(AElectricSwitchboardActor, FocusingPawn);
 	DOREPLIFETIME(AElectricSwitchboardActor, bBreakerFlipped);
 }
@@ -388,8 +381,6 @@ void AElectricSwitchboardActor::CollectKeypadComponents()
 
 void AElectricSwitchboardActor::ResetPuzzle()
 {
-	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 리셋 - 다시 도전 가능"));
-
 	DangerGauge = 0.f;
 	bBreakerFlipped = false;
 	AlarmTimer = 0.f;
@@ -544,9 +535,6 @@ void AElectricSwitchboardActor::TickAlarmNoise(float DeltaTime)
 		Volume = AlarmVolumeLarge;
 		Pitch = AlarmPitchLarge;
 	}
-
-	UE_LOG(LogTemp, Warning, TEXT("[Switchboard] 알람 소음: Ratio=%.2f Type=%d Radius=%.0f 예산=%.1f/%.1f"),
-		Ratio, static_cast<int32>(Type), Radius, AlarmSecondsUsed, MaxAlarmSeconds);
 
 	UGoHomeNoiseLibrary::GenerateNoise(this, GetActorLocation(), Radius, Type, this);
 

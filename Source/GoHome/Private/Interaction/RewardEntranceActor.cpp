@@ -50,7 +50,6 @@ void ARewardEntranceActor::ServerOpen(ERewardGrade Grade)
 	if (!HasAuthority() || EntranceState != EEntranceState::Sealed) return;
 
 	EntranceState = (Grade == ERewardGrade::High) ? EEntranceState::OpenedHigh : EEntranceState::OpenedRisky;
-	UE_LOG(LogTemp, Warning, TEXT("[RewardEntrance] 열림 - 등급: %s"), Grade == ERewardGrade::High ? TEXT("High") : TEXT("Risky"));
 
 	ApplyEntranceState(true); // 서버 자신은 OnRep이 안 뜨므로 수동 호출.
 
@@ -182,8 +181,6 @@ void ARewardEntranceActor::SpawnRewards(const FRewardTierConfig& Config)
 			SpawnedItem->ForceNetUpdate();
 		}
 	}
-
-	UE_LOG(LogTemp, Warning, TEXT("[RewardEntrance] 보상 %d개 스폰"), SpawnCount);
 }
 
 void ARewardEntranceActor::Tick(float DeltaTime)

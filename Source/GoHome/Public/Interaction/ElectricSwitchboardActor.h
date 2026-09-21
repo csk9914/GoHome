@@ -30,15 +30,8 @@ enum class ESwitchboardState : uint8
 	Locked // 실패 - 차단기 잠김, 고위험 강행 루트만 남음.
 };
 
-UENUM(BlueprintType)
-enum class EWireHintMode : uint8
-{
-	FlashSequence, // 시작 시 전선이 빛나는 순서로 정답을 암시.
-	ColorIndexClue // 색상이 랜덤 순서로 나타나고 "N번째 색"을 지시
-};
 
-
-// 합선 배전반: 위험도 게이지 + 전선 제거 퍼즐 + 차단기 연동 위협형 보상 오브젝트.
+// 정답 비밀번호(중복 허용). 힌트가 이미 정답을 보여주는 방식이라 클라에 노출해도 무방 (BeginPlay에서 서버가 랜덤 생성).
 // 권위: 게이지·퍼즐 진행·SwitchboardState 전부 서버 권위, 클라는 표시만.
 // 개인별 페널티는 IStunnable을 통해 호출 (캐릭터 타입 결합 금지 - HydrothermalVentZone과 같은 원칙).
 UCLASS()
@@ -176,7 +169,8 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Switchboard|Puzzle")
 	TArray<TObjectPtr<UMeshComponent>> WireTargets;
 
-	// 정답 순서. 힌트가 이미 정답을 보여주는 방식이라 클라에 노출해도 무방 (BeginPlay에서 서버가 셔플).
+	// 정답 비밀번호(중복 허용).
+	// 힌트가 이미 정답을 보여주는 방식이라 클라에 노출해도 무방 (BeginPlay에서 서버가 랜덤 생성).
 	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Switchboard|Puzzle")
 	TArray<int32> PasswordDigits;
 
@@ -195,17 +189,11 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Switchboard")
 	TObjectPtr<UWidgetComponent> PasswordDisplayWidget;
 
-	UPROPERTY(Replicated, BlueprintReadOnly, Category = "Switchboard|Puzzle")
-	EWireHintMode HintMode = EWireHintMode::FlashSequence;
-
 	UPROPERTY(ReplicatedUsing = OnRep_SwitchboardState, BlueprintReadOnly, Category = "Switchboard")
 	ESwitchboardState SwitchboardState = ESwitchboardState::PuzzleActive;
 
 	UPROPERTY(Replicated)
 	bool bBreakerFlipped = false;
-
-	UPROPERTY(EditAnywhere, Category = "Switchboard|Puzzle")
-	float LockedResetDuration = 30.f;
 
 	// 퍼즐 결과에 따라 열어줄 보상 입구. 레벨에서 연결 (다른 방/여러 개 가능).
 	UPROPERTY(EditInstanceOnly, Category = "Switchboard|Reward")
@@ -361,6 +349,7 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Switchboard|Alarm|Sound")
 	float AlarmPitchPeak = 1.25f;
 
+	// 미사용 - 스테이지/라운드 재시작 시스템 연동 대기. 입구(RewardEntrance)를 닫는 처리는 아직 없음.
 	void ResetPuzzle();
 
 private:
@@ -371,8 +360,6 @@ private:
 	TMap < TWeakObjectPtr<ACharacter>, float> NextPenaltyEligibleTime;
 
 	float PenaltyTickAccumulator = 0.f;
-
-	FTimerHandle LockedResetTimerHandle;
 
 	// 피드백 상태 (로컬 코스메틱 전용)
 	float SmoothedFeedbackRatio = 0.f;
