@@ -8,10 +8,13 @@
 #include "EconomyConfigDataAsset.generated.h"
 
 /**
- * 
+ * UPrimaryDataAsset + Asset Manager 스캔 등록(Config/DefaultGame.ini)으로 참조 그래프와 무관하게
+ * 항상 쿡에 포함되도록 함 — GoHomeSaveSubsystem이 경로 문자열로 LoadObject하는데, 순수 UDataAsset이면
+ * 아무도 하드 레퍼런스하지 않아 패키징 빌드에서 쿡이 잘라내 LoadObject가 null을 반환했었음(에디터/PIE는
+ * 언쿡 상태라 경로만으로도 로드돼 증상이 안 보였음).
  */
-UCLASS()
-class GOHOME_API UEconomyConfigDataAsset : public UDataAsset
+UCLASS(BlueprintType)
+class GOHOME_API UEconomyConfigDataAsset : public UPrimaryDataAsset
 {
 	GENERATED_BODY()
 
