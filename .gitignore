@@ -83,6 +83,9 @@ DerivedDataCache/*
 # Claude Code local (personal) settings
 .claude/settings.local.json
 
+# Codex local (personal) skills
+.agents/skills/
+
 # 개인용 자동화 스킬 (미검증, 아직 팀 공유 안 함)
 .claude/skills/24x7-dev-loop/
 .claude/skills/feature-loop/
