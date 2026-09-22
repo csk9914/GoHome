@@ -31,6 +31,9 @@ public:
 	// 클라이언트는 직접 바꾸면 안 된다.
 	bool SetUpgradeLevel(FName UpgradeId, int32 NewLevel);
 
+	// 게임오버/엔딩 때 모든 강화 레벨을 초기화한다.
+	void ResetUpgradeLevels();
+
 protected:
 	virtual void BeginPlay() override;
 

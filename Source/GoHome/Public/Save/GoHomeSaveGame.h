@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
+#include "Upgrade/EquipmentUpgradeTypes.h"
 #include "GoHomeSaveGame.generated.h"
 
 /** 호스트 로컬 세이브: 파티 공유 재화, 구매 완료 업그레이드 목록, 마지막 진행 지점. */
@@ -33,6 +34,10 @@ public:
 	// 강화
 	UPROPERTY(BlueprintReadWrite, Category = "Save")
 	TArray<FName> PurchasedUpgrades;
+
+	// 업그레이드별 현재 강화 레벨 저장(강화 ID, 현재 레벨)
+	UPROPERTY(BlueprintReadWrite, Category = "Save")
+	TArray<FEquipmentUpgradeLevelState> SavedUpgradeLevels;
 
 	// 마지막 도달 진행 지점
 	UPROPERTY(BlueprintReadWrite, Category = "Save")
