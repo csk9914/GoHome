@@ -245,6 +245,13 @@ void AGoHomeCharacter::MoveUpDown(const FInputActionValue& Value)
 
 void AGoHomeCharacter::StartSprint()
 {
+	if (FocusedSwitchboard)
+	{
+		// 배전반 포커스 중엔 Sprint 입력을 '취소'로 재사용 - 힌트 재생 중이거나 스턴 중이어도 탈출 가능해야 함.
+		FocusedSwitchboard->ServerCancelFocus(this);
+		return;
+	}
+
 	if (bIsStunned) return;
 
 	// 협동 운반 중엔 스프린트 불가 -> 캐리어 간 속도 차이로 이탈되는 것 방지.

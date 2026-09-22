@@ -50,6 +50,11 @@ public:
 	// AElectricBreakerActor::OnInteract에서 호출.
 	bool TryResolveViaBreaker();
 
+	// 포커스 중인 플레이어가 스스로 취소할 때 호출.
+	// (GoHomeCharacter::StartSprint 경유).
+	UFUNCTION(Server, Reliable)
+	void ServerCancelFocus(AActor* InInstigator);
+
 	UFUNCTION(Server, Reliable)
 	void ServerSubmitPassword(const TArray<int32>& EnteredDigits, AActor* InInstigator);
 
@@ -126,6 +131,12 @@ protected:
 	UFUNCTION()
 	void OnRep_FocusingPawn();
 
+	// 포커스 중인 플레이어가 피격(HP 감소)되면 강제로 포커스를 풀어준다.
+	// FocusingPawn은 서버에서 항상 정확하므로(호스트/원격 무관) 이 판단은 배전반이 직접 한다.
+	// 반대로 AGoHomeCharacter::FocusedSwitchboard는 원격 클라에서는 서버 쪽에 존재하지 않아 여기서 쓸 수 없음.
+	UFUNCTION()
+	void HandleFocusingPawnHPChanged(float CurrentHP, float MaxHP);
+
 	UPROPERTY(VisibleAnywhere, Category = "Switchboard")
 	TObjectPtr<UCameraComponent> FocusCamera;
 
@@ -142,7 +153,7 @@ protected:
 
 	// --- 게이지 ---
 	UPROPERTY(EditAnywhere, Category = "Switchboard|Gauge")
-	float GaugeRisePerSecond = 1.f;
+	float GaugeRisePerSecond = 2.f;
 
 	UPROPERTY(EditAnywhere, Category = "Switchboard|Gauge")
 	float MaxGauge = 100.f;
@@ -360,6 +371,15 @@ private:
 	TMap < TWeakObjectPtr<ACharacter>, float> NextPenaltyEligibleTime;
 
 	float PenaltyTickAccumulator = 0.f;
+
+	// 한 번이라도 상호작용(OnInteract)이 있었으면 true.
+	// 이후에 취소/이탈해도 게이지가 계속 오름.
+	bool bHasBeenActivated = false;
+
+
+	// AGoHomeCharacter::LastKnownHP와 같은 패턴.
+	// 최초 브로드캐스트를 감소로 오인하지 않기 위한 -1 센티널.
+	float FocusingPawnLastKnownHP = -1.f;
 
 	// 피드백 상태 (로컬 코스메틱 전용)
 	float SmoothedFeedbackRatio = 0.f;

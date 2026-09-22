@@ -19,6 +19,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundAttenuation.h"
 #include "AI/NoiseType.h"
+#include "Player/HealthComponent.h"
 
 AElectricSwitchboardActor::AElectricSwitchboardActor()
 {
@@ -99,7 +100,14 @@ void AElectricSwitchboardActor::Tick(float DeltaTime)
 		return;
 	}
 
+	// 안정망 : HP 변화 없이(접속 종료) 폰이 무효화 된 경우.
+	if (FocusingPawn && !IsValid(FocusingPawn))
+	{
+		ReleaseFocus();
+	}
+
 	const bool bShouldRiseGauge = (SwitchboardState == ESwitchboardState::Locked)
+		                           || bHasBeenActivated 
 		                           || (OverlappingCharacters.Num() > 0)
 	                               || (FocusingPawn != nullptr);
 
@@ -282,7 +290,16 @@ void AElectricSwitchboardActor::OnInteract(APawn* InstigatorPawn)
 	{
 		FocusingPawn = InstigatorPawn;
 		SetOwner(InstigatorPawn); // ServerSubmitPassword RPC 라우팅에 필요.
+		bHasBeenActivated = true; // 최초 상호작용 시점부터 위험 확정. 취소해도 게이지는 계속 오름.
+	
+		FocusingPawnLastKnownHP = -1.f;
+		if (UHealthComponent* Health = InstigatorPawn->FindComponentByClass<UHealthComponent>())
+		{
+			Health->OnHPChanged.AddDynamic(this, &AElectricSwitchboardActor::HandleFocusingPawnHPChanged);
+		}
 	}
+
+	
 
 	if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(InstigatorPawn))
 	{
@@ -330,6 +347,14 @@ void AElectricSwitchboardActor::ReleaseFocus()
 		else
 		{
 			Character->Client_ExitSwitchboardFocus();
+		}
+	}
+
+	if (IsValid(FocusingPawn))
+	{
+		if (UHealthComponent* Health = FocusingPawn->FindComponentByClass<UHealthComponent>())
+		{
+			Health->OnHPChanged.RemoveDynamic(this, &AElectricSwitchboardActor::HandleFocusingPawnHPChanged);
 		}
 	}
 
@@ -383,6 +408,7 @@ void AElectricSwitchboardActor::ResetPuzzle()
 {
 	DangerGauge = 0.f;
 	bBreakerFlipped = false;
+	bHasBeenActivated = false;
 	AlarmTimer = 0.f;
 	AlarmSecondsUsed = 0.f;
 	SwitchboardState = ESwitchboardState::PuzzleActive;
@@ -548,4 +574,22 @@ void AElectricSwitchboardActor::Multicast_PlayAlarmSound_Implementation(float Vo
 
 	UGameplayStatics::PlaySoundAtLocation(this, AlarmSound, GetActorLocation(),
 		VolumeMultiplier, PitchMultiplier, 0.f, AlarmSoundAttenuation);
+}
+
+
+void AElectricSwitchboardActor::ServerCancelFocus_Implementation(AActor* InInstigator)
+{
+	if (InInstigator != FocusingPawn) return;
+	if (SwitchboardState != ESwitchboardState::PuzzleActive) return; // 이미 성공/실패로 종결된 세션이면 무시.
+
+	ReleaseFocus();
+}
+
+void AElectricSwitchboardActor::HandleFocusingPawnHPChanged(float CurrentHP, float MaxHP)
+{
+	if (FocusingPawnLastKnownHP >= 0.f && CurrentHP < FocusingPawnLastKnownHP)
+	{
+		ReleaseFocus(); // 피격(즉사 포함) -> 강제 해제. 스턴만으로는 데미지가 없어서 여기서 안걸림.
+	}
+	FocusingPawnLastKnownHP = CurrentHP;
 }
