@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Data/FSettlementResult.h"
 #include "Subsystems/GameInstanceSubsystem.h"
+#include "Upgrade/EquipmentUpgradeTypes.h"
 #include "GoHomeSaveSubsystem.generated.h"
 
 class UEconomyConfigDataAsset;
@@ -44,6 +45,15 @@ public:
 
 	// 현재 보유 자금(GameState 복제 미러용). 세이브 없으면 0.
 	int32 GetCurrentFunds() const;
+
+	// 강화 비용을 보유자금에서 차감
+	bool TrySpendFunds(int32 Amount);
+
+	// 저장된 강화 레벨을 가져온다.
+	TArray<FEquipmentUpgradeLevelState> GetSavedUpgradeLevels() const;
+
+	// 현재 업그레이드 레벨을 SaveGame에 저장한다.
+	void SetSavedUpgradeLevels(const TArray<FEquipmentUpgradeLevelState>& InUpgradeLevels);
 
 	// 출발 시 호출해서 값을 초기화
 	void SetTargetMapQuota(int32 Quota) { CurrentMapQuota = Quota; };

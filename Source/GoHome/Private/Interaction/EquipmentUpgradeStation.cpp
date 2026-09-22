@@ -3,6 +3,8 @@
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/Pawn.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Engine/GameInstance.h"
+#include "Save/GoHomeSaveSubsystem.h"
 
 AEquipmentUpgradeStation::AEquipmentUpgradeStation()
 {
@@ -38,9 +40,24 @@ void AEquipmentUpgradeStation::OnInteract(APawn* InstigatorPawn)
 		return;
 	}
 
-	if (AGoHomePlayerController* PlayerController = Cast<AGoHomePlayerController>(InstigatorPawn->GetController()))
+	if (AGoHomePlayerController* PlayerController =
+		Cast<AGoHomePlayerController>(InstigatorPawn->GetController()))
 	{
+		UGameInstance* GameInstance = GetGameInstance();
+
+		// UI를 연 후 서버의 최신 코인을 보낸다.
 		PlayerController->Client_OpenEquipmentUpgrade();
+
+		if (GameInstance)
+		{
+			if (UGoHomeSaveSubsystem* SaveSubsystem =
+				GameInstance->GetSubsystem<UGoHomeSaveSubsystem>())
+			{
+				// UI를 열기 전에 서버의 최신 코인을 보낸다.
+				PlayerController->Client_RefreshUpgradeFunds(
+					SaveSubsystem->GetCurrentFunds());
+			}
+		}
 	}
 }
 

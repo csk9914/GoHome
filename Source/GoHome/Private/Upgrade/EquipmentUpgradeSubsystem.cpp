@@ -7,6 +7,30 @@
 #include "GameFramework/PlayerController.h"
 #include "Upgrade/EquipmentUpgradeStateActor.h"
 #include "EngineUtils.h"
+#include "Save/GoHomeSaveSubsystem.h"
+#include "Engine/GameInstance.h"
+
+void UEquipmentUpgradeSubsystem::Initialize(
+	FSubsystemCollectionBase& CollectionBase)
+{
+	Super::Initialize(CollectionBase);
+
+	// SaveSubsystem이 먼저 세이브 파일을 읽도록 보장한다.
+	CollectionBase.InitializeDependency<UGoHomeSaveSubsystem>();
+
+	UGoHomeSaveSubsystem* SaveSubsystem =
+		GetGameInstance()
+		? GetGameInstance()->GetSubsystem<UGoHomeSaveSubsystem>()
+		: nullptr;
+
+	if (!SaveSubsystem)
+	{
+		return;
+	}
+
+	// SaveGame에 저장된 강화 레벨을 런타임 배열로 가져온다.
+	UpgradeLevels = SaveSubsystem->GetSavedUpgradeLevels();
+}
 
 bool UEquipmentUpgradeSubsystem::HasServerAuthority() const
 {
@@ -85,6 +109,30 @@ EEquipmentUpgradeRequestResult UEquipmentUpgradeSubsystem::UpgradeOnce(UEquipmen
 		return EEquipmentUpgradeRequestResult::AlreadyMaxLevel;
 	}
 
+	// 세이브 시스템을 가져온다.
+	UGameInstance* GameInstance = GetGameInstance();
+
+	UGoHomeSaveSubsystem* SaveSubsystem =
+		GameInstance
+		? GameInstance->GetSubsystem<UGoHomeSaveSubsystem>()
+		: nullptr;
+
+	if (!SaveSubsystem)
+	{
+		return EEquipmentUpgradeRequestResult::InvalidRequester;
+	}
+
+	// 현재 레벨에서 다음 레벨로 올라가는 비용을 계산한다.
+	const int32 UpgradeCost =
+		UpgradeData->GetCostToUpgradeFromLevel(CurrentLevel);
+
+	// 현재 규칙은 음수 자금을 허용하므로,
+	// 돈이 부족해도 -1000 → -1300처럼 차감된다.
+	if (!SaveSubsystem->TrySpendFunds(UpgradeCost))
+	{
+		return EEquipmentUpgradeRequestResult::NotEnoughCurrency;
+	}
+
 	FEquipmentUpgradeLevelState* State = FindMutableLevelState(UpgradeData->UpgradeId);
 	if (!State)
 	{
@@ -96,6 +144,12 @@ EEquipmentUpgradeRequestResult UEquipmentUpgradeSubsystem::UpgradeOnce(UEquipmen
 
 	State->CurrentLevel = UpgradeData->GetClampedLevel(State->CurrentLevel + 1);
 
+	// 런타임 강화 레벨을 SaveGame 데이터에도 복사한다.
+	SaveSubsystem->SetSavedUpgradeLevels(UpgradeLevels);
+
+	// 강화 성공 후 코인과 강화 레벨을 디스크에 저장한다.
+	SaveSubsystem->SaveToDisk();
+
 	OnEquipmentUpgradesChanged.Broadcast();
 
 	return EEquipmentUpgradeRequestResult::Succeeded;
@@ -104,9 +158,12 @@ EEquipmentUpgradeRequestResult UEquipmentUpgradeSubsystem::UpgradeOnce(UEquipmen
 
 EEquipmentUpgradeRequestResult UEquipmentUpgradeSubsystem::RequestUpgrade(
 	APlayerController* RequestingPlayer,
-	UEquipmentUpgradeDataAsset* UpgradeData
+	UEquipmentUpgradeDataAsset* UpgradeData,
+	int32& OutCurrentFunds
 )
 {
+	OutCurrentFunds = 0;
+
 	if (!HasServerAuthority())
 	{
 		return EEquipmentUpgradeRequestResult::InvalidRequester;
@@ -129,6 +186,57 @@ EEquipmentUpgradeRequestResult UEquipmentUpgradeSubsystem::RequestUpgrade(
 		return EEquipmentUpgradeRequestResult::NoEffectReceiver;
 	}
 
+	// 실제 플레이어 액터들이 강화 효과를 받을 수 있는지 먼저 확인한다.
+	// 이 검사를 통과한 뒤에만 코인을 차감해야 한다.
+	UWorld* World = GetWorld();
+
+	if (!World)
+	{
+		return EEquipmentUpgradeRequestResult::InvalidRequester;
+	}
+
+	bool bFoundPawn = false;
+
+	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+	{
+		APlayerController* PlayerController = It->Get();
+
+		if (!PlayerController)
+		{
+			continue;
+		}
+
+		APawn* Pawn = PlayerController->GetPawn();
+
+		if (!Pawn)
+		{
+			continue;
+		}
+
+		bFoundPawn = true;
+
+		if (UpgradeData->EffectType == EEquipmentUpgradeEffectType::OxygenCapacity)
+		{
+			if (!Pawn->FindComponentByClass<UOxygenComponent>())
+			{
+				return EEquipmentUpgradeRequestResult::NoEffectReceiver;
+			}
+		}
+
+		if (UpgradeData->EffectType == EEquipmentUpgradeEffectType::CarryWeightLimit)
+		{
+			if (!Pawn->FindComponentByClass<UCarryWeightComponent>())
+			{
+				return EEquipmentUpgradeRequestResult::NoEffectReceiver;
+			}
+		}
+	}
+
+	if (!bFoundPawn)
+	{
+		return EEquipmentUpgradeRequestResult::NoEffectReceiver;
+	}
+
 	AEquipmentUpgradeStateActor* StateActor = GetOrCreateStateActor();
 	if (!StateActor)
 	{
@@ -144,11 +252,6 @@ EEquipmentUpgradeRequestResult UEquipmentUpgradeSubsystem::RequestUpgrade(
 	const int32 NewLevel = GetUpgradeLevel(UpgradeData->UpgradeId);
 	StateActor->SetUpgradeLevel(UpgradeData->UpgradeId, NewLevel);
 
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return EEquipmentUpgradeRequestResult::InvalidRequester;
-	}
 
 	for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
 	{
@@ -161,6 +264,16 @@ EEquipmentUpgradeRequestResult UEquipmentUpgradeSubsystem::RequestUpgrade(
 		if (APawn* Pawn = PlayerController->GetPawn())
 		{
 			ApplyUpgradeToActor(UpgradeData, Pawn);
+		}
+	}
+
+	// 강화 성공 후 최신 코인을 결과값으로 돌려준다.
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (UGoHomeSaveSubsystem* SaveSubsystem =
+			GameInstance->GetSubsystem<UGoHomeSaveSubsystem>())
+		{
+			OutCurrentFunds = SaveSubsystem->GetCurrentFunds();
 		}
 	}
 
@@ -237,6 +350,31 @@ EEquipmentUpgradeRequestResult UEquipmentUpgradeSubsystem::ApplyUpgradeToActor(
 		return EEquipmentUpgradeRequestResult::UpgradeNotFound;
 	}
 }
+
+void UEquipmentUpgradeSubsystem::ResetUpgradeLevels()
+{
+	// 강화 상태 초기화는 서버에서만 한다.
+	if (!HasServerAuthority())
+	{
+		return;
+	}
+
+	// UpgradeSubsystem의 런타임 강화 레벨을 초기화한다.
+	UpgradeLevels.Reset();
+
+	if (IsValid(CachedStateActor))
+	{
+		// 네트워크 상태 액터도 함께 초기화한다.
+		// 이 함수가 클라이언트 복제와 UI 알림을 처리한다.
+		CachedStateActor->ResetUpgradeLevels();
+	}
+	else
+	{
+		// StateActor가 없는 경우에도 서버 UI에는 변경을 알린다.
+		OnEquipmentUpgradesChanged.Broadcast();
+	}
+}
+
 
 void UEquipmentUpgradeSubsystem::SetUpgradeLevelForSync(FName UpgradeId, int32 NewLevel)
 {

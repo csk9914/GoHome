@@ -5,6 +5,8 @@
 #include "Core/GoHomeGameState.h"
 #include "Data/EconomyConfigDataAsset.h"
 #include "Engine/World.h"
+#include "Engine/GameInstance.h"
+#include "Upgrade/EquipmentUpgradeSubsystem.h"
 
 namespace
 {
@@ -73,6 +75,38 @@ int32 UGoHomeSaveSubsystem::AccumulateDeliveredValue(int32 Value)
 int32 UGoHomeSaveSubsystem::GetCurrentFunds() const
 {
 	return SaveGame ? SaveGame->CurrentFunds : 0;
+}
+
+bool UGoHomeSaveSubsystem::TrySpendFunds(int32 Amount)
+{
+	if (!SaveGame || Amount < 0)
+	{
+		return false;
+	}
+
+	SaveGame->CurrentFunds -= Amount;
+
+	return true;
+}
+
+TArray<FEquipmentUpgradeLevelState>UGoHomeSaveSubsystem::GetSavedUpgradeLevels() const
+{
+	if (!SaveGame)
+	{
+		return TArray<FEquipmentUpgradeLevelState>();
+	}
+
+	return SaveGame->SavedUpgradeLevels;
+}
+
+void UGoHomeSaveSubsystem::SetSavedUpgradeLevels(const TArray<FEquipmentUpgradeLevelState>& InUpgradeLevels)
+{
+	if (!SaveGame)
+	{
+		return;
+	}
+
+	SaveGame->SavedUpgradeLevels = InUpgradeLevels;
 }
 
 FSettlementResult UGoHomeSaveSubsystem::FinalizeRound(bool bForfeited, const TArray<FString>& CasualtyNames)
@@ -179,6 +213,17 @@ FExpeditionProgress UGoHomeSaveSubsystem::BuildProgress() const
 
 void UGoHomeSaveSubsystem::ResetSave()
 {
+	// 세이브 데이터뿐만 아니라
+	// 런타임에 남아 있는 강화 레벨도 함께 초기화한다.
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (UEquipmentUpgradeSubsystem* UpgradeSubsystem =
+			GameInstance->GetSubsystem<UEquipmentUpgradeSubsystem>())
+		{
+			UpgradeSubsystem->ResetUpgradeLevels();
+		}
+	}
+
 	// 깔끔하게 새로 만들어서 기본값으로 초기화 
 	SaveGame = Cast<UGoHomeSaveGame>(UGameplayStatics::CreateSaveGameObject(UGoHomeSaveGame::StaticClass()));
 }

@@ -98,6 +98,24 @@ bool AEquipmentUpgradeStateActor::SetUpgradeLevel(FName UpgradeId, int32 NewLeve
 	return true;
 }
 
+void AEquipmentUpgradeStateActor::ResetUpgradeLevels()
+{
+	// 강화 상태 초기화는 서버만 수행한다.
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	// 네트워크 상태 액터의 강화 레벨을 모두 삭제한다.
+	UpgradeLevels.Reset();
+
+	// 서버 UI와 클라이언트 UI에 초기화를 알린다.
+	OnEquipmentUpgradeStateChanged.Broadcast();
+
+	// 클라이언트에 즉시 복제하도록 요청한다.
+	ForceNetUpdate();
+}
+
 void AEquipmentUpgradeStateActor::OnRep_UpgradeLevels()
 {
 	// 클라이언트가 새 강화 레벨을 받으면 UI 갱신 신호를 보낸다.

@@ -44,6 +44,12 @@ public:
 	UFUNCTION(Client, Reliable)
 	void Client_OpenEquipmentUpgrade();
 
+	UFUNCTION(Client, Reliable)
+	void Client_RefreshUpgradeFunds(int32 InCurrentFunds);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "UI")
+	void OnUpgradeCurrentFundsChanged(int32 InCurrentFunds);
+
 	// 클라이언트 UI에서 누른 강화 요청을 서버로 전달한다.
 	// 실제 처리 로직은 EquipmentUpgradeSubsystem에서 담당한다.
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Equipment Upgrade")

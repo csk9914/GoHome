@@ -18,6 +18,9 @@ class GOHOME_API UEquipmentUpgradeSubsystem : public UGameInstanceSubsystem
 	GENERATED_BODY()
 
 public:
+	// 강화ID 읽는 함수
+	virtual void Initialize(FSubsystemCollectionBase& CollectionBase) override;
+
 	UPROPERTY(BlueprintAssignable, Category = "Equipment Upgrade")
 	FOnEquipmentUpgradesChanged OnEquipmentUpgradesChanged;
 
@@ -45,11 +48,17 @@ public:
 	// 누가 강화 요청했는지 확인하기 위해서
 	// 나중에 코인 / 권한 / 거리 체크 붙일 자리
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Equipment Upgrade")
-	EEquipmentUpgradeRequestResult RequestUpgrade(APlayerController* RequestingPlayer, UEquipmentUpgradeDataAsset* UpgradeData);
+	EEquipmentUpgradeRequestResult RequestUpgrade(
+		APlayerController* RequestingPlayer,
+		UEquipmentUpgradeDataAsset* UpgradeData,
+		int32& OutCurrentFunds);
 
 	// StateActor가 BeginPlay 때 Subsystem에 자신을 등록한다.
 	// 서버/클라이언트 모두 여기로 들어올 수 있다.
 	void RegisterStateActor(AEquipmentUpgradeStateActor* StateActor);
+
+	// 게임오버/엔딩 때 런타임 강화 상태를 초기화한다.
+	void ResetUpgradeLevels();
 
 protected:
 	UPROPERTY()
