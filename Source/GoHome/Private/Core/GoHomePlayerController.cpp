@@ -11,6 +11,7 @@
 #include "GameFramework/GameStateBase.h"
 #include "Upgrade/EquipmentUpgradeSubsystem.h"
 
+
 void AGoHomePlayerController::BeginPlay()
 {
 	Super::BeginPlay();
@@ -103,6 +104,12 @@ void AGoHomePlayerController::Client_OpenEquipmentUpgrade_Implementation()
 	OnOpenEquipmentUpgrade();
 }
 
+void AGoHomePlayerController::Client_RefreshUpgradeFunds_Implementation(
+	int32 InCurrentFunds)
+{
+	OnUpgradeCurrentFundsChanged(InCurrentFunds);
+}
+
 // PlayerController는 클라이언트 UI 요청을 서버로 넘기는 통로만 맡는다.
 // 실제 강화 처리는 EquipmentUpgradeSubsystem에 위임한다.
 void AGoHomePlayerController::Server_RequestEquipmentUpgrade_Implementation(UEquipmentUpgradeDataAsset* UpgradeData)
@@ -119,5 +126,19 @@ void AGoHomePlayerController::Server_RequestEquipmentUpgrade_Implementation(UEqu
 		return;
 	}
 
-	UpgradeSubsystem->RequestUpgrade(this, UpgradeData);
+	int32 CurrentFunds = 0;
+
+	const EEquipmentUpgradeRequestResult UpgradeResult =
+		UpgradeSubsystem->RequestUpgrade(
+			this,
+			UpgradeData,
+			CurrentFunds);
+
+	if (UpgradeResult != EEquipmentUpgradeRequestResult::Succeeded)
+	{
+		return;
+	}
+
+	// PlayerController는 받은 값을 UI로 전달만 한다.
+	Client_RefreshUpgradeFunds(CurrentFunds);
 }
