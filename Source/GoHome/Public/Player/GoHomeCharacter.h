@@ -138,6 +138,11 @@ public:
 	virtual FName GetRightHandSocketName() const override { return RightHandSocketName; }
 	virtual FName GetLeftHandSocketName() const override { return LeftHandSocketName; }
 
+	// 조준 트레이스 시작점으로 쓸 카메라 월드 위치. Camera는 메시에 고정 부착이라
+	// 서버도 그 캐릭터의 권위 있는 액터/본 트랜스폼으로 정확한 값을 얻을 수 있음.
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	FVector GetCameraWorldLocation() const;
+
 	virtual void SetHoldingItem(bool bHolding) override;
 
 	// 스턴 + 넉백 적용 (IStunnable 구현). 배전반 등 환경 위해요소가 캐릭터 타입을 몰라도 호출 가능.

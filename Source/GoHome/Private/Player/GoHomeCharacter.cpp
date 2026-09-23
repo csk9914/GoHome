@@ -325,6 +325,7 @@ void AGoHomeCharacter::Client_ForceStopSprint_Implementation()
 void AGoHomeCharacter::Look(const FInputActionValue& Value)
 {
 	if (bIsStunned) { return; }
+	if (FocusedSwitchboard) { return; }
 
 	const FVector2D LookVector = Value.Get<FVector2D>();
 	AddControllerYawInput(LookVector.X);
@@ -580,6 +581,9 @@ void AGoHomeCharacter::EnterSwitchboardFocus(AElectricSwitchboardActor* Switchbo
 
 	UpdateWireHighlight(-1, HighlightedWireIndex);
 
+	// 추가: FocusCamera로 컷 하면 SetOwnerNoSee가 무력화돼 내 몸이 보이므로 직접 숨김.
+	GetMesh()->SetVisibility(false, true); 
+
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
 		PC->SetViewTargetWithBlend(Switchboard, 0.3f);
@@ -595,6 +599,8 @@ void AGoHomeCharacter::ExitSwitchboardFocus()
 	HintPlaybackStep = -1;
 
 	UpdateWireHighlight(HighlightedWireIndex, -1);
+
+	GetMesh()->SetVisibility(true, true); // 메쉬 복원.
 
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
@@ -853,4 +859,9 @@ void AGoHomeCharacter::UpdateFlashlightVisual(bool bNewIsOn)
 	{
 		FlashlightSpotLight->SetVisibility(bNewIsOn);
 	}
+}
+
+FVector AGoHomeCharacter::GetCameraWorldLocation() const
+{
+	return Camera->GetComponentLocation();
 }
