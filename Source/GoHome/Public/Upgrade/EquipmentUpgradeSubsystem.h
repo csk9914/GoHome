@@ -9,6 +9,7 @@ class UEquipmentUpgradeDataAsset;
 class AActor;
 class APlayerController;
 class AEquipmentUpgradeStateActor;
+class UWorld;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnEquipmentUpgradesChanged);
 
@@ -20,6 +21,9 @@ class GOHOME_API UEquipmentUpgradeSubsystem : public UGameInstanceSubsystem
 public:
 	// 강화ID 읽는 함수
 	virtual void Initialize(FSubsystemCollectionBase& CollectionBase) override;
+
+	// GameInstance 종료 시 월드 감시 델리게이트를 정리한다.
+	virtual void Deinitialize() override;
 
 	UPROPERTY(BlueprintAssignable, Category = "Equipment Upgrade")
 	FOnEquipmentUpgradesChanged OnEquipmentUpgradesChanged;
@@ -44,6 +48,9 @@ public:
 
 	// Subsystem에 클라이언트 동기화 함수 추가
 	void SetUpgradeLevelForSync(FName UpgradeId, int32 NewLevel);
+
+	// 새 Pawn에 저장된 산소·무게 강화 효과를 다시 적용한다.
+	void ApplySavedUpgradesToActor(AActor* TargetActor);
 
 	// 누가 강화 요청했는지 확인하기 위해서
 	// 나중에 코인 / 권한 / 거리 체크 붙일 자리
@@ -84,4 +91,21 @@ private:
 
 	// StateActor 안의 UpgradeLevels를 Subsystem으로 복사한다.
 	void SyncLevelsFromStateActor();
+
+	// 맵이 로드될 때 새 월드를 감시한다.
+	void HandlePostLoadMap(UWorld* LoadedWorld);
+
+	// 새 액터가 생성될 때 호출된다.
+	void HandleActorSpawned(AActor* SpawnedActor);
+
+	// 현재 월드에 Pawn 생성 감지를 연결한다.
+	void BindToWorld(UWorld* World);
+
+	// 이전 월드의 감지 연결을 해제한다.
+	void UnbindFromWorld();
+
+	FDelegateHandle PostLoadMapHandle;
+	FDelegateHandle ActorSpawnedHandle;
+
+	TWeakObjectPtr<UWorld> BoundWorld;
 };
