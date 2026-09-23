@@ -127,19 +127,6 @@ public:
 	// ItemActorBase에서 픽업 확정 시 호출
 	UFUNCTION(BlueprintCallable, Category = "Interaction")
 	void AttachItemToRightHand(UStaticMeshComponent* ItemMeshComponent);
-	
-	// 손전등(Spot) 전용 부착 소켓. 가슴 쪽 본에 붙여서 양손을 자유롭게 사용.
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Interaction")
-	FName FlashlightSocketName = "Spine_03";
-
-	UFUNCTION(BlueprintCallable, Category = "Interaction")
-	void AttachFlashlightToChest(UStaticMeshComponent* FlashlightMeshComponent);
-
-	UFUNCTION(BlueprintCallable, Category = "Interaction")
-	void DetachFlashlightFromChest();
-
-	UFUNCTION(BlueprintPure, Category = "Interaction")
-	bool IsHoldingFlashlight() const { return bIsHoldingFlashlight; }
 
 	// F키 : 손전등 온/오프. 인벤토리와 무관 -> 전원 항상 보유.
 	UFUNCTION(BlueprintCallable, Category = "Flashlight")
@@ -209,9 +196,6 @@ protected:
 	UFUNCTION()
 	void OnRep_IsHoldingItem();
 
-	UFUNCTION()
-	void OnRep_IsHoldingFlashlight();
-
 	UFUNCTION(Server, Reliable)
 	void ServerToggleFlashlight();
 
@@ -235,10 +219,6 @@ protected:
 	TObjectPtr<AElectricSwitchboardActor> FocusedSwitchboard;
 
 	int32 HighlightedWireIndex = -1;
-
-
-	UPROPERTY(ReplicatedUsing = OnRep_IsHoldingFlashlight, BlueprintReadOnly, Category = "Interaction")
-	bool bIsHoldingFlashlight = false;
 
 	UPROPERTY(ReplicatedUsing = OnRep_IsFlashlightOn)
 	bool bIsFlashlightOn = false;

@@ -360,29 +360,6 @@ void AGoHomeCharacter::AttachItemToRightHand(UStaticMeshComponent* ItemMeshCompo
 	// UInventoryComponent(SetActiveSlot/RemoveItem)가 단일 소스로 관리함 -> 여기선 안건드림.
 }
 
-void AGoHomeCharacter::AttachFlashlightToChest(UStaticMeshComponent* FlashlightMeshComponent)
-{
-	if (!FlashlightMeshComponent) return;
-
-	FlashlightMeshComponent->AttachToComponent(
-		GetMesh(),
-		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
-		FlashlightSocketName);
-
-	bIsHoldingFlashlight = true;
-}
-
-void AGoHomeCharacter::DetachFlashlightFromChest()
-{
-	bIsHoldingFlashlight = false;
-}
-
-void AGoHomeCharacter::OnRep_IsHoldingFlashlight()
-{
-	// 필요하면 여기서 사운드/이펙트 등 클라 전용 후처리
-}
-
-
 void AGoHomeCharacter::SetHoldingItem(bool bHolding)
 {
 	if (HasAuthority())
@@ -408,7 +385,6 @@ void AGoHomeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AGoHomeCharacter, bIsHoldingItem);
 	DOREPLIFETIME_CONDITION(AGoHomeCharacter, ReplicatedPitch, COND_SkipOwner);
-	DOREPLIFETIME(AGoHomeCharacter, bIsHoldingFlashlight);
 	DOREPLIFETIME(AGoHomeCharacter, CurrentCarryObject);
 	DOREPLIFETIME_CONDITION(AGoHomeCharacter, CombinedCarryInput, COND_OwnerOnly);
 	DOREPLIFETIME(AGoHomeCharacter, bIsStunned);
