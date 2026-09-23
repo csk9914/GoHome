@@ -19,6 +19,7 @@ class ACoopCarryObjectBase;
 class AElectricSwitchboardActor;
 class UInventoryComponent;
 class UPrimitiveComponent;
+class USpotLightComponent;
 
 UCLASS()
 class GOHOME_API AGoHomeCharacter : public ACharacter, public ISocketProvider, public IStunnable
@@ -89,6 +90,10 @@ private:
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<UCameraComponent> Camera;
 
+	// 손전등(기본 장비) - 전원 동일 스펙 지급, 슬롯 불필요. Spine_03에 항상 부착.
+	UPROPERTY(VisibleAnywhere, Category = "Flashlight")
+	TObjectPtr<USpotLightComponent> FlashlightSpotLight;
+
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
 
@@ -135,6 +140,13 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	bool IsHoldingFlashlight() const { return bIsHoldingFlashlight; }
+
+	// F키 : 손전등 온/오프. 인벤토리와 무관 -> 전원 항상 보유.
+	UFUNCTION(BlueprintCallable, Category = "Flashlight")
+	void ToggleFlashlight();
+
+	UFUNCTION(BlueprintPure, Category = "Flashlight")
+	bool IsFlashlightOn() const { return bIsFlashlightOn; }
 
 	virtual FName GetRightHandSocketName() const override { return RightHandSocketName; }
 	virtual FName GetLeftHandSocketName() const override { return LeftHandSocketName; }
@@ -199,6 +211,14 @@ protected:
 
 	UFUNCTION()
 	void OnRep_IsHoldingFlashlight();
+
+	UFUNCTION(Server, Reliable)
+	void ServerToggleFlashlight();
+
+	UFUNCTION()
+	void OnRep_IsFlashlightOn();
+
+	void UpdateFlashlightVisual(bool bNewIsOn);
 	
 	UFUNCTION()
 	void OnRep_ReplicatedPitch();
@@ -219,6 +239,9 @@ protected:
 
 	UPROPERTY(ReplicatedUsing = OnRep_IsHoldingFlashlight, BlueprintReadOnly, Category = "Interaction")
 	bool bIsHoldingFlashlight = false;
+
+	UPROPERTY(ReplicatedUsing = OnRep_IsFlashlightOn)
+	bool bIsFlashlightOn = false;
 	
 	UPROPERTY(ReplicatedUsing = OnRep_ReplicatedPitch)
 	float ReplicatedPitch = 0.f;

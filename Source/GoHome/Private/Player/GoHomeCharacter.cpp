@@ -18,6 +18,7 @@
 #include "Player/OxygenComponent.h"
 #include "Item/ItemActorBase.h"
 #include "Interaction/InventoryComponent.h"
+#include "Components/SpotLightComponent.h"
 
 AGoHomeCharacter::AGoHomeCharacter()
 {
@@ -48,6 +49,9 @@ AGoHomeCharacter::AGoHomeCharacter()
 
 	GetMesh()->SetOwnerNoSee(true); // 본인한테는 전신 메시 안 보이게
 
+	FlashlightSpotLight = CreateDefaultSubobject<USpotLightComponent>(TEXT("FlashlightSpotLight"));
+	FlashlightSpotLight->SetupAttachment(GetMesh(), "Spine_03");
+	FlashlightSpotLight->SetVisibility(false);
 }
 
 void AGoHomeCharacter::BeginPlay()
@@ -150,6 +154,13 @@ void AGoHomeCharacter::Tick(float DeltaTime)
 			// 순수 원격 클라이언트인 경우 -> 서버에 전송
 			ServerUpdatePitch(CurrentPitch);
 		}
+	}
+
+	if (bIsFlashlightOn && FlashlightSpotLight)
+	{
+		// 모든 클라이언트에서 각자 로컬로 계산 - CurrentPitch는 원격 클라도 ReplicatedPitch를 통해 갱신됨.
+		const FRotator ViewRotation(CurrentPitch, GetActorRotation().Yaw, 0.f);
+		FlashlightSpotLight->SetWorldRotation(ViewRotation);
 	}
 
 	if (HasAuthority())
@@ -401,6 +412,7 @@ void AGoHomeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AGoHomeCharacter, CurrentCarryObject);
 	DOREPLIFETIME_CONDITION(AGoHomeCharacter, CombinedCarryInput, COND_OwnerOnly);
 	DOREPLIFETIME(AGoHomeCharacter, bIsStunned);
+	DOREPLIFETIME(AGoHomeCharacter, bIsFlashlightOn);
 }
 
 void AGoHomeCharacter::OnRep_ReplicatedPitch()
@@ -532,19 +544,6 @@ void AGoHomeCharacter::HandleInventoryBreakOnHit(AActor* OtherActor)
 		NextItemBreakEligibleTime = Now + ItemBreakCooldownSeconds; // 실제로 깨졌을 때만 쿨다운 시작.
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -838,5 +837,44 @@ void AGoHomeCharacter::SetAllWiresOff()
 	for (int32 i = 0; i < FocusedSwitchboard->GetWireTargetCount(); ++i)
 	{
 		SetWireColor(FocusedSwitchboard->GetWireTarget(i), FLinearColor::Black);
+	}
+}
+
+
+void AGoHomeCharacter::ToggleFlashlight()
+{
+	const bool bNewIsOn = !bIsFlashlightOn;
+
+	if (HasAuthority())
+	{
+		// 서버(호스트 자신 포함) - 권위값 직접 갱신. 서버 자신은 RepNotify가 안 뜨므로 시각 갱신도 직접.
+		bIsFlashlightOn = bNewIsOn;
+		UpdateFlashlightVisual(bNewIsOn);
+	}
+
+	else
+	{
+		// 원격 클라 - 내 화면엔 즉시 반영(로컬 예측), 서버엔 권위 갱신 요청.
+		UpdateFlashlightVisual(bNewIsOn);
+		ServerToggleFlashlight();
+	}
+}
+
+void AGoHomeCharacter::ServerToggleFlashlight_Implementation()
+{
+	bIsFlashlightOn = !bIsFlashlightOn;
+	UpdateFlashlightVisual(bIsFlashlightOn); // 서버(리슨 서버) 자신의 화면에도 반영 - RepNotify가 서버 자신에겐 안 뜸.
+}
+
+void AGoHomeCharacter::OnRep_IsFlashlightOn()
+{
+	UpdateFlashlightVisual(bIsFlashlightOn);
+}
+
+void AGoHomeCharacter::UpdateFlashlightVisual(bool bNewIsOn)
+{
+	if (FlashlightSpotLight)
+	{
+		FlashlightSpotLight->SetVisibility(bNewIsOn);
 	}
 }
