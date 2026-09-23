@@ -101,6 +101,12 @@ public:
 	// InteractionComponent도 호출함.
 	void UpdateDamageVisual();
 
+
+	// 서버 전용. 주어인 충격 속도가 파손 임계값을 넘으면 BreakCount를 올리고 시각 갱신.
+	// 성공 시 true.
+	// NotifyHit(드롭 상태 물리 충돌)과 AGoHomeCharacter의 인벤토리 파손 판정이 이 함수를 공유한다.
+	bool TryApplyBreakFromImpact(float ImpactSpeed);
+
 	virtual FText GetInteractionPromptText_Implementation() const override;
 
 protected:

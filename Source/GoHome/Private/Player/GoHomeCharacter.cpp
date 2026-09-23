@@ -16,6 +16,8 @@
 #include "Net/UnrealNetwork.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Player/OxygenComponent.h"
+#include "Item/ItemActorBase.h"
+#include "Interaction/InventoryComponent.h"
 
 AGoHomeCharacter::AGoHomeCharacter()
 {
@@ -68,6 +70,7 @@ void AGoHomeCharacter::BeginPlay()
 
 	DefaultMaxSwimSpeed = GetCharacterMovement()->MaxSwimSpeed;
 	CachedOxygenComponent = FindComponentByClass<UOxygenComponent>();
+	CachedInventoryComponent = FindComponentByClass<UInventoryComponent>();
 
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
@@ -484,6 +487,65 @@ void AGoHomeCharacter::HandleForcedCarryRelease()
 		CurrentCarryObject->ReleaseCarriers();
 	}
 }
+
+
+void AGoHomeCharacter::NotifyHit(UPrimitiveComponent* MyComp, 
+	                             AActor* Other, 
+	                             UPrimitiveComponent* OtherComp, 
+	                             bool bSelfMoved, 
+	                             FVector HitLocation, 
+	                             FVector HitNormal, 
+	                             FVector NormalImpulse, 
+	                             const FHitResult& Hit)
+{
+	Super::NotifyHit(MyComp, Other, OtherComp, bSelfMoved, HitLocation, HitNormal, NormalImpulse, Hit);
+
+	HandleInventoryBreakOnHit(Other);
+}
+
+void AGoHomeCharacter::HandleInventoryBreakOnHit(AActor* OtherActor)
+{
+	if (!HasAuthority() || !CachedInventoryComponent) return;
+
+	const float Now = GetWorld()->GetTimeSeconds();
+	
+	if (Now < NextItemBreakEligibleTime) return; // 쿨다운 중 속도 계산 조차 하지 않고 건너뜀.
+
+	const FVector OtherVelocity = OtherActor ? OtherActor->GetVelocity() : FVector::ZeroVector;
+	const float ImpactSpeed = (GetVelocity() - OtherVelocity).Size(); // 상대 속도.
+
+	bool bAnyBroke = false;
+
+	for (int32 SlotIndex = 0; SlotIndex < CachedInventoryComponent->GetInventorySlotCount(); ++SlotIndex)
+	{
+		if (AItemActorBase* Item = CachedInventoryComponent->GetItemInSlot(SlotIndex))
+		{
+			if (Item->TryApplyBreakFromImpact(ImpactSpeed))
+			{
+				bAnyBroke = true;
+			}
+		}
+	}
+
+	if (bAnyBroke)
+	{
+		NextItemBreakEligibleTime = Now + ItemBreakCooldownSeconds; // 실제로 깨졌을 때만 쿨다운 시작.
+	}
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 void AGoHomeCharacter::SetCombinedCarryInput(const FVector& NewInput)

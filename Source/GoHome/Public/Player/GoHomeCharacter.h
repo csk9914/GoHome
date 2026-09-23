@@ -17,6 +17,8 @@ class USkeletalMeshComponent;
 class UOxygenComponent;
 class ACoopCarryObjectBase;
 class AElectricSwitchboardActor;
+class UInventoryComponent;
+class UPrimitiveComponent;
 
 UCLASS()
 class GOHOME_API AGoHomeCharacter : public ACharacter, public ISocketProvider, public IStunnable
@@ -30,6 +32,18 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	// 캐릭터 이동이 뭔가 막힐 때마다 호출(물리 시뮬레이션과 무관 - 스윕 이동 블로킹 히트).
+	// 인벤토리 파손 아이템 판정을 여기서 건다.
+	virtual void NotifyHit(UPrimitiveComponent* MyComp, 
+		                   AActor* Other, 
+		                   UPrimitiveComponent* OtherComp, 
+		                   bool bSelfMoved, 
+		                   FVector HitLocation, 
+		                   FVector HitNormal, 
+		                   FVector NormalImpulse, 
+		                   const FHitResult& Hit) override;
+
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 	void Move(const FInputActionValue& Value);
@@ -232,8 +246,22 @@ protected:
 	void HandleForcedCarryRelease();
     // ---------------------------------------------------
 
+    void UpdateWireHighlight(int32 OldIndex, int32 NewIndex);
 
-	void UpdateWireHighlight(int32 OldIndex, int32 NewIndex);
+	// 인벤토리 파손 아이템 충돌 감지(캐릭터 이동 충돌 기반).
+	// ---------------------------------------------------
+	// 서버 전용. 상대 속도(나 - 상대) 기준으로 소지 아이템(활성 + 비활성 슬롯 전체)에 파손 판정을 적용.
+	void HandleInventoryBreakOnHit(AActor* OtherActor);
+
+	// 캐릭터 단위 쿨다운(초). 실제로 하나라도 깨졌을 때만 시작
+	// 좁은 통로에서 서로 밀며 반복 충돌할 때 매 틱 판정되는 것 방지.
+	// 약하게 스친 것만으로는 소모되지 않음.
+	UPROPERTY(EditDefaultsOnly, Category = "Item", meta = (ClampMin = "0.0"))
+	float ItemBreakCooldownSeconds = 0.5;
+
+	// 다음 판정 가능 시간. -1 = 아직 한 번도 깨진 적 없음.
+	float NextItemBreakEligibleTime = -1.f;
+	// ---------------------------------------------------
 
 	// 수영, 소음 등급
 	UPROPERTY(EditDefaultsOnly, Category = "Noise")
@@ -275,6 +303,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UOxygenComponent> CachedOxygenComponent;
+
+	UPROPERTY()
+	TObjectPtr<UInventoryComponent> CachedInventoryComponent;
 
 	FVector LastCarryInputWorld = FVector::ZeroVector;
 	float LastKnownHP = -1.f; // -1 = 아직 초기화 안됨(최초 값으로는 감소 판정 안 하기 위함).
