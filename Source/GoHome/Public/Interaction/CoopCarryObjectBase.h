@@ -49,7 +49,8 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "CoopCarry")
 	TObjectPtr<UStaticMeshComponent> MeshComponent;
 
-	// 오브젝트 외곽 양쪽 - 각 캐리어가 서는/붙잡는 위치(에디터에서 배치).
+	// 오브젝트 외곽 양쪽 - 각 캐리어가 서는 위치(에디터에서 배치, 위치만 사용하고 회전은 무시).
+	// 캐리어는 서로 상대 손잡이 쪽을 바라봄. 오브젝트에 붙어 있어서 오브젝트가 움직이거나 돌면 같이 따라감.
 	UPROPERTY(VisibleAnywhere, Category = "CoopCarry")
 	TObjectPtr<USceneComponent> HandleA;
 
@@ -80,32 +81,71 @@ protected:
 
 private:
 
+private:
+private:
+
 	// 빈 핸들에 폰을 배정. 성공하면 true;
 	bool AssignCarrier(APawn* Pawn);
 
 	// CarryData의 메쉬/스케일을 실제 컴포넌트에 반영.
 	void SyncFromCarryData();
 
-	// 정체(손발 안 맞음) 판정 - 둘 다 입력 중인데 합산 결과가 이 값보다 작은 상태가
-	// 이 시간(초) 이상 지속되면 강제로 놓침.
-	UPROPERTY(EditAnywhere, Category = "CoopCarry")
-	float StuckInputThreshold = 0.1f;
+	// 이 위치/회전에 오브젝트를 놓으면 막히는 것과 겹치는지(자기 자신, 캐리어 제외).
+	bool IsBlockedAt(const FVector& Location, const FQuat& Rotation) const;
 
-	UPROPERTY(EditAnywhere, Category = "CoopCarry")
-	float StuckDropDuration = 2.0f;
-
-	// 합산 이동 벡터에 곱해지는 배율.
+	// 공유 이동 벡터에 곱해지는 배율.
 	// 무거운 물건이라 느리게 하고 싶으면 1보다 작게 세팅.
 	UPROPERTY(EditAnywhere, Category = "CoopCarry")
 	float CarrySpeedScale = 1.0f;
 
-	// 두 캐리어를 잇는 축으로 회전을 얼마나 빠르게 따라갈지(회전 보간 속도).
+	// 잡는 순간 1회 랜덤으로 정해지는 역할(그 세션 동안 고정). true면 CarrierA가 이동 역할.
+	bool bCarrierAIsMover = true;
+
+	// true면 CarrierA -> HandleA, CarrierB -> HandleB. 운반 시작 시 이동 거리 합이 짧은 쪽으로 배정(엇갈림 방지).
+	bool bCarrierAOnHandleA = true;
+
+	// 운반 시작 직후 두 캐리어가 손잡이에 도착했는지. 도착 전엔 오브젝트를 고정하고 캐리어만 손잡이로 이동시킴.
+	bool bHandlesReached = false;
+	float HandleReachElapsed = 0.f;
+
+	// 진행 방향. 운반 시작 시 이동 역할의 시선 Yaw로 초기화되고, 회전 역할의 조향으로 바뀜.
+	float HeadingYaw = 0.f;
+	float HeadingPitch = 0.f;
+
+	// 회전 역할 조향 속도(초당 각도).
 	UPROPERTY(EditAnywhere, Category = "CoopCarry")
-	float RotationInterpSpeed = 10.0f;
+	float SteerYawSpeed = 60.f;
+
+	UPROPERTY(EditAnywhere, Category = "CoopCarry")
+	float SteerPitchSpeed = 45.f;
+
+	// 진행 방향 최대 기울기(도). 90에 가까우면 한 사람이 다른 사람 바로 위에 서게 되어 좌우 조향이 불안정해짐.
+	UPROPERTY(EditAnywhere, Category = "CoopCarry", meta = (ClampMin = "0.0", ClampMax = "80.0"))
+	float MaxHeadingPitch = 60.f;
+
+	// 두 캐리어가 손잡이에서 이 거리 이내로 들어오면 "도착"으로 보고 조작 시작.
+	UPROPERTY(EditAnywhere, Category = "CoopCarry")
+	float HandleArriveTolerance = 20.f;
+
+	// 이 시간 안에 도착 못 하면(장애물 등) 그냥 조작 시작.
+	UPROPERTY(EditAnywhere, Category = "CoopCarry")
+	float HandleReachTimeout = 1.5f;
+
+	// 캐릭터가 손잡이에서 이 거리만큼 벗어나면 보정 입력이 최대(1)가 됨.
+	UPROPERTY(EditAnywhere, Category = "CoopCarry")
+	float HandleFollowRange = 100.f;
+
+	// 손잡이와의 오차가 Tolerance를 넘으면 조향이 느려지기 시작하고, StopDistance에서 완전히 멈춤.
+	UPROPERTY(EditAnywhere, Category = "CoopCarry")
+	float HandleLagTolerance = 30.f;
+
+	UPROPERTY(EditAnywhere, Category = "CoopCarry")
+	float HandleLagStopDistance = 120.f;
+
+	// 회전 역할이 Shift를 누르고 있을 때 공유 이동 벡터에 곱해지는 배율.
+	UPROPERTY(EditAnywhere, Category = "CoopCarry")
+	float CarryBoostMultiplier = 1.3f;
 
 	UPROPERTY(EditAnywhere, Category = "CoopCarry")
 	float MaxCarryDistance = 500.f;
-
-	float TimeStuck = 0.f;
-
 };

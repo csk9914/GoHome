@@ -50,8 +50,13 @@ protected:
 	void Move(const FInputActionValue& Value);
 	void MoveUpDown(const FInputActionValue& Value);
 	
-	// 이동 입력을 뗐을 때(Completed/Canceled) 호출 - 운반 중이면 정체된 LastCarryInputWorld를 0으로 리셋.
+	// .이동 입력을 뗐을 때(Completed/Canceled) 호출
+	// 운반 중이면 정체된 LastCarryMoveInput을 0으로 리셋.
 	void StopCarryInput();
+	
+	// 상하이동 입력을 뗐을 때(Completed/Canceled) 호출
+	// 운반 중이면 정체된 LastCarryVerticalInput을 0으로 리셋.
+	void StopCarryVerticalInput();
 
 	void StartSprint();
 	void StopSprint();
@@ -170,11 +175,21 @@ public:
 	// ACoopCarryObjectBase가 잡기/놓기 시 호출(서버 권위).
 	void SetCoopCarryObject(ACoopCarryObjectBase* NewCarryObject);
 
-	// 서버 전용 : ACoopCarryObjectBase가 매 틱 평균 낸 이동 벡터를 세팅.
+	// 서버 전용 : ACoopCarryObjectBase가 매 틱 계산한 이 캐릭터용 이동 벡터(공유 이동 + 잡은 지점 보정)를 세팅.
 	void SetCombinedCarryInput(const FVector& NewInput);
 
-	// 협동 운반 중 서버가 두 캐리어 입력을 평균 낼 때 사용할, 이 캐릭터의 최신 월드 스페이스 이동 의도.
-	FVector GetLastCarryInputWorld() const { return LastCarryInputWorld; }
+	// 서버 전용 : ACoopCarryObjectBase가 매 틱 계산한 몸통 목표 Yaw(배정된 손잡이의 정면 방향)를 세팅.
+	void SetCarryFacingYaw(float NewYaw) { CarryFacingYaw = NewYaw; }
+
+	// 협동 운반 중 이 캐릭터의 원본 2D 이동 입력(X=A/D, Y=W/S). 역할별 해석은 ACoopCarryObjectBase가 함.
+	FVector2D GetLastCarryMoveInput() const { return LastCarryMoveInput; }
+
+	// 협동 운반 중 상하이동 입력(이동 역할일 때만 사용).
+	float GetLastCarryVerticalInput() const { return LastCarryVerticalInput; }
+
+
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	bool IsCarryBoosting() const { return bIsCarryBoosting; }
 
 	UFUNCTION(BlueprintPure, Category = "Switchboard")
 	bool IsFocusingSwitchboard() const { return FocusedSwitchboard != nullptr; }
@@ -241,11 +256,25 @@ protected:
 	UPROPERTY(Replicated)
 	FVector CombinedCarryInput = FVector::ZeroVector;
 
+	// 협동 운반 중 몸통 목표 Yaw. 서버(판정용)와 소유 클라(예측용)가 각자 이 값으로 몸통을 돌림.
+	// 다른 클라에는 서버 회전이 기존 이동 리플리케이션으로 전달되므로 소유자에게만 보냄.
+	UPROPERTY(Replicated)
+	float CarryFacingYaw = 0.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "CoopCarry")
+	float CarryFacingInterpSpeed = 10.f;
+
 	UFUNCTION()
 	void OnRep_CurrentCarryObject();
 
+    UFUNCTION(Server, Unreliable)
+	void Server_UpdateCarryInput(FVector2D MoveInput);
+
 	UFUNCTION(Server, Unreliable)
-	void Server_UpdateCarryInput(FVector WorldIntent);
+	void Server_UpdateCarryVerticalInput(float VerticalInput);
+
+	UFUNCTION(Server, Reliable)
+	void ServerSetCarryBoosting(bool bNewBoosting);
 
 	// 피격/사망 시 강제로 운반 해제하기 위한 구독 핸들러.
 	UFUNCTION()
@@ -315,7 +344,15 @@ private:
 	UPROPERTY()
 	TObjectPtr<UInventoryComponent> CachedInventoryComponent;
 
-	FVector LastCarryInputWorld = FVector::ZeroVector;
+	FVector2D LastCarryMoveInput = FVector2D::ZeroVector;
+
+	// 캡슐이 무시하도록 등록해둔 운반 오브젝트(놓을 때 정확히 해제하기 위해 기억).
+	TWeakObjectPtr<ACoopCarryObjectBase> CapsuleIgnoredCarryObject;
+
+	float LastCarryVerticalInput = 0.f;
+	bool bIsCarryBoosting = false;
+
 	float LastKnownHP = -1.f; // -1 = 아직 초기화 안됨(최초 값으로는 감소 판정 안 하기 위함).
+
 };
 
