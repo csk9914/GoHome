@@ -7,6 +7,8 @@
 #include "Core/GoHomeGameState.h"
 #include "Engine/World.h"
 #include "Engine/OverlapResult.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "Camera/CameraComponent.h"
 
 
 ACoopCarryObjectBase::ACoopCarryObjectBase()
@@ -24,17 +26,51 @@ ACoopCarryObjectBase::ACoopCarryObjectBase()
 
 	HandleB = CreateDefaultSubobject<USceneComponent>(TEXT("HandleB"));
 	HandleB->SetupAttachment(MeshComponent);
+
+	// 공용 추적 카메라.
+	// 위치는 오브젝트를 따라가되 회전/스케일은 절대 값(메시 회전, 기울기, Roll, 스케일 무시).
+	CarryCameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CarryCameraBoom"));
+	CarryCameraBoom->SetupAttachment(MeshComponent);
+	CarryCameraBoom->SetUsingAbsoluteRotation(true);
+	CarryCameraBoom->SetUsingAbsoluteScale(true);
+	CarryCameraBoom->TargetArmLength = 450.f;
+	CarryCameraBoom->TargetOffset = FVector(0.f, 0.f, 80.f);
+	CarryCameraBoom->bUsePawnControlRotation = false;
+	CarryCameraBoom->bEnableCameraLag = true; // 클라는 위치/진행 방향을 계단식으로 받으므로 랙으로 부드럽게.
+	CarryCameraBoom->bEnableCameraRotationLag = true;
+	CarryCameraBoom->CameraLagSpeed = 8.f;
+	CarryCameraBoom->CameraRotationLagSpeed = 8.f;
+	CarryCameraBoom->PrimaryComponentTick.bStartWithTickEnabled = false; // 두 명 다 잡았을 때만 틱(OnRep_Carriers).
+
+	CarryCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("CarryCamera"));
+	CarryCamera->SetupAttachment(CarryCameraBoom, USpringArmComponent::SocketName);
 }
 
 void ACoopCarryObjectBase::BeginPlay()
 {
 	Super::BeginPlay();
 	SyncFromCarryData();
+
+	// BP에서 랙을 조정했을 수 있으니, 켜질 때 잡깐 끈 뒤 되돌릴 값으로 기억.
+	bDefaultCameraLag = CarryCameraBoom->bEnableCameraLag;
+	bDefaultCameraRotationLag = CarryCameraBoom->bEnableCameraRotationLag;
 }
 
 void ACoopCarryObjectBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	// 공용 카메라 : 모든 머신이 복제된 진행 방향으로 각자 계산 -> 두 캐리어가 같은 화면을 봄.
+	if (IsFullyCarried())
+	{
+		UpdateCarryCameraRotation();
+
+		if (CarryCameraSnapFrames > 0 && --CarryCameraSnapFrames == 0)
+		{
+			CarryCameraBoom->bEnableCameraLag = bDefaultCameraLag;
+			CarryCameraBoom->bEnableCameraRotationLag = bDefaultCameraRotationLag;
+		}
+	}
 
 	if (!HasAuthority() || !IsFullyCarried()) return;
 
@@ -279,7 +315,19 @@ void ACoopCarryObjectBase::ReleaseCarriers()
 
 void ACoopCarryObjectBase::OnRep_Carriers()
 {
-	// 캐릭터 운반 상태(bIsCoopCarrying) 갱신.
+	// 공용 카메라 붐은 두 명 다 잡았을 때만 틱(스프링암 매 프레임 충돌 검사 비용 절약).
+	const bool bCarried = IsFullyCarried();
+	CarryCameraBoom->SetComponentTickEnabled(bCarried);
+
+	if (bCarried)
+	{
+		// 켜지는 순간 랙 때문에 이전 운반 때의 위치에서 날아오지 않게, 첫 갱신 한 번은 랙 없이.
+		// (스프링암은 랙 여부와 상관없이 매 갱신 이전 위치를 새로 저장하므로 한 번이면 초기화됨)
+		UpdateCarryCameraRotation();
+		CarryCameraBoom->bEnableCameraLag = false;
+		CarryCameraBoom->bEnableCameraRotationLag = false;
+		CarryCameraSnapFrames = 2;
+	}
 }
 
 FText ACoopCarryObjectBase::GetInteractionPromptText_Implementation() const
@@ -294,6 +342,9 @@ void ACoopCarryObjectBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>&
 	DOREPLIFETIME(ACoopCarryObjectBase, CarrierB);
 	DOREPLIFETIME(ACoopCarryObjectBase, CarryData);
 	DOREPLIFETIME(ACoopCarryObjectBase, bIsBeingDelivered);
+	DOREPLIFETIME(ACoopCarryObjectBase, bCarrierAIsMover);
+	DOREPLIFETIME(ACoopCarryObjectBase, HeadingYaw);
+	DOREPLIFETIME(ACoopCarryObjectBase, HeadingPitch);
 }
 
 void ACoopCarryObjectBase::SyncFromCarryData()
@@ -336,4 +387,10 @@ bool ACoopCarryObjectBase::IsBlockedAt(const FVector& Location, const FQuat& Rot
 	TArray<FOverlapResult> Overlaps;
 	return GetWorld()->ComponentOverlapMultiByChannel(
 		Overlaps, MeshComponent, Location, Rotation, MeshComponent->GetCollisionObjectType(), Params);
+}
+
+void ACoopCarryObjectBase::UpdateCarryCameraRotation()
+{
+	// 진행 방향 뒤에서 약간 내려다봄. 기울기는 일부만 따라가고 Roll은 반영 안 함(멀미 방지).
+	CarryCameraBoom->SetWorldRotation(FRotator(CarryCameraBasePitch + HeadingPitch * CarryCameraPitchFollow, HeadingYaw, 0.f));
 }

@@ -121,28 +121,33 @@ void AGoHomeCharacter::Tick(float DeltaTime)
 	}
 
 
-	// 블랜더로 메시를 자체 수정함에 따라 해당 코드 불필요, 주석처리
 	if (IsLocallyControlled())
 	{
 		if (CurrentCarryObject)
 		{
-			// 서버가 평균 낸 합산 입력을 "내 로컬 폰"에 직접 적용 -> 표준 예측/ServerMove 흐름 그대로.
+			// 서버가 계산한 이 캐릭터용 운반 입력(공유 이동 + 손잡이 보정)을 "내 로컬 폰"에 직접 적용 -> 표준 예측/ServerMove 흐름 그대로.
+			// 운반 중 이동과 손잡이 따라가기가 전부 이 한 줄에 달려 있음(지우면 컴파일은 되지만 운반 중 캐릭터가 멈춤).
 			AddMovementInput(CombinedCarryInput);
 		}
-		//GetMesh()->HideBoneByName(TEXT("Head"), EPhysBodyOp::PBO_None);
 
-		//const float Pitch = FRotator::NormalizeAxis(GetControlRotation().Pitch);
-		//constexpr float BodyHidePitchThreshold = 30.f; // 이 각도 이상이면 몸 전체 숨김
+		// 두 명 다 잡은 동안만 공용 카메라. 놓기/정산/강제 해제 등 모든 해제 경로가 CurrentCarryObject를 비우므로 여기서 자동 복구됨.
+		// 여러 액터의 OnRep 도착 순서에 의존하지 않도록 매 틱 상태를 비교.
+		const bool bWantCarryView = CurrentCarryObject && CurrentCarryObject->IsFullyCarried();
+		if (bWantCarryView && !bCarryViewActive)
+		{
+			EnterCarryView();
+		}
+		else if (!bWantCarryView && bCarryViewActive)
+		{
+			ExitCarryView();
+		}
 
-		//if (FMath::Abs(Pitch) > BodyHidePitchThreshold)
-		//{
-		//	GetMesh()->HideBoneByName(TEXT("Pelvis"), EPhysBodyOp::PBO_None);
-		//}
-		//else
-		//{
-		//	GetMesh()->UnHideBoneByName(TEXT("Pelvis"));
-		//}
+		if (bCarryViewActive && CurrentCarryObject)
+		{
+			LastCarryViewYaw = CurrentCarryObject->GetHeadingRotation().Yaw;
+		}
 	}
+
 
 	if (IsLocallyControlled() || HasAuthority())
 	{
@@ -390,6 +395,7 @@ void AGoHomeCharacter::Look(const FInputActionValue& Value)
 {
 	if (bIsStunned) { return; }
 	if (FocusedSwitchboard) { return; }
+	if (bCarryViewActive) { return; } // 운반 중 공용 화면 - 두 사람이 항상 같은 화면을 보도록 둘러보기 없음.
 
 	const FVector2D LookVector = Value.Get<FVector2D>();
 	AddControllerYawInput(LookVector.X);
@@ -539,10 +545,12 @@ void AGoHomeCharacter::OnRep_CurrentCarryObject()
 	{
 		GetCapsuleComponent()->IgnoreActorWhenMoving(CurrentCarryObject, true);
 	}
+
+	// 운반 중엔 캐리어의 충돌 컴포넌트가 Camera 채널을 무시 -> 공용 카메라 스프링암이 캐리어(특히 카메라 쪽에 선 이동 역할)에
+	// 걸려 코앞으로 당겨졌다 풀렸다 하는 깜빡임 방지. (스프링암은 소유 액터=운반 오브젝트만 무시하고, Pawn/CharacterMesh 프로필은 Camera를 막음)
+	// 스프링암 검사는 머신마다 로컬이라 각 머신에서 두 캐리어 모두 무시해야 함 -> 모든 머신에서 캐리어마다 실행되는 이 OnRep에서 처리.
+	SetCarryCameraCollisionIgnored(bIsCarrying);
 }
-
-
-
 
 void AGoHomeCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
@@ -958,4 +966,78 @@ void AGoHomeCharacter::UpdateFlashlightVisual(bool bNewIsOn)
 FVector AGoHomeCharacter::GetCameraWorldLocation() const
 {
 	return Camera->GetComponentLocation();
+}
+
+bool AGoHomeCharacter::IsCarryMover() const
+{
+	return CurrentCarryObject && CurrentCarryObject->IsMover(this);
+}
+
+void AGoHomeCharacter::EnterCarryView()
+{
+	bCarryViewActive = true;
+	CarryViewObject = CurrentCarryObject;
+	LastCarryViewYaw = CurrentCarryObject->GetHeadingRotation().Yaw;
+
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		// 배전반과 같은 패턴 - 로컬에서만 뷰 타겟 전환(복제 불필요).
+		// 뷰 타겟이 폰이 아니게 되면 OwnerNoSee가 풀려 자기 몸이 보이고, 1인칭 팔(OnlyOwnerSee)은 안 보임 -> 3인칭에 필요한 그대로.
+		PC->SetViewTargetWithBlend(CurrentCarryObject, CarryViewBlendTime);
+	}
+}
+
+void AGoHomeCharacter::ExitCarryView()
+{
+	bCarryViewActive = false;
+
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		// 다른 시스템(사망 관전 등)이 이미 뷰 타겟을 바꿨으면 덮어쓰지 않음.
+		// 정산으로 오브젝트가 파괴돼 뷰 타겟이 무효가 된 경우는 자기 폰으로 복귀.
+		AActor* ViewTarget = PC->GetViewTarget();
+		if (!IsValid(ViewTarget) || ViewTarget == this || ViewTarget == CarryViewObject.Get())
+		{
+			// 1인칭이 공용 화면이 보던 수평 방향에서 이어지게 -> 몸도 그 방향을 향한 채 풀림.
+			PC->SetControlRotation(FRotator(0.f, LastCarryViewYaw, 0.f));
+			PC->SetViewTargetWithBlend(this, CarryViewBlendTime);
+		}
+	}
+
+	CarryViewObject = nullptr;
+}
+
+
+void AGoHomeCharacter::SetCarryCameraCollisionIgnored(bool bIgnore)
+{
+	if (bIgnore)
+	{
+		// 이미 적용된 상태면 다시 저장하지 않음(원래 값 대신 Ignore를 저장해버리는 것 방지).
+		if (CarryCameraIgnoredComponents.Num() > 0) return;
+
+		TArray<UPrimitiveComponent*> Primitives;
+		GetComponents<UPrimitiveComponent>(Primitives);
+
+		for (UPrimitiveComponent* Primitive : Primitives)
+		{
+			const ECollisionResponse Original = Primitive->GetCollisionResponseToChannel(ECC_Camera);
+			if (Original != ECR_Ignore)
+			{
+				CarryCameraIgnoredComponents.Emplace(Primitive, Original);
+				Primitive->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+			}
+		}
+	}
+
+	else
+	{
+		for (const TPair<TWeakObjectPtr<UPrimitiveComponent>, ECollisionResponse>& Entry : CarryCameraIgnoredComponents)
+		{
+			if (UPrimitiveComponent* Primitive = Entry.Key.Get())
+			{
+				Primitive->SetCollisionResponseToChannel(ECC_Camera, Entry.Value);
+			}
+		}
+		CarryCameraIgnoredComponents.Reset();
+	}
 }

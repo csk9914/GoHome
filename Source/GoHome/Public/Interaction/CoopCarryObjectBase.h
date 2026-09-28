@@ -9,6 +9,8 @@
 
 class UStaticMeshComponent;
 class UCoopCarryDataAsset;
+class USpringArmComponent;
+class UCameraComponent;
 
 // 2인 협동 운반 오브젝트 베이스.
 // 오브젝트 외곽 양쪽 손잡이(HandleA / HandleB)에 각각 한 명씩 붙잡아야 운반이 시작된다.
@@ -31,6 +33,13 @@ public:
 	// 두 캐리어가 다 배정이 되었는지 확인(실제 운반이 시작되는 조건).
 	UFUNCTION(BlueprintPure, Category = "CoopCarry")
 	bool IsFullyCarried() const { return CarrierA && CarrierB; }
+
+	// 진행 방향(Yaw/Pitch). 클라에 복제됨.
+	FRotator GetHeadingRotation() const { return FRotator(HeadingPitch, HeadingYaw, 0.f); }
+
+	// 이 폰이 이동 역할인지(두 명 다 잡은 상태에서만 의미 있음).
+	// HUD 역할 표시용.
+	bool IsMover(const APawn* Pawn) const { return IsFullyCarried() && ((Pawn == CarrierA.Get()) == bCarrierAIsMover); }
 
 	// 서버 권위: 자발적(Q)이든 강제(피격/사망 등)든 이 함수 하나로 들어옴.
 	// 한쪽만 반쪽 상태로 남기지 않고 둘다 같이 해제함.
@@ -56,6 +65,16 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, Category = "CoopCarry")
 	TObjectPtr<USceneComponent> HandleB;
+
+	// 운반 중 두 캐리어가 같이 보는 공용 추적 카메라.
+	// 각 클라가 로컬로 이 액터를 뷰 타겟으로 삼음.
+	// 붐은 절대 회전 - 메시의 회전/기울기/Roll을 물려받지 않고, 복제 된 진행 방향으로 매 틱 계산.
+	UPROPERTY(VisibleAnywhere, Category = "CoopCarry|Camera")
+	TObjectPtr<USpringArmComponent> CarryCameraBoom;
+
+	UPROPERTY(VisibleAnywhere, Category = "CoopCarry|Camera")
+	TObjectPtr<UCameraComponent> CarryCamera;
+
 	
 	// 이 오브젝트의 정산 가치/메쉬 등 정보.
 	UPROPERTY(EditAnywhere, ReplicatedUsing = OnRep_CarryData, Category = "CoopCarry")
@@ -81,9 +100,6 @@ protected:
 
 private:
 
-private:
-private:
-
 	// 빈 핸들에 폰을 배정. 성공하면 true;
 	bool AssignCarrier(APawn* Pawn);
 
@@ -99,6 +115,8 @@ private:
 	float CarrySpeedScale = 1.0f;
 
 	// 잡는 순간 1회 랜덤으로 정해지는 역할(그 세션 동안 고정). true면 CarrierA가 이동 역할.
+	// 클라 HUD가 역할을 표시해야 해서 복제.
+	UPROPERTY(Replicated)
 	bool bCarrierAIsMover = true;
 
 	// true면 CarrierA -> HandleA, CarrierB -> HandleB. 운반 시작 시 이동 거리 합이 짧은 쪽으로 배정(엇갈림 방지).
@@ -109,8 +127,28 @@ private:
 	float HandleReachElapsed = 0.f;
 
 	// 진행 방향. 운반 시작 시 이동 역할의 시선 Yaw로 초기화되고, 회전 역할의 조향으로 바뀜.
+	// 공용 카메라를 모든 머신이 같은 값으로 계산해야 해서 복제.
+	UPROPERTY(Replicated)
 	float HeadingYaw = 0.f;
+
+	UPROPERTY(Replicated)
 	float HeadingPitch = 0.f;
+
+	// 공용 카메라 : 기본 내려다보는 각도, 진행 방향 기울기를 따라가는 비율.
+	UPROPERTY(EditAnywhere, Category = "CoopCarry|Camera")
+	float CarryCameraBasePitch = -15.f;
+
+	UPROPERTY(EditAnywhere, Category = "CoopCarry|Camera")
+	float CarryCameraPitchFollow = 0.5f;
+
+	// 붐 회전을 진행 방향 기준으로 갱신(모든 머신에서 실행).
+	void UpdateCarryCameraRotation();
+
+	// 붐이 켜질 떄 한 번 랙을 끄고, 이 프레임 수가 지나면 BP 설정값으로 되돌림.
+	int32 CarryCameraSnapFrames = 0;
+	bool bDefaultCameraLag = true;
+	bool bDefaultCameraRotationLag = true;
+
 
 	// 회전 역할 조향 속도(초당 각도).
 	UPROPERTY(EditAnywhere, Category = "CoopCarry")

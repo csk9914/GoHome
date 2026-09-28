@@ -191,6 +191,14 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	bool IsCarryBoosting() const { return bIsCarryBoosting; }
 
+	// 운반 중 공용 카메라 시점인지(두 명 다 잡은 동안). HUD 크로스헤어 숨김/역할 표시 조건.
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	bool IsCarryViewActive() const { return bCarryViewActive; }
+
+	// 운반 중 내가 이동 역할인지(false면 회전 역할). IsCarryViewActive()가 true일 때만 의미 있음.
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	bool IsCarryMover() const;
+
 	UFUNCTION(BlueprintPure, Category = "Switchboard")
 	bool IsFocusingSwitchboard() const { return FocusedSwitchboard != nullptr; }
 
@@ -351,6 +359,26 @@ private:
 
 	float LastCarryVerticalInput = 0.f;
 	bool bIsCarryBoosting = false;
+
+	// 운반 중 공용 카메라 시점 (로컬 전용 상태 - 복제 안 함)
+	void EnterCarryView();
+	void ExitCarryView();
+
+	bool bCarryViewActive = false;
+	TWeakObjectPtr<ACoopCarryObjectBase> CarryViewObject;
+
+	// 복귀 시 1인칭이 이어질 수평 방향. 정산으로 오브젝트가 파괴되면 읽을 수 없어서 매 틱 캐시.
+	float LastCarryViewYaw = 0.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "CoopCarry")
+	float CarryViewBlendTime = 0.3f;
+
+	// 운반 중 공용 카메라 스프링암이 캐리어에 걸리지 않도록 
+	// 이 캐릭터의 충돌 컴포넌트가 Camera 채널을 무시하게 함(놓을 때 원래 값 복원).
+	void SetCarryCameraCollisionIgnored(bool bIgnore);
+
+	// Camera 채널을 무시로 바꾼 컴포넌트와 원래 반응(복원용).
+	TArray<TPair<TWeakObjectPtr<UPrimitiveComponent>, ECollisionResponse>> CarryCameraIgnoredComponents;
 
 	float LastKnownHP = -1.f; // -1 = 아직 초기화 안됨(최초 값으로는 감소 판정 안 하기 위함).
 
