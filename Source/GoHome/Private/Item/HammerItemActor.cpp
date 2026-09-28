@@ -1,6 +1,7 @@
 ﻿#include "Item/HammerItemActor.h"
 #include "Interaction/BreakableWallActor.h"
 #include "Player/GoHomeCharacter.h"
+#include "TimerManager.h"
 
 FVector AHammerItemActor::GetImpactLocation() const
 {
@@ -25,6 +26,26 @@ void AHammerItemActor::ServerUseSpecialAction()
 
 	LastUseTime = GetWorld()->GetTimeSeconds();
 
+	// 모든 머신에서 휘두르는 모션 재생.
+	Multicast_PlayUseMontage();
+
+	// 휘두른 사람 기억 -> 지연 도중 소유자가 바뀌면 판정 취소.
+	SwingPawn = HoldingPawn;
+
+	if (ImpactDelay <= 0.f)
+	{
+		PerformImpactTrace();
+		return;
+	}
+
+	GetWorldTimerManager().SetTimer(ImpactTimerHandle, this, &AHammerItemActor::PerformImpactTrace, ImpactDelay, false);
+}
+
+void AHammerItemActor::PerformImpactTrace()
+{
+	// 지연 도중 떨어뜨렸거나, 다른 슬롯으로 바꿨거나, 다른 사람이 주워 갔으면 타격 취소.
+	if (!HoldingPawn || !bIsActiveHeld || HoldingPawn != SwingPawn.Get()) return;
+
 	const FVector Start = GetImpactLocation();
 	const FVector End = Start + GetAimDirection() * TraceDistance;
 
@@ -41,7 +62,6 @@ void AHammerItemActor::ServerUseSpecialAction()
 			Wall->ServerHit(HoldingPawn);
 		}
 	}
-	// 코스메틱(휘두르는 모션/타격음)이 필요하면 여기 추가.
 }
 
 bool AHammerItemActor::CanUse() const
