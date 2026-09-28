@@ -2,6 +2,10 @@
 
 #include "Item/UsableItemBase.h"
 #include "Net/UnrealNetwork.h"
+#include "GameFramework/Character.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Animation/AnimInstance.h"
+#include "Animation/AnimMontage.h"
 
 void AUsableItemBase::UpdateAttachment(APawn* OldHoldingPawn)
 {
@@ -86,4 +90,20 @@ void AUsableItemBase::ToggleMeshFlicker()
 	MeshComponent->SetVisibility(!MeshComponent->IsVisible());
 	GetWorldTimerManager().SetTimer(MeshFlickerTimerHandle, this,
 		&AUsableItemBase::ToggleMeshFlicker, FMath::FRandRange(0.05f, 0.15f), false);
+}
+
+void AUsableItemBase::Multicast_PlayUseMontage_Implementation()
+{
+	if (!UseMontage) return;
+
+	const ACharacter* Character = Cast<ACharacter>(HoldingPawn);
+	if (!Character) return;
+
+	USkeletalMeshComponent* BodyMesh = Character->GetMesh();
+	if (!BodyMesh) return;
+
+	if (UAnimInstance* AnimInstance = BodyMesh->GetAnimInstance())
+	{
+		AnimInstance->Montage_Play(UseMontage);
+	}
 }
