@@ -25,7 +25,8 @@ Dev가 1차, Notion은 필요 시만 부차적으로(에이전트가 직접 열�
 | 담당자/목표 기간/DoD가 뭐야? | GoHome 담당자 배정 DB, GoHome 착수 로드맵(Notion) — 사람이 확인해 전달 |
 | 브랜치 어떻게 만들어/머지해? PR은 언제부터 써? | GoHome Git 워크플로우(Notion) — 사람이 확인해 전달, 또는 사람이 직접 수행 |
 | 바이너리(.uasset/.umap) 머지 충돌 CLI로 어떻게 풀어? | [CODING_CONVENTIONS.md "바이너리 충돌 시 CLI로 한쪽 선택하기"](CODING_CONVENTIONS.md#바이너리uassetumap-충돌-시-cli로-한쪽-선택하기) — 실시간 도움이 필요한 절이라 md로 직접 참조 |
-| UI 화면 새로 만들거나 구조 바꿔야 해 (레이어·라우터·연출·네이밍) | [UI_GUIDE.md](UI_GUIDE.md) — 개별 위젯 필드는 `Content/GoHome/UI/`가 출처, 데이터 방향 원칙은 [ARCHITECTURE.md UI 절](ARCHITECTURE.md#ui) |
+| UI 화면 새로 만들거나 구조 바꿔야 해 (레이어·라우터·연출·네이밍) | [UI_GUIDE.md](UI_GUIDE.md) — 개별 위젯 필드는 `Content/GoHome/UI/`가 출처, 데이터 방향 원칙은 [ARCHITECTURE.md UI 절](ARCHITECTURE.md#ui). [UI Reference Pack 워크플로우](UI_REFERENCE_WORKFLOW.md)는 담당자 개인이 그 환경을 갖췄을 때만 추가로 참고(개인 환경 세팅, 팀 공용 아님) |
+| UI 시안·사용자 흐름·애니메이션을 에이전트에게 기획/디자인/검토시켜야 해 | (개인 환경에 `ui-reference-pack` 스킬이 설치돼 있다면) [UI Reference Pack 워크플로우](UI_REFERENCE_WORKFLOW.md#에이전트-협업-모델) — 기획 → 디자인 → 사람 승인 → 구현 → 독립 검토 순서와 역할별 산출물·반복 한도를 따른다 |
 | Blueprint 노드 그래프 어떻게 만들어? 코드랑 같이 BP 가이드도 줘 | [NODECASTER_GUIDE.md](NODECASTER_GUIDE.md) — 설치 안 돼 있으면 "2. 사용 절차"는 읽지 않고 기존 방식(텍스트 설명)으로 안내 |
 | 블루프린트 코멘트 박스 색상은 뭘 써야 해? | [BP_COMMENT_COLORS.md](BP_COMMENT_COLORS.md) |
 
@@ -36,6 +37,7 @@ Claude Code를 쓰는 팀원은 매번 절차를 프롬프트로 다시 설명�
 | 스킬 | 호출 | 용도 |
 |---|---|---|
 | `dev-doc-review` | `/dev-doc-review [파일명 또는 경로] [최대 루프 횟수]` | `Docs/Dev/`의 `ARCHITECTURE.md`·`CODING_CONVENTIONS.md`·`AI_AGENT_GUIDE.md`를 원칙급 리뷰어 서브에이전트로 반복 검증·반영. 문서명 생략 시 대상을 물어보고, 루프 횟수 생략 시 기본 3회 |
+| `ui-reference-pack` (개인 로컬 설치 시) | `/ui-reference-pack [draft\|implement\|review] [화면 또는 기능]` | 신규/대규모 UI 변경의 기획 → 인터랙티브 시안·모션 → 사람 승인 → Unreal 구현 → 독립 검토. 상세 계약은 [UI Reference Pack 워크플로우](UI_REFERENCE_WORKFLOW.md) |
 
 - 대상 파일명은 별칭으로도 인식된다: `아키텍처`/`ARCHITECTURE`, `컨벤션`/`CONVENTIONS`, `에이전트 가이드`/`AI_AGENT_GUIDE`. 예: `/dev-doc-review 아키텍처 2`
 - 새 스킬이 추가되면 이 표에 한 줄만 추가한다(상세 절차의 유일한 출처는 각 `SKILL.md`).

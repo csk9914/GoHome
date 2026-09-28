@@ -89,6 +89,7 @@ DerivedDataCache/*
 # 개인용 자동화 스킬 (미검증, 아직 팀 공유 안 함)
 .claude/skills/24x7-dev-loop/
 .claude/skills/feature-loop/
+.claude/skills/ui-reference-pack/
 .claude/skills/LOOP_CORE.md
 .claude/skills/ENGINE_BINDING_UE5.md
 .claude/skills/PROJECT_BINDING.md
@@ -96,6 +97,9 @@ DerivedDataCache/*
 
 # 개인 작업 문서 (담당자별 스크래치 — 팀 공유 아님)
 /Docs/Dev/_personal/
+
+# UI Reference Pack 산출물 (개인 작업 영역 — 팀 공유 아님)
+/Docs/Dev/UI/
 
 # 문서 검색 인덱스 캐시 (로컬 생성 아티팩트, 소스 아님)
 /Docs/index.bleve/
