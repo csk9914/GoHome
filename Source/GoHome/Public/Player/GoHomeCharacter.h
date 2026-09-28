@@ -21,6 +21,9 @@ class UInventoryComponent;
 class UPrimitiveComponent;
 class USpotLightComponent;
 
+// 운반 중 공용 카메라 시점에 들어가거나 나올 때(로컬 폰에서만 발생). HUD가 크로스헤어 숨김/역할 표시에 사용.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCarryViewChanged, bool, bActive, bool, bIsMover);
+
 UCLASS()
 class GOHOME_API AGoHomeCharacter : public ACharacter, public ISocketProvider, public IStunnable
 {
@@ -198,6 +201,11 @@ public:
 	// 운반 중 내가 이동 역할인지(false면 회전 역할). IsCarryViewActive()가 true일 때만 의미 있음.
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	bool IsCarryMover() const;
+
+	// 공용 카메라 시점 진입/종료 알림(로컬 폰에서만). bIsMover는 bActive가 true일 때만 의미 있음.
+	// HUD는 바인딩 직후 IsCarryViewActive()/IsCarryMover()로 초기값을 한 번 읽는다.
+	UPROPERTY(BlueprintAssignable, Category = "Interaction")
+	FOnCarryViewChanged OnCarryViewChanged;
 
 	UFUNCTION(BlueprintPure, Category = "Switchboard")
 	bool IsFocusingSwitchboard() const { return FocusedSwitchboard != nullptr; }

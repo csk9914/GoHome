@@ -985,6 +985,8 @@ void AGoHomeCharacter::EnterCarryView()
 		// 뷰 타겟이 폰이 아니게 되면 OwnerNoSee가 풀려 자기 몸이 보이고, 1인칭 팔(OnlyOwnerSee)은 안 보임 -> 3인칭에 필요한 그대로.
 		PC->SetViewTargetWithBlend(CurrentCarryObject, CarryViewBlendTime);
 	}
+
+	OnCarryViewChanged.Broadcast(true, IsCarryMover());
 }
 
 void AGoHomeCharacter::ExitCarryView()
@@ -1005,6 +1007,8 @@ void AGoHomeCharacter::ExitCarryView()
 	}
 
 	CarryViewObject = nullptr;
+
+	OnCarryViewChanged.Broadcast(false, false);
 }
 
 
