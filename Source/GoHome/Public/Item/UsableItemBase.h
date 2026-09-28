@@ -6,6 +6,8 @@
 #include "Item/ItemActorBase.h"
 #include "UsableItemBase.generated.h"
 
+class UAnimMontage;
+
 // 오른손 활성 슬롯 아이템 중 "사용(좌클릭)" 가능한 것들의 공통 베이스.
 // 부착/활성 슬롯 로직은 AItemActorBase 재사용.
 // 여기서는 "지금 사용 가능한 상태인지" 판단 지점만 추가함.
@@ -44,6 +46,16 @@ protected:
 
 	// 카운트다운/경고 도중 다시 주워져서 취소될 때 호출. 기본은 깜빡임 정지 + 다시 보이게 복구.
 	virtual void OnDespawnCanceled();
+
+	// 사용(좌클릭) 시 들고 있는 캐릭터가 재생할 몽타주. 비워두면 재생 안 함(모션 없는 아이템은 기존 그대로).
+	UPROPERTY(EditDefaultsOnly, Category = "Item|Animation")
+	TObjectPtr<UAnimMontage> UseMontage;
+
+	// 서버에서 호출 -> 모든 머신(서버 포함)에서 HoldingPawn 몸 메시에 UseMontage 재생.
+	// 1인칭 팔은 LeaderPose로 몸 메시를 따라가므로 따로 재생할 필요 없음.
+	// 순수 연출이라 Unreliable (유실돼도 게임 판정에는 영향 없음).
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayUseMontage();
 
 private:
 
