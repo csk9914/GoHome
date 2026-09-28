@@ -4,12 +4,57 @@
 #include "Core/DockingDoorComponent.h"
 #include "Core/ExplorationGameMode.h"
 #include "Core/ExplorationGameState.h"
+#include "Data/FExpeditionProgress.h"
 #include "Net/UnrealNetwork.h"
 #include "Save/GoHomeSaveSubsystem.h"
 
 AGoHomeGameState::AGoHomeGameState()
 {
 	DockingDoorComponent = CreateDefaultSubobject<UDockingDoorComponent>(TEXT("DockingDoorComponent"));
+}
+
+void AGoHomeGameState::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	const UGameInstance* GameInstance = GetGameInstance();
+	if (!GameInstance)
+	{
+		return;
+	}
+
+	UGoHomeSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<UGoHomeSaveSubsystem>();
+	if (!SaveSubsystem)
+	{
+		return;
+	}
+
+	const FExpeditionProgress Progress = SaveSubsystem->BuildProgress();
+	SetRoundProgress(Progress.CurrentRound, Progress.FinalRound);
+}
+
+void AGoHomeGameState::SetRoundProgress(int32 InCurrentRound, int32 InFinalRound)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	CurrentRound = InCurrentRound;
+	FinalRound = InFinalRound;
+
+	// 리슨 서버 호스트는 OnRep이 불리지 않으므로 서버에서 직접 브로드캐스트
+	OnRoundProgressChanged.Broadcast(CurrentRound, FinalRound);
+}
+
+void AGoHomeGameState::OnRep_RoundProgress()
+{
+	OnRoundProgressChanged.Broadcast(CurrentRound, FinalRound);
 }
 
 void AGoHomeGameState::SetState(EExpeditionState NewState)
@@ -78,6 +123,8 @@ void AGoHomeGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME(AGoHomeGameState, CurrentState);
+	DOREPLIFETIME(AGoHomeGameState, CurrentRound);
+	DOREPLIFETIME(AGoHomeGameState, FinalRound);
 }
 
 void AGoHomeGameState::OnRep_State()
