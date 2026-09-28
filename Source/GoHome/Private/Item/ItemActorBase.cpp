@@ -345,7 +345,14 @@ void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp,
 	FVector NormalImpulse,
 	const FHitResult& Hit)
 {
-	Super::NotifyHit(MyComp, Other, OtherComp, bSelfMoved, HitLocation, HitNormal, NormalImpulse, Hit);
+	Super::NotifyHit(MyComp, 
+		             Other, 
+		             OtherComp, 
+		             bSelfMoved, 
+		             HitLocation, 
+		             HitNormal, 
+		             NormalImpulse, 
+		             Hit);
 
 	// 가라앉아서 멈춘(Tick off) 아이템이 플레이어 등과 다시 충동할 경우.
 	// 중력이 꺼져 있어 스스로 못내려오기 때문에 Tick을 다시 on 하여 가라앉는 힘을 재 적용 시킴.
@@ -354,17 +361,24 @@ void AItemActorBase::NotifyHit(UPrimitiveComponent* MyComp,
 		SetActorTickEnabled(true);
 	}
 
-	if (!HasAuthority() || !ItemData || !ItemData->bCanBreak) return;
-	if (BreakCount >= ItemData->MaxBreakCount) return;
+	TryApplyBreakFromImpact(GetVelocity().Size());
+}
 
-	const float ImpactSpeed = GetVelocity().Size();
+bool AItemActorBase::TryApplyBreakFromImpact(float ImpactSpeed)
+{
+	if (!HasAuthority() || !ItemData || !ItemData->bCanBreak) return false;
+	if (BreakCount >= ItemData->MaxBreakCount) return false;
 
 	if (ImpactSpeed >= ItemData->BreakVelocityThreshold)
 	{
 		++BreakCount;
 		UpdateDamageVisual(); // 서버 자신은 OnRep이 안 뜨므로 수동 호출.
+		return true;
 	}
+	return false;
 }
+
+
 
 // NoiseType
 

@@ -1,14 +1,16 @@
 ﻿#include "Upgrade/EquipmentUpgradeSubsystem.h"
 #include "Upgrade/EquipmentUpgradeDataAsset.h"
+#include "Upgrade/EquipmentUpgradeStateActor.h"
 #include "Engine/World.h"
+#include "Engine/GameInstance.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "Player/OxygenComponent.h"
 #include "Player/CarryWeightComponent.h"
-#include "GameFramework/PlayerController.h"
-#include "Upgrade/EquipmentUpgradeStateActor.h"
-#include "EngineUtils.h"
 #include "Save/GoHomeSaveSubsystem.h"
-#include "Engine/GameInstance.h"
+#include "EngineUtils.h"
+#include "UObject/UObjectGlobals.h"
 
 void UEquipmentUpgradeSubsystem::Initialize(
 	FSubsystemCollectionBase& CollectionBase)
@@ -30,6 +32,31 @@ void UEquipmentUpgradeSubsystem::Initialize(
 
 	// SaveGame에 저장된 강화 레벨을 런타임 배열로 가져온다.
 	UpgradeLevels = SaveSubsystem->GetSavedUpgradeLevels();
+
+	// 맵이 바뀔 때마다 새 Pawn을 감시한다.
+	PostLoadMapHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(
+		this,
+		&UEquipmentUpgradeSubsystem::HandlePostLoadMap
+	);
+
+	// 이미 월드가 존재한다면 즉시 감시를 시작한다.
+	if (UWorld* World = GetWorld())
+	{
+		BindToWorld(World);
+	}
+}
+
+void UEquipmentUpgradeSubsystem::Deinitialize()
+{
+	UnbindFromWorld();
+
+	if (PostLoadMapHandle.IsValid())
+	{
+		FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
+		PostLoadMapHandle.Reset();
+	}
+
+	Super::Deinitialize();
 }
 
 bool UEquipmentUpgradeSubsystem::HasServerAuthority() const
@@ -126,8 +153,19 @@ EEquipmentUpgradeRequestResult UEquipmentUpgradeSubsystem::UpgradeOnce(UEquipmen
 	const int32 UpgradeCost =
 		UpgradeData->GetCostToUpgradeFromLevel(CurrentLevel);
 
-	// 현재 규칙은 음수 자금을 허용하므로,
-	// 돈이 부족해도 -1000 → -1300처럼 차감된다.
+	// 현재 보유 코인을 가져온다.
+	const int32 CurrentFunds =
+		SaveSubsystem->GetCurrentFunds();
+
+	// 업그레이드는 보유 코인이 비용보다 적으면 실패한다.
+	// 다른 시스템에서는 음수 코인을 허용할 수 있지만,
+	// 업그레이드에서는 빚을 지고 강화할 수 없게 한다.
+	if (UpgradeCost < 0 || CurrentFunds < UpgradeCost)
+	{
+		return EEquipmentUpgradeRequestResult::NotEnoughCurrency;
+	}
+
+	// 충분한 코인이 확인된 뒤에만 실제로 차감한다.
 	if (!SaveSubsystem->TrySpendFunds(UpgradeCost))
 	{
 		return EEquipmentUpgradeRequestResult::NotEnoughCurrency;
@@ -351,6 +389,39 @@ EEquipmentUpgradeRequestResult UEquipmentUpgradeSubsystem::ApplyUpgradeToActor(
 	}
 }
 
+void UEquipmentUpgradeSubsystem::ApplySavedUpgradesToActor(AActor* TargetActor)
+{
+	// 실제 게임플레이 수치는 서버만 변경한다.
+	if (!HasServerAuthority() || !IsValid(TargetActor))
+	{
+		return;
+	}
+
+	// 산소 강화 데이터 에셋을 가져온다.
+	UEquipmentUpgradeDataAsset* OxygenUpgrade =
+		LoadObject<UEquipmentUpgradeDataAsset>(
+			nullptr,
+			TEXT("/Game/GoHome/Developers/LSA/Blueprint/DA_OxygenUpgrade.DA_OxygenUpgrade")
+		);
+
+	if (OxygenUpgrade)
+	{
+		ApplyUpgradeToActor(OxygenUpgrade, TargetActor);
+	}
+
+	// 무게 강화 데이터 에셋을 가져온다.
+	UEquipmentUpgradeDataAsset* CarryWeightUpgrade =
+		LoadObject<UEquipmentUpgradeDataAsset>(
+			nullptr,
+			TEXT("/Game/GoHome/Developers/LSA/Blueprint/DA_CarryWeightUpgrade.DA_CarryWeightUpgrade")
+		);
+
+	if (CarryWeightUpgrade)
+	{
+		ApplyUpgradeToActor(CarryWeightUpgrade, TargetActor);
+	}
+}
+
 void UEquipmentUpgradeSubsystem::ResetUpgradeLevels()
 {
 	// 강화 상태 초기화는 서버에서만 한다.
@@ -446,9 +517,16 @@ void UEquipmentUpgradeSubsystem::RegisterStateActor(AEquipmentUpgradeStateActor*
 	// 그래서 서버에서는 Subsystem의 현재 값을 StateActor에 밀어 넣는다.
 	if (HasServerAuthority())
 	{
-		for (const FEquipmentUpgradeLevelState& LevelState : UpgradeLevels)
+		// SetUpgradeLevel()이 이벤트를 발생시키면서
+		// 원본 UpgradeLevels를 변경할 수 있으므로 복사본을 사용한다.
+		const TArray<FEquipmentUpgradeLevelState> LevelsToSync = UpgradeLevels;
+
+		for (const FEquipmentUpgradeLevelState& LevelState : LevelsToSync)
 		{
-			CachedStateActor->SetUpgradeLevel(LevelState.UpgradeId, LevelState.CurrentLevel);
+			CachedStateActor->SetUpgradeLevel(
+				LevelState.UpgradeId,
+				LevelState.CurrentLevel
+			);
 		}
 
 		return;
@@ -518,4 +596,100 @@ void UEquipmentUpgradeSubsystem::SyncLevelsFromStateActor()
 	}
 
 	UpgradeLevels = CachedStateActor->GetUpgradeLevels();
+}
+
+void UEquipmentUpgradeSubsystem::HandlePostLoadMap(UWorld* LoadedWorld)
+{
+	if (!LoadedWorld || LoadedWorld->GetNetMode() == NM_Client)
+	{
+		return;
+	}
+
+	if (GetGameInstance() &&
+		LoadedWorld != GetGameInstance()->GetWorld())
+	{
+		return;
+	}
+
+	// 새 월드의 액터 생성을 감시한다.
+	BindToWorld(LoadedWorld);
+
+	// 새 맵에서도 강화 상태 액터를 반드시 만든다.
+	// 강화가 초기화된 경우 빈 배열을 클라이언트에 복제하기 위해 필요하다.
+	if (HasServerAuthority())
+	{
+		GetOrCreateStateActor();
+	}
+
+	// 이미 생성된 Pawn이 있다면 바로 적용한다.
+	for (TActorIterator<APawn> It(LoadedWorld); It; ++It)
+	{
+		if (APawn* Pawn = *It)
+		{
+			ApplySavedUpgradesToActor(Pawn);
+		}
+	}
+}
+
+void UEquipmentUpgradeSubsystem::HandleActorSpawned(AActor* SpawnedActor)
+{
+	if (!SpawnedActor)
+	{
+		return;
+	}
+
+	if (!BoundWorld.IsValid() ||
+		SpawnedActor->GetWorld() != BoundWorld.Get())
+	{
+		return;
+	}
+
+	APawn* Pawn = Cast<APawn>(SpawnedActor);
+	if (!Pawn)
+	{
+		return;
+	}
+
+	// 새 Pawn이 생성되면 저장된 강화 효과를 다시 적용한다.
+	ApplySavedUpgradesToActor(Pawn);
+}
+
+void UEquipmentUpgradeSubsystem::BindToWorld(UWorld* World)
+{
+	if (!World || World->GetNetMode() == NM_Client)
+	{
+		return;
+	}
+
+	if (BoundWorld.Get() == World &&
+		ActorSpawnedHandle.IsValid())
+	{
+		return;
+	}
+
+	UnbindFromWorld();
+
+	BoundWorld = World;
+
+	ActorSpawnedHandle =
+		World->AddOnActorSpawnedHandler(
+			FOnActorSpawned::FDelegate::CreateUObject(
+				this,
+				&UEquipmentUpgradeSubsystem::HandleActorSpawned
+			)
+		);
+}
+
+void UEquipmentUpgradeSubsystem::UnbindFromWorld()
+{
+	if (UWorld* World = BoundWorld.Get())
+	{
+		if (ActorSpawnedHandle.IsValid())
+		{
+			World->RemoveOnActorSpawnedHandler(ActorSpawnedHandle);
+		}
+	}
+
+	ActorSpawnedHandle.Reset();
+	BoundWorld.Reset();
 }

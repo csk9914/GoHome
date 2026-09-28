@@ -16,6 +16,9 @@
 #include "Net/UnrealNetwork.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Player/OxygenComponent.h"
+#include "Item/ItemActorBase.h"
+#include "Interaction/InventoryComponent.h"
+#include "Components/SpotLightComponent.h"
 
 AGoHomeCharacter::AGoHomeCharacter()
 {
@@ -46,6 +49,9 @@ AGoHomeCharacter::AGoHomeCharacter()
 
 	GetMesh()->SetOwnerNoSee(true); // 본인한테는 전신 메시 안 보이게
 
+	FlashlightSpotLight = CreateDefaultSubobject<USpotLightComponent>(TEXT("FlashlightSpotLight"));
+	FlashlightSpotLight->SetupAttachment(GetMesh(), "Spine_03");
+	FlashlightSpotLight->SetVisibility(false);
 }
 
 void AGoHomeCharacter::BeginPlay()
@@ -68,6 +74,7 @@ void AGoHomeCharacter::BeginPlay()
 
 	DefaultMaxSwimSpeed = GetCharacterMovement()->MaxSwimSpeed;
 	CachedOxygenComponent = FindComponentByClass<UOxygenComponent>();
+	CachedInventoryComponent = FindComponentByClass<UInventoryComponent>();
 
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
@@ -147,6 +154,13 @@ void AGoHomeCharacter::Tick(float DeltaTime)
 			// 순수 원격 클라이언트인 경우 -> 서버에 전송
 			ServerUpdatePitch(CurrentPitch);
 		}
+	}
+
+	if (bIsFlashlightOn && FlashlightSpotLight)
+	{
+		// 모든 클라이언트에서 각자 로컬로 계산 - CurrentPitch는 원격 클라도 ReplicatedPitch를 통해 갱신됨.
+		const FRotator ViewRotation(CurrentPitch, GetActorRotation().Yaw, 0.f);
+		FlashlightSpotLight->SetWorldRotation(ViewRotation);
 	}
 
 	if (HasAuthority())
@@ -311,6 +325,7 @@ void AGoHomeCharacter::Client_ForceStopSprint_Implementation()
 void AGoHomeCharacter::Look(const FInputActionValue& Value)
 {
 	if (bIsStunned) { return; }
+	if (FocusedSwitchboard) { return; }
 
 	const FVector2D LookVector = Value.Get<FVector2D>();
 	AddControllerYawInput(LookVector.X);
@@ -346,29 +361,6 @@ void AGoHomeCharacter::AttachItemToRightHand(UStaticMeshComponent* ItemMeshCompo
 	// UInventoryComponent(SetActiveSlot/RemoveItem)가 단일 소스로 관리함 -> 여기선 안건드림.
 }
 
-void AGoHomeCharacter::AttachFlashlightToChest(UStaticMeshComponent* FlashlightMeshComponent)
-{
-	if (!FlashlightMeshComponent) return;
-
-	FlashlightMeshComponent->AttachToComponent(
-		GetMesh(),
-		FAttachmentTransformRules::SnapToTargetNotIncludingScale,
-		FlashlightSocketName);
-
-	bIsHoldingFlashlight = true;
-}
-
-void AGoHomeCharacter::DetachFlashlightFromChest()
-{
-	bIsHoldingFlashlight = false;
-}
-
-void AGoHomeCharacter::OnRep_IsHoldingFlashlight()
-{
-	// 필요하면 여기서 사운드/이펙트 등 클라 전용 후처리
-}
-
-
 void AGoHomeCharacter::SetHoldingItem(bool bHolding)
 {
 	if (HasAuthority())
@@ -394,10 +386,10 @@ void AGoHomeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AGoHomeCharacter, bIsHoldingItem);
 	DOREPLIFETIME_CONDITION(AGoHomeCharacter, ReplicatedPitch, COND_SkipOwner);
-	DOREPLIFETIME(AGoHomeCharacter, bIsHoldingFlashlight);
 	DOREPLIFETIME(AGoHomeCharacter, CurrentCarryObject);
 	DOREPLIFETIME_CONDITION(AGoHomeCharacter, CombinedCarryInput, COND_OwnerOnly);
 	DOREPLIFETIME(AGoHomeCharacter, bIsStunned);
+	DOREPLIFETIME(AGoHomeCharacter, bIsFlashlightOn);
 }
 
 void AGoHomeCharacter::OnRep_ReplicatedPitch()
@@ -486,6 +478,52 @@ void AGoHomeCharacter::HandleForcedCarryRelease()
 }
 
 
+void AGoHomeCharacter::NotifyHit(UPrimitiveComponent* MyComp, 
+	                             AActor* Other, 
+	                             UPrimitiveComponent* OtherComp, 
+	                             bool bSelfMoved, 
+	                             FVector HitLocation, 
+	                             FVector HitNormal, 
+	                             FVector NormalImpulse, 
+	                             const FHitResult& Hit)
+{
+	Super::NotifyHit(MyComp, Other, OtherComp, bSelfMoved, HitLocation, HitNormal, NormalImpulse, Hit);
+
+	HandleInventoryBreakOnHit(Other);
+}
+
+void AGoHomeCharacter::HandleInventoryBreakOnHit(AActor* OtherActor)
+{
+	if (!HasAuthority() || !CachedInventoryComponent) return;
+
+	const float Now = GetWorld()->GetTimeSeconds();
+	
+	if (Now < NextItemBreakEligibleTime) return; // 쿨다운 중 속도 계산 조차 하지 않고 건너뜀.
+
+	const FVector OtherVelocity = OtherActor ? OtherActor->GetVelocity() : FVector::ZeroVector;
+	const float ImpactSpeed = (GetVelocity() - OtherVelocity).Size(); // 상대 속도.
+
+	bool bAnyBroke = false;
+
+	for (int32 SlotIndex = 0; SlotIndex < CachedInventoryComponent->GetInventorySlotCount(); ++SlotIndex)
+	{
+		if (AItemActorBase* Item = CachedInventoryComponent->GetItemInSlot(SlotIndex))
+		{
+			if (Item->TryApplyBreakFromImpact(ImpactSpeed))
+			{
+				bAnyBroke = true;
+			}
+		}
+	}
+
+	if (bAnyBroke)
+	{
+		NextItemBreakEligibleTime = Now + ItemBreakCooldownSeconds; // 실제로 깨졌을 때만 쿨다운 시작.
+	}
+}
+
+
+
 void AGoHomeCharacter::SetCombinedCarryInput(const FVector& NewInput)
 {
 	CombinedCarryInput = NewInput; 
@@ -543,6 +581,9 @@ void AGoHomeCharacter::EnterSwitchboardFocus(AElectricSwitchboardActor* Switchbo
 
 	UpdateWireHighlight(-1, HighlightedWireIndex);
 
+	// 추가: FocusCamera로 컷 하면 SetOwnerNoSee가 무력화돼 내 몸이 보이므로 직접 숨김.
+	GetMesh()->SetVisibility(false, true); 
+
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
 		PC->SetViewTargetWithBlend(Switchboard, 0.3f);
@@ -558,6 +599,8 @@ void AGoHomeCharacter::ExitSwitchboardFocus()
 	HintPlaybackStep = -1;
 
 	UpdateWireHighlight(HighlightedWireIndex, -1);
+
+	GetMesh()->SetVisibility(true, true); // 메쉬 복원.
 
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
@@ -777,4 +820,48 @@ void AGoHomeCharacter::SetAllWiresOff()
 	{
 		SetWireColor(FocusedSwitchboard->GetWireTarget(i), FLinearColor::Black);
 	}
+}
+
+
+void AGoHomeCharacter::ToggleFlashlight()
+{
+	const bool bNewIsOn = !bIsFlashlightOn;
+
+	if (HasAuthority())
+	{
+		// 서버(호스트 자신 포함) - 권위값 직접 갱신. 서버 자신은 RepNotify가 안 뜨므로 시각 갱신도 직접.
+		bIsFlashlightOn = bNewIsOn;
+		UpdateFlashlightVisual(bNewIsOn);
+	}
+
+	else
+	{
+		// 원격 클라 - 내 화면엔 즉시 반영(로컬 예측), 서버엔 권위 갱신 요청.
+		UpdateFlashlightVisual(bNewIsOn);
+		ServerToggleFlashlight();
+	}
+}
+
+void AGoHomeCharacter::ServerToggleFlashlight_Implementation()
+{
+	bIsFlashlightOn = !bIsFlashlightOn;
+	UpdateFlashlightVisual(bIsFlashlightOn); // 서버(리슨 서버) 자신의 화면에도 반영 - RepNotify가 서버 자신에겐 안 뜸.
+}
+
+void AGoHomeCharacter::OnRep_IsFlashlightOn()
+{
+	UpdateFlashlightVisual(bIsFlashlightOn);
+}
+
+void AGoHomeCharacter::UpdateFlashlightVisual(bool bNewIsOn)
+{
+	if (FlashlightSpotLight)
+	{
+		FlashlightSpotLight->SetVisibility(bNewIsOn);
+	}
+}
+
+FVector AGoHomeCharacter::GetCameraWorldLocation() const
+{
+	return Camera->GetComponentLocation();
 }

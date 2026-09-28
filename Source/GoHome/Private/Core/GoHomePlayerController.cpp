@@ -139,6 +139,16 @@ void AGoHomePlayerController::Server_RequestEquipmentUpgrade_Implementation(UEqu
 		return;
 	}
 
-	// PlayerController는 받은 값을 UI로 전달만 한다.
+	// 강화 후 최신 코인을 메인 HUD용 GameState 미러에 반영한다.
+	if (UWorld* World = GetWorld())
+	{
+		if (AExplorationGameState* ExplorationGameState =
+			World->GetGameState<AExplorationGameState>())
+		{
+			ExplorationGameState->SetCurrentFunds(CurrentFunds);
+		}
+	}
+
+	// 강화 UI에도 최신 코인을 전달한다.
 	Client_RefreshUpgradeFunds(CurrentFunds);
 }

@@ -15,20 +15,10 @@ void AHarpoonGunItemActor::ServerUseSpecialAction()
 
 	LastUseTime = GetWorld()->GetTimeSeconds();
 
-	// 카메라 컴포넌트는 원격 클라이언트 기준으로 서버에서 못 믿음.
-	// 이미 정확히 리플리케이트되는 CurrentPitch + ActorRotation Yaw 조합으로 조준 방향 계산.
+	// 판정은 카메라(화면 중앙 = 크로스헤어) 기준. 총구 기준이면 화면 중앙과 어긋난 방향으로 나가서
+	// 크로스헤어가 가리키는 곳과 실제 판정 지점이 안 맞는 문제가 있었음(확인됨).
 	const FRotator AimRotation(Character->CurrentPitch, Character->GetActorRotation().Yaw, 0.f);
-
-	FVector Start;
-	if (MuzzleSocketName != NAME_None && MeshComponent->DoesSocketExist(MuzzleSocketName))
-	{
-		Start = MeshComponent->GetSocketLocation(MuzzleSocketName);
-	}
-	else
-	{
-		Start = HoldingPawn->GetActorLocation() + FVector::UpVector * 60.f; // 소켓 미설정 시 임시 근사치.
-	}
-	
+	const FVector Start = Character->GetCameraWorldLocation();
 	const FVector End = Start + AimRotation.Vector() * TraceDistance;
 
 	FCollisionQueryParams Params;
@@ -36,21 +26,28 @@ void AHarpoonGunItemActor::ServerUseSpecialAction()
 	Params.AddIgnoredActor(this);
 
 	FHitResult Hit;
-	const bool bHit = GetWorld()->SweepSingleByChannel(Hit, 
-		                                               Start,
-		                                               End, 
-		                                               FQuat::Identity, 
-		                                               ECC_Visibility,
-		                                               FCollisionShape::MakeSphere(TraceRadius),
-		                                               Params);
+	const bool bHit = GetWorld()->SweepSingleByChannel(Hit,
+		Start,
+		End,
+		FQuat::Identity,
+		ECC_Visibility,
+		FCollisionShape::MakeSphere(TraceRadius),
+		Params);
 
 	AItemActorBase* Target = bHit ? Cast<AItemActorBase>(Hit.GetActor()) : nullptr;
+
+	// 연출(로프/훅 비주얼)은 총구 위치에서 시작 - 판정용 트레이스와는 분리된 순수 코스메틱.
+	FVector MuzzleLocation = Start;
+	if (MuzzleSocketName != NAME_None && MeshComponent->DoesSocketExist(MuzzleSocketName))
+	{
+		MuzzleLocation = MeshComponent->GetSocketLocation(MuzzleSocketName);
+	}
 
 	// CoopCarryObject는 타입이 안 맞아 Cast 실패로 자동 제외.
 	// 이미 확보된(bIsBeingClaimed) 아이템도 CanInteract()에서 자동 제외.
 	if (!Target || !Target->CanInteract(HoldingPawn))
 	{
-		FireEventStart = Start;
+		FireEventStart = MuzzleLocation;
 		FireEventEnd = bHit ? Hit.Location : End; // 벽/바닥에 막히면 그 지점까지만, 아무것도 없으면 사거리 끝까지.
 		++FireEventId;
 		PlayFireCosmetic(); // 서버 자신은 RepNotify가 안 뜨므로 수동 호출.
@@ -66,7 +63,7 @@ void AHarpoonGunItemActor::ServerUseSpecialAction()
 	// 회수 도중 자기 자신(플레이어)의 콜리전에 막혀 튕기는 것 방지 - 벽/바닥은 그대로 막힘.
 	RetrievingTarget->MeshComponent->IgnoreActorWhenMoving(HoldingPawn, true);
 
-	FireEventStart = Start;
+	FireEventStart = MuzzleLocation;
 	FireEventEnd = Hit.Location;
 	++FireEventId;
 	PlayFireCosmetic();

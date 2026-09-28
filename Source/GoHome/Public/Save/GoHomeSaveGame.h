@@ -16,7 +16,7 @@ class GOHOME_API UGoHomeSaveGame : public USaveGame
 public:
 	// 자금, (납품 +, 강화 or 구매 -
 	UPROPERTY(BlueprintReadWrite, Category = "Save")
-	int32 CurrentFunds = 0;
+	int32 CurrentFunds = 1000;
 
 	// 이번 라운드 누적 납품액, 판정 후 0으로 리셋
 	UPROPERTY(BlueprintReadWrite, Category = "Save")

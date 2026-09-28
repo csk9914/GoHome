@@ -3,7 +3,6 @@
 #include "Interaction/InventoryComponent.h"
 #include "Net/UnrealNetwork.h"
 #include "Item/ItemActorBase.h"
-#include "Item/FlashlightActor.h"
 #include "Item/UsableItemBase.h"
 #include "Player/DeathNotifier.h"
 #include "Player/GoHomeCharacter.h"
@@ -266,23 +265,6 @@ int32 UInventoryComponent::FindSlotIndexOf(AItemActorBase* Item) const
 	return INDEX_NONE;
 }
 
-void UInventoryComponent::TryToggleFlashlight()
-{
-	Server_RequestToggleFlashlight();
-}
-
-void UInventoryComponent::Server_RequestToggleFlashlight_Implementation()
-{
-	// Spot은 최대 1개만 소지 가능하니, 찾으면 그걸로 끝.
-	for (const FInventorySlot& Slot : Slots)
-	{
-		if (AFlashlightActor* Flashlight = Cast<AFlashlightActor>(Slot.Item))
-		{
-			Flashlight->ServerUseSpecialAction();
-			break;
-		}
-	}
-}
 
 void UInventoryComponent::TryUseActiveItem()
 {
