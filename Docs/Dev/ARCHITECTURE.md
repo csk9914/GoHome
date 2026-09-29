@@ -31,7 +31,7 @@
 | `Interaction/` | 4. 상호작용/운반/납품/협동 게이트 | 협동 게이트는 원래 `Core/` 배치가 검토됐다가 상호작용 트리거라는 이유로 여기 옮겨짐 |
 | `AI/` | 5. AI 몬스터 | - |
 | `Item/` | 4. 상호작용/운반/납품 (아이템 정의 + 물리/부력) | - |
-| `UI/` | 6. UI (현재 Source 파일 없음 — Blueprint 전용) | - |
+| `UI/` | 6. UI | 신규 화면은 화면군 하위 폴더(`UI/Title/`)에 C++ 베이스. 기존 BP 전용 화면은 해당 화면 작업 시에만 이주 |
 | `Save/` | 9. 세이브 데이터 스키마, 8. 장비 강화(미구현) | - |
 
 `Public/`·`Private/` 최상위 배치 규칙은 [CODING_CONVENTIONS.md 폴더 규칙](CODING_CONVENTIONS.md#폴더-규칙) 참고.
@@ -156,7 +156,7 @@ decisions:
 
 ### UI
 
-`UI/`는 C++ 베이스 없음(Blueprint 전용). 화면 구조·레이어·카탈로그·연출·네이밍은 [UI_GUIDE.md](UI_GUIDE.md)가 출처(새 화면 만들 때만). 여기엔 코드 경계에 걸리는 규칙만.
+신규 화면은 위젯마다 C++ 베이스(`UUserWidget` 상속)를 두고, BP 서브클래스는 레이아웃·스타일·`BindWidget`·Widget Animation만 갖는다. 기존 BP 전용 화면(정산·HUD 등)은 그대로 두고 해당 화면을 크게 손볼 때만 이주한다(빅뱅 금지). 화면 구조·레이어·카탈로그·연출·네이밍은 [UI_GUIDE.md](UI_GUIDE.md)가 출처(새 화면 만들 때만). 여기엔 코드 경계에 걸리는 규칙만.
 
 ```yaml
 decoupling:
@@ -179,6 +179,11 @@ decisions:
       현 AExplorationGameMode::AutoReturnDelay(8s 고정, SetSettlementResult 시점 시작)는 연출 길이가 상수일 때만 성립 — 영상/다중 페이지가 붙으면 서버가 모르는 연출 길이를 추측하게 됨.
       목표: Phase1 연출(가변, 클라 스텝 러너 소유, 서버는 안전 타임아웃만) + Phase2 복귀 창(OnPresentationComplete 후 시작). C++: Server_SettlementReady() RPC + ReturnDeadline(복제, 절대 서버시각) + 안전 타임아웃 → 생존 전원 ready(or 타임아웃)에 deadline 세팅 → 만료 시 ReturnToLobby. AutoReturnTimer 2곳(ExplorationGameMode.cpp:111,244) 교체, AutoReturnDelay는 "읽기 창" 값으로 잔존. 클라 리턴 바가 복제 ReturnDeadline 바인딩 → 드리프트 0.
       착수 시점: 영상 클립 실제 도입 직전. 그전까진 8s 상향으로 임시 대응.
+  - name: UI C++ 베이스 도입 (타이틀 파일럿)
+    detail: |
+      이전 결정 "UI/는 C++ 베이스 없음(BP 전용)"을 신규 화면부터 뒤집음 — 상태 전이·포커스·세션 요청 흐름이 BP 그래프에 쌓이면 리뷰·diff·병합(바이너리)이 불가능해서. 타이틀(UI/Title/)이 첫 적용.
+      UI는 Core 구체 클래스를 include하지 않고 백엔드 인터페이스만 본다(타이틀: ITitleBackend, ATitlePlayerController가 구현) — 폴더 간 의존은 인터페이스로만이라는 컨벤션 + 디자이너 프리뷰용 목 백엔드 여지.
+      CommonUI는 계속 반려 — 타이틀에 필요한 건 패널 1단 스택·포커스 복귀·Escape뿐이라 UTitleScreenWidget 하나로 충분. 화면 간 스택이 깊어지면 재검토.
   - name: HUD 위젯 소유
     detail: |
       상시 HUD 위젯은 BP PlayerController(또는 그 AHUD) 소유 — Pawn/Character 소유 금지. 폰 스코프 데이터(HP·산소·인벤토리)도 위젯은 뷰라 GetOwningPlayerPawn으로 읽고 OnPossessedPawnChanged에 재바인딩. 폰 소유 불가 이유: 사망 시 부활 없이 관전이 수 분 지속되며 그동안도 목표/타이머 HUD가 필요(폰 소유면 관전 내내 검은 화면), 폰은 로비마다 재생성되는 소모품. per-pawn 패널은 "폰 없음/사망" 상태를 명시.

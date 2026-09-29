@@ -1,6 +1,6 @@
-# GoHome UI 구조 가이드 (Blueprint)
+# GoHome UI 구조 가이드
 
-> `UI/`는 C++ 베이스 없이 전부 Blueprint(`Content/GoHome/UI/`) — 이 문서가 코드가 강제 못 하는 UI 구조 규칙의 단일 출처다. 개별 위젯 필드/함수는 담지 않고 화면 분할·소유·연출 배치만 고정한다. 표시 전용/입력 위젯의 데이터 방향은 [ARCHITECTURE.md UI 절](ARCHITECTURE.md#ui)이 출처.
+> 신규 화면은 C++ 베이스 + BP 레이아웃(첫 적용 `UI/Title/`), 기존 화면은 Blueprint(`Content/GoHome/UI/`) — C++/BP 분담은 [CODING_CONVENTIONS.md](CODING_CONVENTIONS.md#ui-위젯-로직--c로-뺄지-판단-기준-2026-09-18). 이 문서가 코드가 강제 못 하는 UI 구조 규칙의 단일 출처다. 개별 위젯 필드/함수는 담지 않고 화면 분할·소유·연출 배치만 고정한다. 표시 전용/입력 위젯의 데이터 방향은 [ARCHITECTURE.md UI 절](ARCHITECTURE.md#ui)이 출처.
 
 ## 목차
 
@@ -44,6 +44,7 @@
 | 정산/게임오버/엔딩 (`WBP_Settlement` 라우터) | Sequence | BP PlayerController | 클라 BeginPlay에 숨겨 생성 + `OnSettlementReady` 바인딩 / 로비 트래블 시 파괴 | `FSettlementResult` (이벤트 인자). 사망자명 = `PlayerState->GetPlayerName()` — 스팀 페르소나가 실리는지 세션 배선 확인, 아니면 로그인 시 `IOnlineIdentity::GetPlayerNickname` → `ServerChangeName` 보정 |
 | HUD 묶음 | HUD | BP PlayerController | 탐사 레벨 Possess 후 / 레벨 전환 | GameState 복제 필드 / 컴포넌트 델리게이트 |
 | 존 선택 | Modal | 존 셀렉트 모니터 또는 PlayerController | 상호작용 트리거 / 확정·취소 | Zone DataAsset |
+| 타이틀 (`UTitleScreenWidget` 부모 WBP) | Fullscreen | `ATitlePlayerController`(C++, `TitleScreenClass`) | 로컬 BeginPlay 생성 / 로비·세션 트래블 시 파괴 | `ITitleBackend`(컨트롤러가 구현 — 검색 스냅샷·세이브 요약·Host/Join 결과) |
 
 ## HUD 묶음 소유 규칙
 

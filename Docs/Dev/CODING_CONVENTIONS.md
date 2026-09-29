@@ -74,11 +74,13 @@ AI 컨트롤러(`AIC_`), 파티클 시스템(`PS_`) 등 위 표에 없는 타입
 
 ### UI 위젯 로직 — C++로 뺄지 판단 기준 (2026-09-18)
 
-`UI/`는 C++ 베이스가 없지만([ARCHITECTURE.md "UI"](ARCHITECTURE.md#ui) 참고), **상태 없는 순수 계산**은 정적 헬퍼(`BlueprintFunctionLibrary`) 호출로 C++에 둘 수 있다 — 이건 "UI엔 C++ 베이스 없음" 결정과 충돌하지 않는다(베이스클래스를 붙이는 게 아니라 정적 함수를 호출하는 것뿐이므로). 판단 기준:
+**신규 화면**은 위젯마다 C++ 베이스(`UUserWidget` 상속)를 둔다 — 상태·전이·이벤트 바인딩·요청은 C++(`UFUNCTION`), BP 서브클래스는 레이아웃·스타일·`BindWidget`·Widget Animation만([ARCHITECTURE.md "UI"](ARCHITECTURE.md#ui), 첫 적용은 `UI/Title/`). 위젯은 `Core/` 구체 클래스 대신 백엔드 인터페이스(예: `ITitleBackend`)에 의존한다.
+
+**기존 BP 전용 화면**(정산·HUD 등)은 그 화면을 크게 손보는 작업이 아니면 이주하지 않는다. 그 화면들에서의 판단 기준:
 
 - **C++ 정적 헬퍼로 뺀다**: 여러 위젯이 공유하고, 입력만으로 결과가 정해지고, 위젯 자신의 상태를 안 바꾸는 계산(문자열 포맷팅, 수치 변환, 색상 계산 등). `settlement-table-graph-split`(2026-09-18) 작업에서 `Conv_IntToText`/`Concat_StrStr` 같은 이미 있는 엔진 정적 함수를 그대로 쓴 게 이 케이스.
-- **BP에 남긴다**: 위젯 자신의 상태/동작을 바꾸는 메서드(`SetRow`/`SetBadgeText`/`SetLeadColor`처럼 그 위젯 인스턴스에 값을 반영하는 함수). 이런 걸 C++로 옮기려면 그 위젯에 C++ 베이스클래스를 새로 붙여야 하는데, 이는 "UI는 C++ 베이스 없음" 결정 자체를 뒤집는 것이므로 개별 작업 중에 조용히 하지 않는다 — 필요하다고 판단되면 이 결정 자체를 재검토 사안으로 올린다(사용자/팀 확인 필요, [문서 라이프사이클](../../CLAUDE.md#document-lifecycle) 원칙).
-- 무인 루프(`feature-loop` 등)가 "가독성을 위해 C++로 옮길지" 판단할 때는 위 기준으로만 판단하고, 애매하면 BP에 남기는 쪽(더 보수적인 선택)을 기본값으로 한다 — BP 안에서의 함수 분리(SRP)만으로도 대부분의 가독성 문제는 해결된다([feature-loop 2-1/2-2](../../.claude/skills/feature-loop/SKILL.md) 참고).
+- **BP에 남긴다**: 위젯 자신의 상태/동작을 바꾸는 메서드(`SetRow`/`SetBadgeText`/`SetLeadColor`처럼 그 위젯 인스턴스에 값을 반영하는 함수). 기존 화면에 C++ 베이스를 붙이는 이주는 개별 버그수정·폴리시 작업 중에 조용히 하지 않고 별도 작업으로 올린다.
+- 무인 루프(`feature-loop` 등)가 기존 BP 화면에서 "가독성을 위해 C++로 옮길지" 판단할 때는 위 기준으로만 판단하고, 애매하면 BP에 남기는 쪽을 기본값으로 한다 — BP 안에서의 함수 분리(SRP)만으로도 대부분의 가독성 문제는 해결된다([feature-loop 2-1/2-2](../../.claude/skills/feature-loop/SKILL.md) 참고).
 
 ### AI(몬스터 BP) 작업 방식
 
