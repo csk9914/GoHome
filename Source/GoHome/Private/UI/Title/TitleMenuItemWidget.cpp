@@ -105,7 +105,7 @@ void UTitleMenuItemWidget::ApplyStaticStyle()
 		LabelText->SetFont(Font);
 	}
 
-	const FLinearColor MarkerColor = bSecondary ? SecondaryLabelColor : PrimaryAccentColor;
+	const FLinearColor MarkerColor = bSecondary ? SecondaryMarkerColor : PrimaryAccentColor;
 	const bool bUseIcon = MarkerIconTexture && MarkerIcon;
 
 	if (MarkerText)

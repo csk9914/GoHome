@@ -76,6 +76,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
 	FLinearColor HighlightLabelColor = FLinearColor::White;
 
+	// .menu-secondary .menu-marker — 보조 항목 마커는 라벨보다 한 단계 어둡다
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
+	FLinearColor SecondaryMarkerColor = FLinearColor::FromSRGBColor(FColor(0xA8, 0xB9, 0xB1));
+
 	// UMG 폰트 Size는 72DPI 포인트라 CSS px × 0.75 — 주 항목 16px/600, 보조 14px/500
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
 	float LabelFontSize = 12.f;
