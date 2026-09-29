@@ -211,6 +211,18 @@ FExpeditionProgress UGoHomeSaveSubsystem::BuildProgress() const
 	return Progress;
 }
 
+bool UGoHomeSaveSubsystem::HasResumableProgress() const
+{
+	return SaveGame && SaveGame->CurrentRound > 0;
+}
+
+bool UGoHomeSaveSubsystem::StartNewExpedition()
+{
+	ResetSave();
+
+	return SaveGame && UGameplayStatics::SaveGameToSlot(SaveGame, GoHomeSaveSlotName, GoHomeSaveUserIndex);
+}
+
 void UGoHomeSaveSubsystem::ResetSave()
 {
 	// 세이브 데이터뿐만 아니라

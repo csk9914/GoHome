@@ -40,6 +40,12 @@ public:
 	// 세이브의 상태를 리플리케이트 가능한 평면 struct로 복사
 	FExpeditionProgress BuildProgress() const;
 
+	// 이어할 진행이 있는가 — 완료 라운드가 1 이상일 때만(기본 SaveGame의 초기 자금만으로는 진행으로 보지 않음)
+	bool HasResumableProgress() const;
+
+	// 호스트 전용: 진행을 초기화하고 즉시 디스크에 반영한다. 디스크 저장 실패 시 false.
+	bool StartNewExpedition();
+
 	UFUNCTION(BlueprintPure, Category = "Save")
 	const UGoHomeSaveGame* GetSaveGame() const { return SaveGame; };
 

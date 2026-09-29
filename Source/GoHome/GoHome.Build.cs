@@ -18,7 +18,10 @@ public class GoHome : ModuleRules
 			"Niagara",
 			"CableComponent",
 			"GeometryCollectionEngine",
-			"NavigationSystem"
+			"NavigationSystem",
+			"UMG",
+			"Slate",
+			"SlateCore"
 		});
 
         PrivateDependencyModuleNames.AddRange(new string[]

@@ -6,6 +6,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Interfaces/OnlineSessionInterface.h"
 #include "OnlineSessionSettings.h"
+#include "Core/TitleBackend.h"
 #include "TitlePlayerController.generated.h"
 
 // 세션 검색 결과 브로드캐스트용 (BP가 다루기 쉬운 형태로 가공해서 넘김)                 
@@ -17,17 +18,32 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FGoHomeTitleOnJoinComplete, bool, bW
 
 
 class USessionSubsystem;
+class UGoHomeSaveSubsystem;
 class ACineCameraActor;
+class UUserWidget;
 
 /**
  *
  */
 UCLASS()
-class GOHOME_API ATitlePlayerController : public APlayerController
+class GOHOME_API ATitlePlayerController : public APlayerController, public ITitleBackend
 {
 	GENERATED_BODY()
 
 public:
+	// ~ITitleBackend
+	virtual FTitleBackendEvents& GetTitleEvents() override { return TitleEvents; }
+	virtual const FTitleSearchSnapshot& GetSearchSnapshot() const override { return SearchSnapshot; }
+	virtual bool HasResumableProgress() const override;
+	virtual FExpeditionProgress GetProgressSummary() const override;
+	virtual bool IsHostInFlight() const override { return PendingHostMode.IsSet(); }
+	virtual bool IsJoinInFlight() const override { return bJoinInFlight; }
+	virtual void RequestHost(ETitleHostMode Mode) override;
+	virtual void RequestRefresh() override;
+	virtual bool RequestJoin(int32 Generation, int32 SearchIndex) override;
+	// ~ITitleBackend
+
+
 	UFUNCTION(BlueprintCallable, Category = "Title")
 	void CreateGameSession(int32 NumPublicConnections);
                                                                                                                   
@@ -71,6 +87,14 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Title")
 	int32 SessionListMaxSearchResults = 50;
 
+	// RequestHost가 여는 세션의 공개 인원
+	UPROPERTY(EditAnywhere, Category = "Title")
+	int32 MaxPlayers = 4;
+
+	// 지정하면 로컬 BeginPlay에서 생성·표시한다. 위젯은 GetOwningPlayer()를 ITitleBackend로 캐스팅해 스스로 바인딩한다.
+	UPROPERTY(EditDefaultsOnly, Category = "Title")
+	TSubclassOf<UUserWidget> TitleScreenClass;
+
 private:
 	TWeakObjectPtr<USessionSubsystem> CachedSessionSubsystem;
 
@@ -82,4 +106,18 @@ private:
 
 	// FindGameSessions 진행 중 타이머/수동클릭이 겹쳐 SessionSubsystem에 델리게이트가 중첩 등록되는 것을 방지
 	bool bFindSessionsInFlight = false;
+
+	void SetSearchStatus(ETitleSearchStatus NewStatus);
+	UGoHomeSaveSubsystem* GetSaveSubsystem() const;
+
+	FTitleBackendEvents TitleEvents;
+	FTitleSearchSnapshot SearchSnapshot;
+
+	// RequestHost로 시작한 생성 요청의 의도. 새 원정은 생성 성공 후에만 세이브를 초기화한다(실패 시 기존 진행 보호).
+	TOptional<ETitleHostMode> PendingHostMode;
+
+	bool bJoinInFlight = false;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> TitleScreen;
 };
