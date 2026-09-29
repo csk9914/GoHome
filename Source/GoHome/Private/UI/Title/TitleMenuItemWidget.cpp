@@ -97,6 +97,12 @@ void UTitleMenuItemWidget::ApplyStaticStyle()
 	if (LabelText)
 	{
 		LabelText->SetText(Label);
+
+		FSlateFontInfo Font = LabelText->GetFont();
+		Font.Size = bSecondary ? SecondaryLabelFontSize : LabelFontSize;
+		Font.TypefaceFontName = bSecondary ? SecondaryLabelTypeface : LabelTypeface;
+		Font.LetterSpacing = LabelLetterSpacing;
+		LabelText->SetFont(Font);
 	}
 
 	if (MarkerText)

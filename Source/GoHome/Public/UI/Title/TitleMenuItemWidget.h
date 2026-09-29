@@ -68,6 +68,23 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
 	FLinearColor HighlightLabelColor = FLinearColor::White;
 
+	// UMG 폰트 Size는 72DPI 포인트라 CSS px × 0.75 — 주 항목 16px/600, 보조 14px/500
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
+	float LabelFontSize = 12.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
+	float SecondaryLabelFontSize = 10.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
+	FName LabelTypeface = TEXT("Bold");
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
+	FName SecondaryLabelTypeface = TEXT("Regular");
+
+	// .045em
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
+	int32 LabelLetterSpacing = 45;
+
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> Button;
 
