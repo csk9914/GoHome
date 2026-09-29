@@ -127,6 +127,11 @@ void UTitleHostPanel::RefreshSaveSummary()
 	const ITitleBackend* Backend = GetBackend();
 	bHasResumableProgress = Backend && Backend->HasResumableProgress();
 
+	if (SaveDot)
+	{
+		SaveDot->SetVisibility(bHasResumableProgress ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Hidden);
+	}
+
 	if (!bHasResumableProgress)
 	{
 		SaveTitleText->SetText(NoSaveTitle);

@@ -51,6 +51,10 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> SaveSummaryText;
 
+	// 저장 데이터가 있을 때만 켜지는 상태 점
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UWidget> SaveDot;
+
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UWidget> ConfirmBlock;
 
