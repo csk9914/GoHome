@@ -8,6 +8,7 @@
 class UButton;
 class UImage;
 class UTextBlock;
+class UTexture2D;
 class UWidgetAnimation;
 
 /**
@@ -44,6 +45,13 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Menu")
 	FText Marker;
+
+	// 지정하면 텍스트 마커 대신 아이콘을 쓴다 — 폰트에 글리프가 없는 기호(⚙ 등)용
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Menu")
+	TObjectPtr<UTexture2D> MarkerIconTexture;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
+	FVector2D MarkerIconSize = FVector2D(10.f, 10.f);
 
 	// HOST 같은 주 행동 — 강조색을 호박색으로
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Menu")
@@ -93,6 +101,9 @@ protected:
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> MarkerText;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UImage> MarkerIcon;
 
 	// 좌측 3px 강조 막대
 	UPROPERTY(meta = (BindWidgetOptional))

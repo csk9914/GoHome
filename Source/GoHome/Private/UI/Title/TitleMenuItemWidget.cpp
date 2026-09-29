@@ -105,10 +105,25 @@ void UTitleMenuItemWidget::ApplyStaticStyle()
 		LabelText->SetFont(Font);
 	}
 
+	const FLinearColor MarkerColor = bSecondary ? SecondaryLabelColor : PrimaryAccentColor;
+	const bool bUseIcon = MarkerIconTexture && MarkerIcon;
+
 	if (MarkerText)
 	{
 		MarkerText->SetText(Marker);
-		MarkerText->SetColorAndOpacity(FSlateColor(bSecondary ? SecondaryLabelColor : PrimaryAccentColor));
+		MarkerText->SetColorAndOpacity(FSlateColor(MarkerColor));
+		MarkerText->SetVisibility(bUseIcon ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
+	}
+
+	if (MarkerIcon)
+	{
+		if (bUseIcon)
+		{
+			MarkerIcon->SetBrushFromTexture(MarkerIconTexture);
+			MarkerIcon->SetDesiredSizeOverride(MarkerIconSize);
+			MarkerIcon->SetColorAndOpacity(MarkerColor);
+		}
+		MarkerIcon->SetVisibility(bUseIcon ? ESlateVisibility::HitTestInvisible : ESlateVisibility::Collapsed);
 	}
 }
 
