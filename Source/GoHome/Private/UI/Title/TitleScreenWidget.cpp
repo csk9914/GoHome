@@ -36,13 +36,11 @@ void UTitleScreenWidget::NativeConstruct()
 		MainMenu->OnItemActivated.AddUObject(this, &ThisClass::HandleMenuItemActivated);
 	}
 
-	for (UTitlePanelBase* Panel : { HostPanel.Get(), SessionBrowserPanel.Get(), SettingsPanel.Get() })
+	for (UTitlePanelBase* Panel : GetPanels())
 	{
-		if (Panel)
-		{
-			Panel->BindBackend(Backend.Get());
-			Panel->OnPanelClosed.AddUObject(this, &ThisClass::HandlePanelClosed);
-		}
+		Panel->BindBackend(Backend.Get());
+		Panel->OnPanelClosed.AddUObject(this, &ThisClass::HandlePanelClosed);
+		Panel->OnToastRequested.AddUObject(this, &ThisClass::ShowToast);
 	}
 
 	if (Shade)
@@ -70,12 +68,10 @@ void UTitleScreenWidget::NativeDestruct()
 		MainMenu->OnItemActivated.RemoveAll(this);
 	}
 
-	for (UTitlePanelBase* Panel : { HostPanel.Get(), SessionBrowserPanel.Get(), SettingsPanel.Get() })
+	for (UTitlePanelBase* Panel : GetPanels())
 	{
-		if (Panel)
-		{
-			Panel->OnPanelClosed.RemoveAll(this);
-		}
+		Panel->OnPanelClosed.RemoveAll(this);
+		Panel->OnToastRequested.RemoveAll(this);
 	}
 
 	if (Shade)
@@ -215,4 +211,17 @@ void UTitleScreenWidget::ShowToast(const FText& Message)
 	{
 		Toast->ShowMessage(Message);
 	}
+}
+
+TArray<UTitlePanelBase*> UTitleScreenWidget::GetPanels() const
+{
+	TArray<UTitlePanelBase*> Panels;
+	for (UTitlePanelBase* Panel : { HostPanel.Get(), SessionBrowserPanel.Get(), SettingsPanel.Get() })
+	{
+		if (Panel)
+		{
+			Panels.Add(Panel);
+		}
+	}
+	return Panels;
 }

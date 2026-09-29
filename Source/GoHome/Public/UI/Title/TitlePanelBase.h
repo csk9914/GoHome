@@ -23,6 +23,10 @@ public:
 	DECLARE_MULTICAST_DELEGATE_OneParam(FOnPanelClosed, UTitlePanelBase* /*Panel*/);
 	FOnPanelClosed OnPanelClosed;
 
+	// 패널은 토스트를 직접 소유하지 않고 화면에 표시를 요청한다.
+	DECLARE_MULTICAST_DELEGATE_OneParam(FOnToastRequested, const FText& /*Message*/);
+	FOnToastRequested OnToastRequested;
+
 	void BindBackend(ITitleBackend* InBackend);
 
 	void OpenPanel();
@@ -39,6 +43,7 @@ protected:
 	virtual void OnAnimationFinished_Implementation(const UWidgetAnimation* Animation) override;
 
 	ITitleBackend* GetBackend() const { return WeakBackend.Get(); }
+	void RequestToast(const FText& Message) { OnToastRequested.Broadcast(Message); }
 
 	// 열림이 끝난 뒤 키보드 포커스를 받을 위젯. nullptr이면 패널 자체.
 	virtual UWidget* GetInitialFocus() const { return nullptr; }

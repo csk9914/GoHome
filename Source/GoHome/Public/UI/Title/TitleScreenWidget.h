@@ -72,6 +72,7 @@ private:
 	void HandleHostComplete(bool bWasSuccessful);
 	void HandleJoinComplete(bool bWasSuccessful);
 	void ShowToast(const FText& Message);
+	TArray<UTitlePanelBase*> GetPanels() const;
 
 	UTitlePanelBase* FindPanel(ETitleMenuAction Action) const;
 	void OpenPanel(UTitlePanelBase* Panel, UTitleMenuItemWidget* Source);
