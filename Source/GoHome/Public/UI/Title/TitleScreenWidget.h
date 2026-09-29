@@ -11,6 +11,7 @@ class UButton;
 class UTitleMenuItemWidget;
 class UTitleMenuWidget;
 class UTitlePanelBase;
+class UTitleToastWidget;
 class UWidgetAnimation;
 
 /**
@@ -46,8 +47,20 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UButton> Shade;
 
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTitleToastWidget> Toast;
+
 	UPROPERTY(Transient, meta = (BindWidgetAnimOptional))
 	TObjectPtr<UWidgetAnimation> IntroAnim;
+
+	UPROPERTY(EditAnywhere, Category = "Title|Text")
+	FText HostSuccessMessage = NSLOCTEXT("Title", "ToastHostSuccess", "세션이 준비되었습니다. 로비로 이동합니다.");
+
+	UPROPERTY(EditAnywhere, Category = "Title|Text")
+	FText HostFailureMessage = NSLOCTEXT("Title", "ToastHostFailure", "세션을 만들지 못했습니다. 다시 시도하세요.");
+
+	UPROPERTY(EditAnywhere, Category = "Title|Text")
+	FText JoinSuccessMessage = NSLOCTEXT("Title", "ToastJoinSuccess", "세션에 참가합니다.");
 
 private:
 	void HandleMenuItemActivated(UTitleMenuItemWidget* Item);
@@ -56,6 +69,10 @@ private:
 	UFUNCTION()
 	void HandleShadeClicked();
 
+	void HandleHostComplete(bool bWasSuccessful);
+	void HandleJoinComplete(bool bWasSuccessful);
+	void ShowToast(const FText& Message);
+
 	UTitlePanelBase* FindPanel(ETitleMenuAction Action) const;
 	void OpenPanel(UTitlePanelBase* Panel, UTitleMenuItemWidget* Source);
 	void SetShadeVisible(bool bVisible);
@@ -63,4 +80,6 @@ private:
 	TWeakInterfacePtr<ITitleBackend> Backend;
 	TWeakObjectPtr<UTitlePanelBase> ActivePanel;
 	TWeakObjectPtr<UTitleMenuItemWidget> ReturnFocusItem;
+	FDelegateHandle HostCompleteHandle;
+	FDelegateHandle JoinCompleteHandle;
 };

@@ -37,6 +37,9 @@ public:
 	// 검색이 진행 중이면 무시한다
 	virtual void RequestRefresh() = 0;
 
+	// 세션 목록을 보고 있는 동안 자동 검색을 멈춘다 — 보이는 목록과 참가 대상 인덱스가 바뀌지 않게.
+	virtual void SetAutoRefreshPaused(bool bPaused) = 0;
+
 	// Generation이 최신 스냅샷과 다르거나 이미 참가 중이면 false (요청 안 함)
 	virtual bool RequestJoin(int32 Generation, int32 SearchIndex) = 0;
 };

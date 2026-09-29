@@ -40,6 +40,7 @@ public:
 	virtual bool IsJoinInFlight() const override { return bJoinInFlight; }
 	virtual void RequestHost(ETitleHostMode Mode) override;
 	virtual void RequestRefresh() override;
+	virtual void SetAutoRefreshPaused(bool bPaused) override;
 	virtual bool RequestJoin(int32 Generation, int32 SearchIndex) override;
 	// ~ITitleBackend
 
@@ -117,6 +118,7 @@ private:
 	TOptional<ETitleHostMode> PendingHostMode;
 
 	bool bJoinInFlight = false;
+	bool bAutoRefreshPaused = false;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> TitleScreen;

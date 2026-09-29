@@ -38,6 +38,11 @@ void ATitlePlayerController::FindGameSessions(int32 MaxSearchResults)
 
 void ATitlePlayerController::AutoRefreshFindSessions()
 {
+	if (bAutoRefreshPaused)
+	{
+		return;
+	}
+
 	FindGameSessions(SessionListMaxSearchResults);
 }
 
@@ -244,6 +249,11 @@ void ATitlePlayerController::RequestHost(ETitleHostMode Mode)
 void ATitlePlayerController::RequestRefresh()
 {
 	FindGameSessions(SessionListMaxSearchResults);
+}
+
+void ATitlePlayerController::SetAutoRefreshPaused(bool bPaused)
+{
+	bAutoRefreshPaused = bPaused;
 }
 
 bool ATitlePlayerController::RequestJoin(int32 Generation, int32 SearchIndex)

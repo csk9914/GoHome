@@ -38,7 +38,7 @@ protected:
 	virtual void NativeDestruct() override;
 	virtual void OnAnimationFinished_Implementation(const UWidgetAnimation* Animation) override;
 
-	ITitleBackend* GetBackend() const { return Backend.Get(); }
+	ITitleBackend* GetBackend() const { return WeakBackend.Get(); }
 
 	// 열림이 끝난 뒤 키보드 포커스를 받을 위젯. nullptr이면 패널 자체.
 	virtual UWidget* GetInitialFocus() const { return nullptr; }
@@ -72,5 +72,5 @@ private:
 	void FinishClose();
 
 	EPanelState PanelState = EPanelState::Closed;
-	TWeakInterfacePtr<ITitleBackend> Backend;
+	TWeakInterfacePtr<ITitleBackend> WeakBackend;
 };

@@ -8,6 +8,7 @@
 #include "UI/Title/TitleMenuItemWidget.h"
 #include "UI/Title/TitleMenuWidget.h"
 #include "UI/Title/TitlePanelBase.h"
+#include "UI/Title/TitleToastWidget.h"
 
 void UTitleScreenWidget::NativeOnInitialized()
 {
@@ -23,6 +24,12 @@ void UTitleScreenWidget::NativeConstruct()
 
 	Backend = Cast<ITitleBackend>(GetOwningPlayer());
 	ensureMsgf(Backend.IsValid(), TEXT("UTitleScreenWidget: 오너 PlayerController가 ITitleBackend를 구현하지 않음"));
+
+	if (ITitleBackend* BackendPtr = Backend.Get())
+	{
+		HostCompleteHandle = BackendPtr->GetTitleEvents().OnHostComplete.AddUObject(this, &ThisClass::HandleHostComplete);
+		JoinCompleteHandle = BackendPtr->GetTitleEvents().OnJoinComplete.AddUObject(this, &ThisClass::HandleJoinComplete);
+	}
 
 	if (MainMenu)
 	{
@@ -52,6 +59,12 @@ void UTitleScreenWidget::NativeConstruct()
 
 void UTitleScreenWidget::NativeDestruct()
 {
+	if (ITitleBackend* BackendPtr = Backend.Get())
+	{
+		BackendPtr->GetTitleEvents().OnHostComplete.Remove(HostCompleteHandle);
+		BackendPtr->GetTitleEvents().OnJoinComplete.Remove(JoinCompleteHandle);
+	}
+
 	if (MainMenu)
 	{
 		MainMenu->OnItemActivated.RemoveAll(this);
@@ -179,5 +192,27 @@ void UTitleScreenWidget::SetShadeVisible(bool bVisible)
 	if (Shade)
 	{
 		Shade->SetVisibility(bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
+}
+
+void UTitleScreenWidget::HandleHostComplete(bool bWasSuccessful)
+{
+	ShowToast(bWasSuccessful ? HostSuccessMessage : HostFailureMessage);
+}
+
+void UTitleScreenWidget::HandleJoinComplete(bool bWasSuccessful)
+{
+	// 참가 실패 안내는 세션 목록 패널이 직접 표시한다.
+	if (bWasSuccessful)
+	{
+		ShowToast(JoinSuccessMessage);
+	}
+}
+
+void UTitleScreenWidget::ShowToast(const FText& Message)
+{
+	if (Toast)
+	{
+		Toast->ShowMessage(Message);
 	}
 }

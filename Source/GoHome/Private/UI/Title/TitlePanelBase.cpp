@@ -6,7 +6,7 @@
 
 void UTitlePanelBase::BindBackend(ITitleBackend* InBackend)
 {
-	Backend = InBackend;
+	WeakBackend = InBackend;
 	if (InBackend)
 	{
 		OnBackendBound();
