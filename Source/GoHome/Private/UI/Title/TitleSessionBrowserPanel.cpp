@@ -212,7 +212,12 @@ void UTitleSessionBrowserPanel::ApplyState(ETitleBrowserState NewState)
 
 	const bool bLocked = NewState == ETitleBrowserState::Loading || NewState == ETitleBrowserState::JoinPending;
 	RefreshButton->SetIsEnabled(!bLocked);
-	JoinButton->SetIsEnabled(!bLocked && bShowList && SelectedSearchIndex != INDEX_NONE);
+	const bool bCanJoin = !bLocked && bShowList && SelectedSearchIndex != INDEX_NONE;
+	JoinButton->SetIsEnabled(bCanJoin);
+	if (JoinLabel)
+	{
+		JoinLabel->SetColorAndOpacity(FSlateColor(bCanJoin ? JoinLabelColor : JoinLabelDisabledColor));
+	}
 
 	for (UTitleSessionRowWidget* Row : Rows)
 	{

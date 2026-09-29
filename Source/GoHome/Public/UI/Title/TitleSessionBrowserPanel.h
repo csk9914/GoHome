@@ -59,6 +59,16 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> JoinButton;
 
+	// 비활성 버튼 배경 위에서도 읽히도록 라벨 색을 상태별로 바꾼다(.join-button:disabled)
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> JoinLabel;
+
+	UPROPERTY(EditAnywhere, Category = "Title|Browser|Style")
+	FLinearColor JoinLabelColor = FLinearColor::FromSRGBColor(FColor(0x0D, 0x1C, 0x1C));
+
+	UPROPERTY(EditAnywhere, Category = "Title|Browser|Style")
+	FLinearColor JoinLabelDisabledColor = FLinearColor::FromSRGBColor(FColor(0x81, 0x93, 0x8B));
+
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UWidget> LoadingBlock;
 
@@ -69,23 +79,23 @@ protected:
 	TObjectPtr<UTextBlock> FooterText;
 
 	UPROPERTY(EditAnywhere, Category = "Title|Browser|Text")
-	FText LoadingStatus = NSLOCTEXT("Title", "BrowserLoading", "검색 중");
+	FText LoadingStatus = NSLOCTEXT("Title", "BrowserLoading", "탐색 중");
 
-	// {Count}
+	// {Count} 사용 가능(레퍼런스 문구는 개수를 표시하지 않음)
 	UPROPERTY(EditAnywhere, Category = "Title|Browser|Text")
-	FText ReadyStatusFormat = NSLOCTEXT("Title", "BrowserReady", "세션 {Count}개");
-
-	UPROPERTY(EditAnywhere, Category = "Title|Browser|Text")
-	FText EmptyStatus = NSLOCTEXT("Title", "BrowserEmpty", "세션 없음");
+	FText ReadyStatusFormat = NSLOCTEXT("Title", "BrowserReady", "세션 검색 완료");
 
 	UPROPERTY(EditAnywhere, Category = "Title|Browser|Text")
-	FText FooterHint = NSLOCTEXT("Title", "BrowserFooterHint", "방을 선택한 뒤 참가하세요");
+	FText EmptyStatus = NSLOCTEXT("Title", "BrowserEmpty", "검색 완료");
+
+	UPROPERTY(EditAnywhere, Category = "Title|Browser|Text")
+	FText FooterHint = NSLOCTEXT("Title", "BrowserFooterHint", "세션을 선택하세요");
 
 	UPROPERTY(EditAnywhere, Category = "Title|Browser|Text")
 	FText FooterJoining = NSLOCTEXT("Title", "BrowserFooterJoining", "세션에 참가하는 중…");
 
 	UPROPERTY(EditAnywhere, Category = "Title|Browser|Text")
-	FText FooterJoinError = NSLOCTEXT("Title", "BrowserFooterJoinError", "참가하지 못했습니다. 다시 선택하거나 새로고침하세요.");
+	FText FooterJoinError = NSLOCTEXT("Title", "BrowserFooterJoinError", "다른 세션을 선택하거나 새로고침하세요");
 
 private:
 	UFUNCTION()
