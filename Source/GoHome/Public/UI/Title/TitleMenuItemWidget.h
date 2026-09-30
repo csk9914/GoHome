@@ -88,10 +88,10 @@ protected:
 	float SecondaryLabelFontSize = 10.5f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
-	FName LabelTypeface = TEXT("Bold");
+	FName LabelTypeface = TEXT("SemiBold");
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
-	FName SecondaryLabelTypeface = TEXT("Regular");
+	FName SecondaryLabelTypeface = TEXT("Medium");
 
 	// .045em
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
