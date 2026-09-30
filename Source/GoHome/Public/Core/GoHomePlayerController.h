@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "Shop/ItemShopTypes.h"
 #include "GoHomePlayerController.generated.h"
 
 class UEquipmentUpgradeDataAsset;
@@ -54,6 +55,11 @@ public:
 	// 실제 처리 로직은 EquipmentUpgradeSubsystem에서 담당한다.
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Equipment Upgrade")
 	void Server_RequestEquipmentUpgrade(UEquipmentUpgradeDataAsset* UpgradeData);
+
+	// 상점 관련 - UI의 구매 주문서를 서버로 전달한다.
+	// 실제 상점 처리는 ItemShopSubsystem이 담당한다.
+	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Item Shop")
+	void Server_RequestShopPurchase(FItemShopPurchaseRequest Request);
 
 protected:
 	virtual void BeginPlay() override;
