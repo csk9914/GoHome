@@ -112,28 +112,42 @@ void AGoHomeCharacter::Tick(float DeltaTime)
 		}
 	}
 
-	// 블랜더로 메시를 자체 수정함에 따라 해당 코드 불필요, 주석처리
+	if (CurrentCarryObject && (IsLocallyControlled() || HasAuthority()))
+	{
+		// 운반 중 몸통을 손잡이 방향으로 돌림. 서버와 소유 클라가 같은 목표로 각자 돌려야 서로 어긋나지 않음.
+		// (bUseControllerRotationYaw / bOrientRotationToMovement 둘 다 꺼져 있어서 무브먼트가 덮어쓰지 않음)
+		const FRotator TargetRotation(0.f, CarryFacingYaw, 0.f);
+		SetActorRotation(FMath::RInterpTo(GetActorRotation(), TargetRotation, DeltaTime, CarryFacingInterpSpeed));
+	}
+
+
 	if (IsLocallyControlled())
 	{
 		if (CurrentCarryObject)
 		{
-			// 서버가 평균 낸 합산 입력을 "내 로컬 폰"에 직접 적용 -> 표준 예측/ServerMove 흐름 그대로.
+			// 서버가 계산한 이 캐릭터용 운반 입력(공유 이동 + 손잡이 보정)을 "내 로컬 폰"에 직접 적용 -> 표준 예측/ServerMove 흐름 그대로.
+			// 운반 중 이동과 손잡이 따라가기가 전부 이 한 줄에 달려 있음(지우면 컴파일은 되지만 운반 중 캐릭터가 멈춤).
 			AddMovementInput(CombinedCarryInput);
 		}
-		//GetMesh()->HideBoneByName(TEXT("Head"), EPhysBodyOp::PBO_None);
 
-		//const float Pitch = FRotator::NormalizeAxis(GetControlRotation().Pitch);
-		//constexpr float BodyHidePitchThreshold = 30.f; // 이 각도 이상이면 몸 전체 숨김
+		// 두 명 다 잡은 동안만 공용 카메라. 놓기/정산/강제 해제 등 모든 해제 경로가 CurrentCarryObject를 비우므로 여기서 자동 복구됨.
+		// 여러 액터의 OnRep 도착 순서에 의존하지 않도록 매 틱 상태를 비교.
+		const bool bWantCarryView = CurrentCarryObject && CurrentCarryObject->IsFullyCarried();
+		if (bWantCarryView && !bCarryViewActive)
+		{
+			EnterCarryView();
+		}
+		else if (!bWantCarryView && bCarryViewActive)
+		{
+			ExitCarryView();
+		}
 
-		//if (FMath::Abs(Pitch) > BodyHidePitchThreshold)
-		//{
-		//	GetMesh()->HideBoneByName(TEXT("Pelvis"), EPhysBodyOp::PBO_None);
-		//}
-		//else
-		//{
-		//	GetMesh()->UnHideBoneByName(TEXT("Pelvis"));
-		//}
+		if (bCarryViewActive && CurrentCarryObject)
+		{
+			LastCarryViewYaw = CurrentCarryObject->GetHeadingRotation().Yaw;
+		}
 	}
+
 
 	if (IsLocallyControlled() || HasAuthority())
 	{
@@ -193,6 +207,8 @@ void AGoHomeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(MoveAction, ETriggerEvent::Completed, this, &ThisClass::StopCarryInput);
 		EIC->BindAction(MoveAction, ETriggerEvent::Canceled, this, &ThisClass::StopCarryInput);
 		EIC->BindAction(MoveUpDownAction, ETriggerEvent::Triggered, this, &ThisClass::MoveUpDown);
+		EIC->BindAction(MoveUpDownAction, ETriggerEvent::Completed, this, & ThisClass::StopCarryVerticalInput);
+		EIC->BindAction(MoveUpDownAction, ETriggerEvent::Canceled, this, &ThisClass::StopCarryVerticalInput);
 		EIC->BindAction(LookAction, ETriggerEvent::Triggered, this, &ThisClass::Look);
 		EIC->BindAction(MoveAction, ETriggerEvent::Started, this, &ThisClass::HandleFocusMoveStarted);
 		EIC->BindAction(SprintAction, ETriggerEvent::Started, this, &ThisClass::StartSprint);
@@ -200,7 +216,6 @@ void AGoHomeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		EIC->BindAction(SprintAction, ETriggerEvent::Canceled, this, &ThisClass::StopSprint);
 		EIC->BindAction(PushToTalkAction, ETriggerEvent::Started, this, &ThisClass::StartTalking);
 		EIC->BindAction(PushToTalkAction, ETriggerEvent::Completed, this, &ThisClass::StopTalking);
-		
 	}
 }
 
@@ -210,27 +225,27 @@ void AGoHomeCharacter::Move(const FInputActionValue& Value)
 	if (FocusedSwitchboard) return;
 
 	const FVector2D MovementVector = Value.Get<FVector2D>();
-	const FRotator FullRotation = GetControlRotation();
 
-	const FVector ForwardDirection = FRotationMatrix(FullRotation).GetUnitAxis(EAxis::X);
-	const FVector RightDirection = FRotationMatrix(FullRotation).GetUnitAxis(EAxis::Y);
-	const FVector WorldIntent = ForwardDirection * MovementVector.Y + RightDirection * MovementVector.X;
-	
 	if (CurrentCarryObject)
 	{
-		// 협동 운반 중이면 서버가 두 캐리어 입력을 평균 낼 수 있게 월드 스페이스 이동 의도를 알려줌.
+		// 운반 중엔 직업 이동하지 않고 원본 입력만 서버로 보고함.
+		// 같은 W 라도 이동 역할이면 전진, 회전 역할이면 위로 조향이라서 해석은 서버(CoopCarryObjectBase)가 역할에 따라 함.
 		if (HasAuthority())
 		{
-			// 호스트 자기 자신이면 굳이 RPC 안 거치고 바로 반영.
-			LastCarryInputWorld = WorldIntent;
+			LastCarryMoveInput = MovementVector;
 		}
 		else
 		{
-			Server_UpdateCarryInput(WorldIntent);
+			Server_UpdateCarryInput(MovementVector);
 		}
 		return;
 	}
 
+	const FRotator FullRotation = GetControlRotation();
+
+	const FVector ForwardDirection = FRotationMatrix(FullRotation).GetUnitAxis(EAxis::X);
+	const FVector RightDirection = FRotationMatrix(FullRotation).GetUnitAxis(EAxis::Y);
+	
 	AddMovementInput(ForwardDirection, MovementVector.Y);
 	AddMovementInput(RightDirection, MovementVector.X);	
 }
@@ -241,11 +256,25 @@ void AGoHomeCharacter::StopCarryInput()
 
 	if (HasAuthority())
 	{
-		LastCarryInputWorld = FVector::ZeroVector;
+		LastCarryMoveInput = FVector2D::ZeroVector;
 	}
 	else
 	{
-		Server_UpdateCarryInput(FVector::ZeroVector);
+		Server_UpdateCarryInput(FVector2D::ZeroVector);
+	}
+}
+
+void AGoHomeCharacter::StopCarryVerticalInput()
+{
+	if (!CurrentCarryObject) return;
+
+	if (HasAuthority())
+	{
+		LastCarryVerticalInput = 0.f;
+	}
+	else
+	{
+		Server_UpdateCarryVerticalInput(0.f);
 	}
 }
 
@@ -254,6 +283,21 @@ void AGoHomeCharacter::MoveUpDown(const FInputActionValue& Value)
 	if (bIsStunned) return;
 
 	const float UpDownValue = Value.Get<float>();
+
+	if (CurrentCarryObject)
+	{
+		// 운반 중엔 직접 적용하지 않고 서버로 보고만 함.
+		// 이동 역할이면 그룹 상하 이동, 회전 역할이면 무시됨.
+		if (HasAuthority())
+		{
+			LastCarryVerticalInput = UpDownValue;
+		}
+		else
+		{
+			Server_UpdateCarryVerticalInput(UpDownValue);
+		}
+		return;
+	}
 	AddMovementInput(FVector::UpVector, UpDownValue);
 }
 
@@ -268,8 +312,20 @@ void AGoHomeCharacter::StartSprint()
 
 	if (bIsStunned) return;
 
-	// 협동 운반 중엔 스프린트 불가 -> 캐리어 간 속도 차이로 이탈되는 것 방지.
-	if (CurrentCarryObject) return;
+	if(CurrentCarryObject)
+	{
+		// 운반 중엔 Shift가 개인 스프린트가 아니라 공유 이동 부스트 요청으로 재해석됨.
+		// 실제로 반영되는지는 CoopCarryObjectBase::Tick에서 "지금 회전 역할인지" 여부로 결정 -> 이동 역할이 눌러도 무시됨.
+		if(HasAuthority())
+		{ 
+			bIsCarryBoosting = true;
+		}
+		else
+		{
+			ServerSetCarryBoosting(true);
+		}
+		return;
+	}
 
 	ApplySprintState(true);
 
@@ -281,6 +337,19 @@ void AGoHomeCharacter::StartSprint()
 
 void AGoHomeCharacter::StopSprint()
 {
+	if (CurrentCarryObject)
+	{
+		if (HasAuthority())
+		{
+			bIsCarryBoosting = false;
+		}
+		else
+		{
+			ServerSetCarryBoosting(false);
+		}
+		return;
+	}
+
 	ApplySprintState(false);
 
 	if (!HasAuthority())
@@ -326,6 +395,7 @@ void AGoHomeCharacter::Look(const FInputActionValue& Value)
 {
 	if (bIsStunned) { return; }
 	if (FocusedSwitchboard) { return; }
+	if (bCarryViewActive) { return; } // 운반 중 공용 화면 - 두 사람이 항상 같은 화면을 보도록 둘러보기 없음.
 
 	const FVector2D LookVector = Value.Get<FVector2D>();
 	AddControllerYawInput(LookVector.X);
@@ -388,6 +458,7 @@ void AGoHomeCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME_CONDITION(AGoHomeCharacter, ReplicatedPitch, COND_SkipOwner);
 	DOREPLIFETIME(AGoHomeCharacter, CurrentCarryObject);
 	DOREPLIFETIME_CONDITION(AGoHomeCharacter, CombinedCarryInput, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(AGoHomeCharacter, CarryFacingYaw, COND_OwnerOnly);
 	DOREPLIFETIME(AGoHomeCharacter, bIsStunned);
 	DOREPLIFETIME(AGoHomeCharacter, bIsFlashlightOn);
 }
@@ -402,24 +473,38 @@ void AGoHomeCharacter::ServerUpdatePitch_Implementation(float NewPitch)
 	ReplicatedPitch = NewPitch;
 }
 
-void AGoHomeCharacter::Server_UpdateCarryInput_Implementation(FVector WorldIntent)
+void AGoHomeCharacter::Server_UpdateCarryInput_Implementation(FVector2D MoveInput)
 {
-	LastCarryInputWorld = WorldIntent;
+	LastCarryMoveInput = MoveInput;
+}
+
+void AGoHomeCharacter::Server_UpdateCarryVerticalInput_Implementation(float VerticalInput)
+{
+	LastCarryVerticalInput = VerticalInput;
+}
+
+void AGoHomeCharacter::ServerSetCarryBoosting_Implementation(bool bNewBoosting)
+{
+	bIsCarryBoosting = bNewBoosting;
 }
 
 void AGoHomeCharacter::SetCoopCarryObject(ACoopCarryObjectBase* NewCarryObject)
 {
 	CurrentCarryObject = NewCarryObject;
 	
-	if (!NewCarryObject)
-	{
-		// 놓을 때든 새로 잡을 때든 잔여 입력값 리셋 -> 이전 세션 값이 새 세션에 넘어가지 않게.
-		LastCarryInputWorld = FVector::ZeroVector;
-		CombinedCarryInput = FVector::ZeroVector;
-	}
+	// 잡을 때든 놓을 때든 잔여 입력값 리셋 -> 이전 세션 값이 새 세션에 넘어가지 않게.
+	// (놓은 직후) 늦게 도착한 Unreliable RPC, 운반 끝난 뒤 키를 떼서 Stop*이 무시된 경우 모두 여기서 정리.
 
-	else
+	LastCarryMoveInput = FVector2D::ZeroVector;
+	LastCarryVerticalInput = 0.f;
+	bIsCarryBoosting = false;
+	CombinedCarryInput = FVector::ZeroVector;
+
+	if (NewCarryObject)
 	{
+		// 목표 몸통 방향을 현재 방향으로 초기화 -> 이전 운반의 값이 남아 잡는 순간 휙 도는 것 방지.
+		CarryFacingYaw = GetActorRotation().Yaw;
+
 		// 운반 시작 지점에 스프린트 중이었을 수 있으니 강제로 끔.
 		// 서버 + 원격 클라 둘다.
 		ApplySprintState(false);
@@ -428,7 +513,7 @@ void AGoHomeCharacter::SetCoopCarryObject(ACoopCarryObjectBase* NewCarryObject)
 			Client_ForceStopSprint();
 		}
 	}
-	
+
 	OnRep_CurrentCarryObject(); // 서버 자신에게는 RepNotify가 안 뜨므로 직접 호출 -> 호스트 로컬도 즉시 반영.
 }
 
@@ -436,7 +521,8 @@ void AGoHomeCharacter::OnRep_CurrentCarryObject()
 {
 	const bool bIsCarrying = (CurrentCarryObject != nullptr);
 
-	// 운반 중엔 시야는 자유롭게, 몸통 Yaw는 고정(잡은 모습 유지). 운반 아니면 원래대로 시야를 따라감.
+	// 운반 중엔 시야는 자유롭게, 몸통 Yaw는 고정(잡은 모습 유지).
+	// 운반 아니면 원래대로 시야를 따라감.
 	bUseControllerRotationYaw = !bIsCarrying;
 
 	// 1인칭 팔은 몸통(캡슐) 기준 Yaw를 따라가는데, 운반 중엔 몸통 Yaw가 고정되고 카메라만 돌아서
@@ -445,10 +531,26 @@ void AGoHomeCharacter::OnRep_CurrentCarryObject()
 	{
 		FirstPersonArmsMesh->SetVisibility(!bIsCarrying);
 	}
+
+	// 운반 중엔 캡슐이 운반 오브젝트를 무시 -> 오브젝트가 회전하며 캡슐을 밀어내는 것 방지.
+	// IgnoreActorWhenMoving은 리플리케이트되지 않으므로, 서버/클라 각자 여기서 적용 및 해제함.
+	if (CapsuleIgnoredCarryObject.IsValid())
+	{
+		GetCapsuleComponent()->IgnoreActorWhenMoving(CapsuleIgnoredCarryObject.Get(), false);
+	}
+
+	CapsuleIgnoredCarryObject = CurrentCarryObject;
+
+	if (CurrentCarryObject)
+	{
+		GetCapsuleComponent()->IgnoreActorWhenMoving(CurrentCarryObject, true);
+	}
+
+	// 운반 중엔 캐리어의 충돌 컴포넌트가 Camera 채널을 무시 -> 공용 카메라 스프링암이 캐리어(특히 카메라 쪽에 선 이동 역할)에
+	// 걸려 코앞으로 당겨졌다 풀렸다 하는 깜빡임 방지. (스프링암은 소유 액터=운반 오브젝트만 무시하고, Pawn/CharacterMesh 프로필은 Camera를 막음)
+	// 스프링암 검사는 머신마다 로컬이라 각 머신에서 두 캐리어 모두 무시해야 함 -> 모든 머신에서 캐리어마다 실행되는 이 OnRep에서 처리.
+	SetCarryCameraCollisionIgnored(bIsCarrying);
 }
-
-
-
 
 void AGoHomeCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
@@ -864,4 +966,82 @@ void AGoHomeCharacter::UpdateFlashlightVisual(bool bNewIsOn)
 FVector AGoHomeCharacter::GetCameraWorldLocation() const
 {
 	return Camera->GetComponentLocation();
+}
+
+bool AGoHomeCharacter::IsCarryMover() const
+{
+	return CurrentCarryObject && CurrentCarryObject->IsMover(this);
+}
+
+void AGoHomeCharacter::EnterCarryView()
+{
+	bCarryViewActive = true;
+	CarryViewObject = CurrentCarryObject;
+	LastCarryViewYaw = CurrentCarryObject->GetHeadingRotation().Yaw;
+
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		// 배전반과 같은 패턴 - 로컬에서만 뷰 타겟 전환(복제 불필요).
+		// 뷰 타겟이 폰이 아니게 되면 OwnerNoSee가 풀려 자기 몸이 보이고, 1인칭 팔(OnlyOwnerSee)은 안 보임 -> 3인칭에 필요한 그대로.
+		PC->SetViewTargetWithBlend(CurrentCarryObject, CarryViewBlendTime);
+	}
+
+	OnCarryViewChanged.Broadcast(true, IsCarryMover());
+}
+
+void AGoHomeCharacter::ExitCarryView()
+{
+	bCarryViewActive = false;
+
+	if (APlayerController* PC = Cast<APlayerController>(GetController()))
+	{
+		// 다른 시스템(사망 관전 등)이 이미 뷰 타겟을 바꿨으면 덮어쓰지 않음.
+		// 정산으로 오브젝트가 파괴돼 뷰 타겟이 무효가 된 경우는 자기 폰으로 복귀.
+		AActor* ViewTarget = PC->GetViewTarget();
+		if (!IsValid(ViewTarget) || ViewTarget == this || ViewTarget == CarryViewObject.Get())
+		{
+			// 1인칭이 공용 화면이 보던 수평 방향에서 이어지게 -> 몸도 그 방향을 향한 채 풀림.
+			PC->SetControlRotation(FRotator(0.f, LastCarryViewYaw, 0.f));
+			PC->SetViewTargetWithBlend(this, CarryViewBlendTime);
+		}
+	}
+
+	CarryViewObject = nullptr;
+
+	OnCarryViewChanged.Broadcast(false, false);
+}
+
+
+void AGoHomeCharacter::SetCarryCameraCollisionIgnored(bool bIgnore)
+{
+	if (bIgnore)
+	{
+		// 이미 적용된 상태면 다시 저장하지 않음(원래 값 대신 Ignore를 저장해버리는 것 방지).
+		if (CarryCameraIgnoredComponents.Num() > 0) return;
+
+		TArray<UPrimitiveComponent*> Primitives;
+		GetComponents<UPrimitiveComponent>(Primitives);
+
+		for (UPrimitiveComponent* Primitive : Primitives)
+		{
+			const ECollisionResponse Original = Primitive->GetCollisionResponseToChannel(ECC_Camera);
+			if (Original != ECR_Ignore)
+			{
+				CarryCameraIgnoredComponents.Emplace(Primitive, Original);
+				Primitive->SetCollisionResponseToChannel(ECC_Camera, ECR_Ignore);
+			}
+		}
+	}
+
+	else
+	{
+		for (const TPair<TWeakObjectPtr<UPrimitiveComponent>, ECollisionResponse>& Entry : CarryCameraIgnoredComponents)
+		{
+			if (UPrimitiveComponent* Primitive = Entry.Key.Get())
+			{
+				Primitive->SetCollisionResponseToChannel(ECC_Camera, Entry.Value);
+			}
+		}
+		CarryCameraIgnoredComponents.Reset();
+	}
 }

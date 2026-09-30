@@ -45,6 +45,10 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Interaction")
 	float MaxInteractDistance = 300.f;
 
+	// 운반 중 납품 지점 근접 판정 반경(바운딩 박스까지 거리). 서버 재검증 MaxInteractDistance보다 작게 둬서 핑 여유 확보.
+	UPROPERTY(EditAnywhere, Category = "Interaction")
+	float CarryDeliverRadius = 200.f;
+
 	UPROPERTY(EditAnywhere, Category = "Interaction")
 	float TraceInterval = 0.1f;
 
@@ -82,6 +86,9 @@ protected:
 private:
 
 	void PerformTrace();
+
+	// 운반 중 : 반경 안 가장 가까운 납품 지점(없으면 nullptr).
+	ADeliveryPoint* FindNearbyDeliveryPoint(const APawn* OwnerPawn) const;
 
 	// 반경 안의 미획득 아이템들을 찾아 근접 힌트(스텐실)를 켜거나 끔. CurrentTarget은 제외(조준 강조가 우선).
 	void UpdateNearbyItemHints();

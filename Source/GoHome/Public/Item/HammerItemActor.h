@@ -32,9 +32,23 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Hammer")
 	FName ImpactSocketName = NAME_None;
 
+	// 휘두르기 시작 -> 실제 타격 판정까지 지연(초).
+	// AM_Hammer_Swing에서 망치가 가장 아래로 내려오는 순간에 맞춘다. 0이면 즉시 판정(기존 동작).
+	UPROPERTY(EditAnywhere, Category = "Hammer", meta = (ClampMin = "0.0"))
+	float ImpactDelay = 0.5f;
+
 private:
 	FVector GetImpactLocation() const;
 	FVector GetAimDirection() const;
 
+	// 실제 스윕 판정. ImpactDelay 후 타이머로 호출된다(서버 전용).
+	void PerformImpactTrace();
+
 	float LastUseTime = -1000.f;
+
+	// 타격 판정 지연 타이머.
+	FTimerHandle ImpactTimerHandle;
+
+	// 휘두르기 시작 시점의 사용자. 지연 도중 다른 사람이 주워 가면 판정을 취소하기 위함.
+	TWeakObjectPtr<APawn> SwingPawn;
 };

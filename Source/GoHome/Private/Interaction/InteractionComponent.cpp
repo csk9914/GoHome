@@ -53,13 +53,23 @@ void UInteractionComponent::PerformTrace()
 	AActor* NewTarget = nullptr;
 
 	bool bIsFocusing = false;
+	bool bIsCarrying = false;
+
 	if (AGoHomeCharacter* Character = Cast<AGoHomeCharacter>(GetOwner()))
 	{
 		bIsFocusing = Character->IsFocusingSwitchboard();
+		bIsCarrying = Character->IsCoopCarrying();
+	}
+
+	if (bIsCarrying)
+	{
+		// 운반 중엔 공용 3인칭 화면이라 1인칭 트레이스로 조준할 수 없음 -> 근처 납품 지점을 대상으로 잡음(조준 불필요).
+		// 대상 변경 브로드캐스트(HUD 프롬프트)와 TryInteract의 운반 분기는 기존 그대로 사용.
+		NewTarget = FindNearbyDeliveryPoint(Cast<APawn>(GetOwner()));
 	}
 
 	// 포커스 모드 중엔 일반 조준 트레이스/아웃라인을 끄고 전선 하이라이트에 양보함.
-	if (!bIsFocusing)
+	else if (!bIsFocusing)
 	{
 		const FVector Start = CachedCamera->GetComponentLocation();
 		const FVector End = Start + CachedCamera->GetForwardVector() * TraceDistance;
@@ -114,6 +124,31 @@ void UInteractionComponent::SetOutlineEnabled(AActor* Target, bool bEnabled, int
 		}
 	}
 }
+
+ADeliveryPoint* UInteractionComponent::FindNearbyDeliveryPoint(const APawn* OwnerPawn) const
+{
+	if (!OwnerPawn) return nullptr;
+
+	TArray<AActor*> DeliveryPoints;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ADeliveryPoint::StaticClass(), DeliveryPoints);
+
+	// 서버 재검증(Server_RequestDeliverCarry)과 같은 기준 - 바운딩 박스까지의 거리.
+	ADeliveryPoint* Nearest = nullptr;
+	float NearestDistSq = FMath::Square(CarryDeliverRadius);
+
+	for (AActor* Actor : DeliveryPoints)
+	{
+		const float DistSq = Actor->GetComponentsBoundingBox().ComputeSquaredDistanceToPoint(OwnerPawn->GetActorLocation());
+		if (DistSq <= NearestDistSq)
+		{
+			NearestDistSq = DistSq;
+			Nearest = Cast<ADeliveryPoint>(Actor);
+		}
+	}
+
+	return Nearest;
+}
+
 
 void UInteractionComponent::UpdateNearbyItemHints()
 {
