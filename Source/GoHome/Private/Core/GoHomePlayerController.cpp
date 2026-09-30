@@ -11,6 +11,8 @@
 #include "GameFramework/GameStateBase.h"
 #include "Upgrade/EquipmentUpgradeSubsystem.h"
 
+#include "Shop/ItemShopSubsystem.h"
+
 
 void AGoHomePlayerController::BeginPlay()
 {
@@ -151,4 +153,50 @@ void AGoHomePlayerController::Server_RequestEquipmentUpgrade_Implementation(UEqu
 
 	// 강화 UI에도 최신 코인을 전달한다.
 	Client_RefreshUpgradeFunds(CurrentFunds);
+}
+
+// PlayerController는 구매 요청을 서버로 전달만 한다.
+// 실제 상품 검증은 ItemShopSubsystem이 담당한다.
+void AGoHomePlayerController::Server_RequestShopPurchase_Implementation(
+	FItemShopPurchaseRequest Request)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	UGameInstance* GameInstance = GetGameInstance();
+	if (!GameInstance)
+	{
+		return;
+	}
+
+	UItemShopSubsystem* ShopSubsystem =
+		GameInstance->GetSubsystem<UItemShopSubsystem>();
+
+	if (!ShopSubsystem)
+	{
+		return;
+	}
+
+	int32 TotalPrice = 0;
+	int32 CurrentFunds = 0;
+	EItemShopResult Result = EItemShopResult::ShopUnavailable;
+
+	// 상품과 보유 코인을 함께 확인한다.
+	const bool bValid =
+		ShopSubsystem->TryValidatePurchase(
+			Request,
+			TotalPrice,
+			CurrentFunds,
+			Result);
+
+	UE_LOG(
+		LogTemp,
+		Log,
+		TEXT("[ItemShop] Server request. Valid: %s, Total: %d, Funds: %d, Result: %d"),
+		bValid ? TEXT("true") : TEXT("false"),
+		TotalPrice,
+		CurrentFunds,
+		static_cast<uint8>(Result));
 }
