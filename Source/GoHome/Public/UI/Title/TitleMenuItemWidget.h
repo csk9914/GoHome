@@ -93,9 +93,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
 	FName SecondaryLabelTypeface = TEXT("Medium");
 
-	// .045em
+	// .045em(16px에서 0.72px → 1px). Slate 자간은 포인트 크기 기준이고 정수 px로 잘리므로
+	// em×1000을 그대로 넣으면 0이 된다 — (목표px + 0.5) × 1000 / 12pt
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
-	int32 LabelLetterSpacing = 45;
+	int32 LabelLetterSpacing = 125;
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> Button;
