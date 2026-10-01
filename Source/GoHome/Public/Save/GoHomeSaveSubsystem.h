@@ -64,6 +64,18 @@ public:
 	// 출발 시 호출해서 값을 초기화
 	void SetTargetMapQuota(int32 Quota) { CurrentMapQuota = Quota; };
 
+	// 상점 상품의 총 구매 수량
+	int32 GetShopPurchasedQuantity(const FString& OwnerPlayerKey,FName ProductId) const;
+
+	// 상점 현재 실제 보유 수량
+	int32 GetShopOwnedQuantity(const FString& OwnerPlayerKey,FName ProductId) const;
+
+	// 상점 구매 성공 시 구매량과 보유량을 함께 증가
+	void AddShopPurchase(const FString& OwnerPlayerKey,FName ProductId,int32 Quantity);
+
+	// 상점 라운드 종료 시 현재 보유량을 갱신
+	void SetShopOwnedQuantity(const FString& OwnerPlayerKey,FName ProductId,int32 OwnedQuantity);
+
 private:
 	void ResetSave();
 	ESettlementOutcome DetermineOutcome(const FCheckPoint* CheckPoint, int32 CompletedRound) const;
