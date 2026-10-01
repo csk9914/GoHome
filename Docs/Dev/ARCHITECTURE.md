@@ -184,6 +184,12 @@ decisions:
       이전 결정 "UI/는 C++ 베이스 없음(BP 전용)"을 신규 화면부터 뒤집음 — 상태 전이·포커스·세션 요청 흐름이 BP 그래프에 쌓이면 리뷰·diff·병합(바이너리)이 불가능해서. 타이틀(UI/Title/)이 첫 적용.
       UI는 Core 구체 클래스를 include하지 않고 백엔드 인터페이스만 본다(타이틀: ITitleBackend, ATitlePlayerController가 구현) — 폴더 간 의존은 인터페이스로만이라는 컨벤션 + 디자이너 프리뷰용 목 백엔드 여지.
       CommonUI는 계속 반려 — 타이틀에 필요한 건 패널 1단 스택·포커스 복귀·Escape뿐이라 UTitleScreenWidget 하나로 충분. 화면 간 스택이 깊어지면 재검토.
+  - name: 인게임 시스템 메뉴 (UI/Pause)
+    detail: |
+      타이틀과 같은 백엔드 패턴 — UI는 IPauseMenuBackend만 보고, 위젯 생성·입력 모드·세션 정리는 AGoHomePlayerController가 소유한다.
+      나가기는 "USessionSubsystem::DestroySession → OnDestroyComplete(성공)" 뒤에만 OpenLevel(TitleMapPath)/QuitGame. 정리할 세션이 없으면(IP 직접 접속·세션 없이 연 PIE) 바로 이동, 실패·타임아웃은 OnLeaveFailed로 팝업 안 재시도.
+      호스트/참가자 구분은 NetMode(Client=참가자)로만 — 정리 API는 같고 문구만 다르다(리슨 호스트가 레벨을 떠나면 참가자는 연결 끊김으로 기본 맵 복귀).
+      반려: SetGamePaused(협동 세션 전체가 멈춤). 반려: WBP_TitleSettingsPanel 인스턴스를 그대로 임베드(타이틀 드로어 배경·슬라이드 연출이 딸려 옴) — 대신 UTitleSettingsPanel 클래스를 부모로 한 별도 WBP. 클래스는 백엔드 없이도 동작(GetBackend 미사용)함을 확인.
   - name: HUD 위젯 소유
     detail: |
       상시 HUD 위젯은 BP PlayerController(또는 그 AHUD) 소유 — Pawn/Character 소유 금지. 폰 스코프 데이터(HP·산소·인벤토리)도 위젯은 뷰라 GetOwningPlayerPawn으로 읽고 OnPossessedPawnChanged에 재바인딩. 폰 소유 불가 이유: 사망 시 부활 없이 관전이 수 분 지속되며 그동안도 목표/타이머 HUD가 필요(폰 소유면 관전 내내 검은 화면), 폰은 로비마다 재생성되는 소모품. per-pawn 패널은 "폰 없음/사망" 상태를 명시.
@@ -271,7 +277,6 @@ known_gaps:
   - (`AddDeliveredValue`는 `SaveSubsystem::AccumulateDeliveredValue`로 포워드 완료)
 - **도킹 문 위협 판정** — AI가 `OnDoorStateChanged` 구독해 `Fail(EFailReason::DockThreatened)` 호출하는 코드 없음
 - **정산 배선 나머지** — 복귀 버튼 RPC, DA_EconomyConfig 애셋 생성, 정산/게임오버/엔딩 UI 위젯. (사망자 추적, 실패 경로, 타임오버 경로, 정상복귀 Settlement 경로 `HandleReturn→EnterSettlement`, 자동복귀 타이머, `FSettlementResult` GameState 복제(`AExplorationGameState::SettlementResult`/`OnSettlementReady`)는 구현됨)
-- `UI/`는 C++ 베이스 클래스 없음(Blueprint 전용).
 - `Save/` 장비 강화 구매 로직 미구현 — 스키마 필드(`PurchasedUpgrades`)만 있음.
 - 레벨/그레이박스는 `Source/GoHome/` 코드가 아니라 레벨 애셋 작업.
 

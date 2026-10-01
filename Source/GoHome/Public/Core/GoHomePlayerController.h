@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
+#include "Core/PauseMenuBackend.h"
+#include "Data/FSettlementResult.h"
 #include "Shop/ItemShopTypes.h"
 #include "GoHomePlayerController.generated.h"
 
@@ -15,11 +17,25 @@ class UUserWidget;
  *
  */
 UCLASS()
-class GOHOME_API AGoHomePlayerController : public APlayerController
+class GOHOME_API AGoHomePlayerController : public APlayerController, public IPauseMenuBackend
 {
 	GENERATED_BODY()
 
 public:
+	// IPauseMenuBackend
+	virtual EPauseSessionRole GetSessionRole() const override;
+	virtual void RequestResume() override;
+	virtual void RequestLeave(EPauseLeaveTarget Target) override;
+	virtual bool IsLeaveInFlight() const override { return PendingLeaveTarget.IsSet(); }
+	virtual FPauseLeaveFailedEvent& OnLeaveFailed() override { return LeaveFailedEvent; }
+
+	UFUNCTION(BlueprintPure, Category = "UI|Pause")
+	bool IsPauseMenuOpen() const { return PauseMenu != nullptr; }
+
+	// Escape / 게임패드 Start. 메뉴가 열려 있으면 위젯이 키를 먼저 받으므로 여기 오는 건 "열기"뿐이다.
+	UFUNCTION(BlueprintCallable, Category = "UI|Pause")
+	void OpenPauseMenu();
+
 	// 탐사 HUD 묶음(WBP_HUD) 생성/파괴 지점. 실제 CreateWidget + AddToViewport 는 BP_GoHomePlayerController 가 한다.
 	// Ready  : 로컬 컨트롤러 + AExplorationGameState 유효할 때 1회 (탐사 레벨 진입).
 	// Teardown: 탐사 레벨을 벗어날 때 1회 (로비 복귀 / 접속 종료).
@@ -67,6 +83,23 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void OnRep_Pawn() override;
 	virtual void SetPawn(APawn* InPawn) override;
+	virtual void SetupInputComponent() override;
+	virtual void PlayerTick(float DeltaTime) override;
+
+	// 로비·탐사 공용 인게임 시스템 메뉴(UPauseMenuWidget 부모 WBP). 비어 있으면 Escape 메뉴가 열리지 않는다.
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Pause")
+	TSubclassOf<UUserWidget> PauseMenuClass;
+
+	// HUD·Modal 위, 정산 같은 Sequence보다는 아래에 두지 않는다 — 열려 있는 동안은 이게 최상단이어야 포커스가 안 샌다.
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Pause")
+	int32 PauseMenuZOrder = 100;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Pause")
+	FString TitleMapPath = TEXT("/Game/GoHome/Maps/LV_Title");
+
+	// OnlineSubsystem이 DestroySession 콜백을 끝내 안 주는 경우의 실패 처리 시간
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Pause")
+	float LeaveTimeoutSeconds = 10.f;
 
 	// 로비·탐사 공통 상시 진행도 HUD(라운드·다음 관문·보유 자금, 탐사맵이면 할당량). BP에서 위젯 클래스를 지정한다.
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
@@ -95,4 +128,32 @@ private:
 
 	bool bExplorationHUDActive = false;
 	TWeakObjectPtr<UWorld> BoundGameStateWorld;
+
+	// --- 인게임 시스템 메뉴 ---
+	bool CanOpenPauseMenu() const;
+	void ClosePauseMenu();
+	void ApplyPauseInputMode();
+
+	// 다른 화면이 입력을 가져가는 순간(정산) 메뉴만 걷어낸다 — 입력 모드는 그 화면 몫이라 건드리지 않는다.
+	void DismissPauseMenuWithoutInputRestore();
+	void BindSettlementDismiss();
+	UFUNCTION()
+	void HandleSettlementReadyForPause(const FSettlementResult& Result);
+	TWeakObjectPtr<AGameStateBase> SettlementDismissGameState;
+
+	void StartSessionCleanup();
+	UFUNCTION()
+	void HandleSessionDestroyed(bool bWasSuccessful);
+	void HandleLeaveTimeout();
+	void FailLeave(const FText& Reason);
+	void CompleteLeave();
+	void StopWaitingForSession();
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> PauseMenu;
+
+	TOptional<EPauseLeaveTarget> PendingLeaveTarget;
+	FPauseLeaveFailedEvent LeaveFailedEvent;
+	FTimerHandle LeaveTimeoutHandle;
+	bool bWaitingForSessionDestroy = false;
 };

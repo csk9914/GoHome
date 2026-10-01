@@ -165,13 +165,26 @@ void USessionSubsystem::DestroySession()
 		return;
 	}
 
+	// 이미 파괴 중이면 OSS에 다시 요청하지 않는다 — 핸들이 덮여 이전 등록이 새고 완료가 두 번 방송되는 것을 막는다.
+	if (bDestroyInFlight)
+	{
+		return;
+	}
+
+	bDestroyInFlight = true;
 	DestroySessionCompleteDelegateHandle = SessionInterface->AddOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegate);
 
 	if (!SessionInterface->DestroySession(NAME_GameSession))
 	{
+		bDestroyInFlight = false;
 		SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
 		OnDestroyComplete.Broadcast(false);
 	}
+}
+
+bool USessionSubsystem::HasActiveSession() const
+{
+	return SessionInterface.IsValid() && SessionInterface->GetNamedSession(NAME_GameSession) != nullptr;
 }
 
 // 게임 매치가 실제 시작되었음을 세션에 알림
@@ -238,6 +251,8 @@ void USessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessionC
 // 세션 퇴장 요청 결과 수신 콜백
 void USessionSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasSuccessful)
 {
+	bDestroyInFlight = false;
+
 	if (SessionInterface.IsValid())
 	{
 		SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
