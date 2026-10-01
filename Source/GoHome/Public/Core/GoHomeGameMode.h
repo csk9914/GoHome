@@ -18,6 +18,7 @@ class GOHOME_API AGoHomeGameMode : public AGameMode
 
 public:
 	AGoHomeGameMode();
+	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
 
 	UFUNCTION(BlueprintCallable, Category = "Expedition")

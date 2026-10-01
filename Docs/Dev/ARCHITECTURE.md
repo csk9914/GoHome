@@ -103,6 +103,8 @@ decisions:
     detail: UOxygenComponent가 산소 0시 매 틱 IDamageable::ApplyDamage(질식 데미지, Owner, "Suffocation") 동기 호출.
   - name: 중복 사망 방지
     detail: OnDeath는 캐릭터당 탐사 1회만 브로드캐스트 — `AExplorationGameMode`가 생존자 수를 추적하므로 이 보장이 깨지면 카운트가 틀어진다.
+  - name: 플레이어 이름(이름표) 출처
+    detail: "서버 `AGoHomeGameMode::PostLogin`이 PlayerState UniqueNetId로 OSS `GetPlayerNickname`을 조회해 `SetPlayerName` → 기본 PlayerName 복제. 접속 URL의 `Name=`은 덮어쓴다(클라 자기신고 이름 불신). 클라 RPC로 이름을 보내는 안은 기각(서버 권한 원칙). 표시는 `AGoHomeCharacter`의 `UWidgetComponent`(Screen) + `UPlayerNameplateWidget`이 PlayerState 이름을 매 Tick 비교 반영. Steam OSS는 엔진 설계상 에디터 PIE에서 항상 꺼지므로(`IsRunningGame()`일 때만 활성) 실제 Steam 이름 검증은 `-game` Standalone으로."
 
 decisions:
   - name: HP 0 처리

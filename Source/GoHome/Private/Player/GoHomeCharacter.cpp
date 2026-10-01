@@ -19,6 +19,10 @@
 #include "Item/ItemActorBase.h"
 #include "Interaction/InventoryComponent.h"
 #include "Components/SpotLightComponent.h"
+#include "Components/WidgetComponent.h"
+#include "GameFramework/PlayerState.h"
+#include "UI/Nameplate/PlayerNameplateWidget.h"
+#include "UObject/ConstructorHelpers.h"
 
 AGoHomeCharacter::AGoHomeCharacter()
 {
@@ -30,6 +34,21 @@ AGoHomeCharacter::AGoHomeCharacter()
 	Camera->SetupAttachment(GetMesh(), "Spine_03"); // 카메라는 임시로 몸통(Spine_03)에 부착
 	Camera->SetRelativeLocation(FVector(0.f, 0.f, 70.f));
 	Camera->bUsePawnControlRotation = true;
+
+	NameplateWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("NameplateWidget"));
+	NameplateWidgetComponent->SetupAttachment(GetCapsuleComponent());
+	NameplateWidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 122.f));
+	NameplateWidgetComponent->SetWidgetSpace(EWidgetSpace::Screen);
+	NameplateWidgetComponent->SetDrawSize(FVector2D(320.f, 48.f));
+	NameplateWidgetComponent->SetPivot(FVector2D(0.5f, 1.f));
+	NameplateWidgetComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	NameplateWidgetComponent->SetOwnerNoSee(false);
+	static ConstructorHelpers::FClassFinder<UPlayerNameplateWidget> NameplateWidgetClass(TEXT("/Game/GoHome/UI/Nameplate/WBP_PlayerNameplate"));
+	if (NameplateWidgetClass.Class)
+	{
+		// Store the widget class on the component template so the cooker follows this asset reference.
+		NameplateWidgetComponent->SetWidgetClass(NameplateWidgetClass.Class);
+	}
 
 	//GetMesh()->SetOwnerNoSee(true); // 소유자가 자신을 보지 못하도록 하는 코드(일단 주석처리)
 
@@ -76,6 +95,9 @@ void AGoHomeCharacter::BeginPlay()
 	CachedOxygenComponent = FindComponentByClass<UOxygenComponent>();
 	CachedInventoryComponent = FindComponentByClass<UInventoryComponent>();
 
+	NameplateWidgetComponent->InitWidget();
+	RefreshNameplate();
+
 	if (APlayerController* PC = Cast<APlayerController>(GetController()))
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
@@ -102,6 +124,7 @@ void AGoHomeCharacter::BeginPlay()
 void AGoHomeCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	RefreshNameplate();
 
 	// BP가 되돌린 직후, 스프린트 중이면 다시 덮어씌운다
 	if (bIsSprinting)
@@ -194,6 +217,33 @@ void AGoHomeCharacter::Tick(float DeltaTime)
 		{
 			TimeSinceLastSwimNoise = 0.f; // 멈추면 타이머 리셋 -> 멈췄다 바로 움직였을 때 즉시 안 쏘게
 		}
+	}
+}
+
+void AGoHomeCharacter::RefreshNameplate()
+{
+	APlayerState* OwningPlayerState = GetPlayerState();
+	const FString PlayerName = OwningPlayerState ? OwningPlayerState->GetPlayerName() : FString();
+	if (!NameplateWidgetComponent)
+	{
+		return;
+	}
+
+	if (!NameplateWidgetComponent->GetUserWidgetObject())
+	{
+		NameplateWidgetComponent->InitWidget();
+	}
+
+	UPlayerNameplateWidget* Nameplate = Cast<UPlayerNameplateWidget>(NameplateWidgetComponent->GetUserWidgetObject());
+	if (!Nameplate || (bHasAppliedPlayerName && PlayerName == LastDisplayedPlayerName))
+	{
+		return;
+	}
+
+	if (Nameplate->SetPlayerName(PlayerName))
+	{
+		LastDisplayedPlayerName = PlayerName;
+		bHasAppliedPlayerName = true;
 	}
 }
 
