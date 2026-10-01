@@ -61,7 +61,7 @@ void AExplorationGameState::SetMapQuota(int32 InMapQuota)
 
 	MapQuota = InMapQuota;
 	// 리슨 서버 호스트는 OnRep이 불리지 않으므로 서버에서 직접 브로드캐스트
-	OnQuotaProgressChanged.Broadcast(RoundDeliveredValue, MapQuota);
+	NotifyExpeditionProgressChanged();
 }
 
 void AExplorationGameState::SetRoundDeliveredValue(int32 InDeliveredValue)
@@ -72,24 +72,37 @@ void AExplorationGameState::SetRoundDeliveredValue(int32 InDeliveredValue)
 	}
 
 	RoundDeliveredValue = InDeliveredValue;
-	OnQuotaProgressChanged.Broadcast(RoundDeliveredValue, MapQuota);
-}
-
-void AExplorationGameState::SetCurrentFunds(int32 InCurrentFunds)
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-
-	CurrentFunds = InCurrentFunds;
-	// 리슨 서버 호스트는 OnRep이 불리지 않으므로 서버에서 직접 브로드캐스트
-	OnQuotaProgressChanged.Broadcast(RoundDeliveredValue, MapQuota);
+	NotifyExpeditionProgressChanged();
 }
 
 void AExplorationGameState::OnRep_QuotaProgress()
 {
+	NotifyExpeditionProgressChanged();
+}
+
+void AExplorationGameState::NotifyExpeditionProgressChanged()
+{
+	Super::NotifyExpeditionProgressChanged();
 	OnQuotaProgressChanged.Broadcast(RoundDeliveredValue, MapQuota);
+}
+
+bool AExplorationGameState::GetMapQuotaProgress(int32& OutDeliveredValue, int32& OutMapQuota) const
+{
+	OutDeliveredValue = RoundDeliveredValue;
+	OutMapQuota = MapQuota;
+	return true;
+}
+
+bool AExplorationGameState::GetTimeLimitProgress(float& OutRemainingSeconds, float& OutTotalSeconds) const
+{
+	if (!HasTimeLimit())
+	{
+		return false;
+	}
+
+	OutRemainingSeconds = GetRemainingSeconds();
+	OutTotalSeconds = ExpeditionDurationSeconds;
+	return true;
 }
 
 float AExplorationGameState::GetRemainingSeconds() const
@@ -117,6 +130,5 @@ void AExplorationGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	DOREPLIFETIME(AExplorationGameState, SettlementResult);
 	DOREPLIFETIME(AExplorationGameState, MapQuota);
 	DOREPLIFETIME(AExplorationGameState, RoundDeliveredValue);
-	DOREPLIFETIME(AExplorationGameState, CurrentFunds);
 }
 

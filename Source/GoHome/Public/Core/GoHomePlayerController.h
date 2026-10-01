@@ -9,6 +9,7 @@
 
 class UEquipmentUpgradeDataAsset;
 class AGameStateBase;
+class UUserWidget;
 
 /**
  *
@@ -67,9 +68,26 @@ protected:
 	virtual void OnRep_Pawn() override;
 	virtual void SetPawn(APawn* InPawn) override;
 
+	// 로비·탐사 공통 상시 진행도 HUD(라운드·다음 관문·보유 자금, 탐사맵이면 할당량). BP에서 위젯 클래스를 지정한다.
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> ProgressHUDClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	int32 ProgressHUDZOrder = 0;
+
 private:
 	// 로컬 컨트롤러에서 현재 월드의 GameState 로 탐사 레벨 여부를 판정해 Ready/Teardown 을 엣지에서 1회씩 쏜다.
 	void RefreshExplorationHUD();
+
+	// 로비/탐사 GameState 가 잡힐 때마다 진행도 HUD 를 그 GameState 기준으로 (재)생성한다.
+	// seamless travel 은 컨트롤러를 살려 둔 채 월드만 바꾸므로 BeginPlay 1회 생성으로는 탐사맵에서 사라진다.
+	void RefreshProgressHUD();
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> ProgressHUD;
+
+	// ProgressHUD 가 생성될 때의 GameState — 다르면(새 월드) 다시 만든다
+	TWeakObjectPtr<AGameStateBase> ProgressHUDGameState;
 
 	// GameState 가 Pawn 보다 늦게 복제되는 경우를 위해 월드마다 GameStateSetEvent 에 재바인딩.
 	void BindGameStateSetEvent();
