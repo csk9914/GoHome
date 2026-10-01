@@ -6,6 +6,7 @@
 #include "Core/LobbyGameState.h"
 #include "Core/ExplorationGameState.h"
 
+#include "Blueprint/UserWidget.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "GameFramework/GameStateBase.h"
@@ -19,6 +20,7 @@ void AGoHomePlayerController::BeginPlay()
 	Super::BeginPlay();
 	BindGameStateSetEvent();
 	RefreshExplorationHUD();
+	RefreshProgressHUD();
 }
 
 void AGoHomePlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -28,6 +30,11 @@ void AGoHomePlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		bExplorationHUDActive = false;
 		OnExplorationHUDTeardown();
 	}
+	if (ProgressHUD)
+	{
+		ProgressHUD->RemoveFromParent();
+		ProgressHUD = nullptr;
+	}
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -36,6 +43,7 @@ void AGoHomePlayerController::OnRep_Pawn()
 	Super::OnRep_Pawn();
 	BindGameStateSetEvent();
 	RefreshExplorationHUD();
+	RefreshProgressHUD();
 }
 
 void AGoHomePlayerController::SetPawn(APawn* InPawn)
@@ -43,6 +51,7 @@ void AGoHomePlayerController::SetPawn(APawn* InPawn)
 	Super::SetPawn(InPawn);
 	BindGameStateSetEvent();
 	RefreshExplorationHUD();
+	RefreshProgressHUD();
 
 	// 서버에서만 저장된 상점 아이템을 지급한다.
 	if (HasAuthority())
@@ -73,6 +82,47 @@ void AGoHomePlayerController::BindGameStateSetEvent()
 void AGoHomePlayerController::HandleGameStateSet(AGameStateBase* /*NewGameState*/)
 {
 	RefreshExplorationHUD();
+	RefreshProgressHUD();
+}
+
+void AGoHomePlayerController::RefreshProgressHUD()
+{
+	if (!IsLocalController() || !ProgressHUDClass)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	// seamless travel 중 떠나는 월드에서 SetPawn/GameStateSet 이 불려도 거기엔 만들지 않는다(UMG ensure !bIsTearingDown)
+	if (!World || World->bIsTearingDown)
+	{
+		return;
+	}
+	AGameStateBase* GameState = World->GetGameState();
+
+	// 로비·탐사 레벨에서만 표시(로딩 맵 등 다른 GameState 에선 띄우지 않음)
+	const bool bWantHUD = Cast<ALobbyGameState>(GameState) || Cast<AExplorationGameState>(GameState);
+	if (!bWantHUD)
+	{
+		return;
+	}
+
+	if (ProgressHUD && ProgressHUDGameState.Get() == GameState && ProgressHUD->IsInViewport())
+	{
+		return;
+	}
+
+	if (ProgressHUD)
+	{
+		ProgressHUD->RemoveFromParent();
+	}
+
+	ProgressHUD = CreateWidget<UUserWidget>(this, ProgressHUDClass);
+	ProgressHUDGameState = GameState;
+	if (ProgressHUD)
+	{
+		ProgressHUD->AddToViewport(ProgressHUDZOrder);
+	}
 }
 
 void AGoHomePlayerController::RefreshExplorationHUD()
@@ -154,13 +204,12 @@ void AGoHomePlayerController::Server_RequestEquipmentUpgrade_Implementation(UEqu
 		return;
 	}
 
-	// 강화 후 최신 코인을 메인 HUD용 GameState 미러에 반영한다.
+	// 강화 후 최신 코인을 상시 HUD용 GameState 미러에 반영한다(로비·탐사 공통).
 	if (UWorld* World = GetWorld())
 	{
-		if (AExplorationGameState* ExplorationGameState =
-			World->GetGameState<AExplorationGameState>())
+		if (AGoHomeGameState* GoHomeGameState = World->GetGameState<AGoHomeGameState>())
 		{
-			ExplorationGameState->SetCurrentFunds(CurrentFunds);
+			GoHomeGameState->SetCurrentFunds(CurrentFunds);
 		}
 	}
 
