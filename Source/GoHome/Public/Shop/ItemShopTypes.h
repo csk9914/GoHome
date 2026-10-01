@@ -36,7 +36,8 @@ enum class EItemShopResult : uint8
 	InventoryFull,
 	Overweight,
 	NotAllowedInContext,
-	SpawnFailed
+	SpawnFailed,
+	PurchaseLimitReached
 };
 
 // 상품 하나의 구조
@@ -76,6 +77,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
 	int32 MaxQuantityPerOrder = 1;
 
+	// 한 런 동안 구매할 수 있는 총 수량
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
+	int32 MaxPurchasesPerRun = 3;
+
 	// 플레이어 한 명당 하나만 가질 수 있는지
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
 	bool bUniquePerPlayer = false;
@@ -114,7 +119,8 @@ public:
 	EItemShopContext Context = EItemShopContext::InGameImmediate;
 };
 
-// 보유 장비 구조
+
+// 상점 상품의 구매 및 현재 보유 상태
 USTRUCT(BlueprintType)
 struct GOHOME_API FItemShopLoadoutEntry
 {
@@ -127,8 +133,13 @@ public:
 	UPROPERTY(BlueprintReadWrite, Category = "Shop")
 	FName ProductId = NAME_None;
 
+	// 지금까지 구매한 총 수량
 	UPROPERTY(BlueprintReadWrite, Category = "Shop")
-	int32 Quantity = 1;
+	int32 PurchasedQuantity = 0;
+
+	// 현재 실제로 보유한 수량
+	UPROPERTY(BlueprintReadWrite, Category = "Shop")
+	int32 OwnedQuantity = 0;
 };
 
 // 구매 결과 구조 (서버가 UI에게 보냄)

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
 #include "Upgrade/EquipmentUpgradeTypes.h"
+#include "Shop/ItemShopTypes.h"
 #include "GoHomeSaveGame.generated.h"
 
 /** 호스트 로컬 세이브: 파티 공유 재화, 구매 완료 업그레이드 목록, 마지막 진행 지점. */
@@ -43,4 +44,7 @@ public:
 	UPROPERTY(BlueprintReadWrite, Category = "Save")
 	FName LastProgressPoint;
 	
+	// 상점 상품의 구매 및 현재 보유 상태
+	UPROPERTY(BlueprintReadWrite, Category = "Save")
+	TArray<FItemShopLoadoutEntry> ItemShopPurchaseStates;
 };

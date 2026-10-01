@@ -7,6 +7,8 @@
 #include "Engine/World.h"
 #include "Engine/GameInstance.h"
 #include "Upgrade/EquipmentUpgradeSubsystem.h"
+#include "Shop/ItemShopTypes.h"
+#include "Shop/ItemShopSubsystem.h"
 
 namespace
 {
@@ -118,6 +120,20 @@ FSettlementResult UGoHomeSaveSubsystem::FinalizeRound(bool bForfeited, const TAr
 
 	FSettlementResult Result;
 
+	// 라운드 정산 전에 상점 아이템의 현재 보유 상태를 반영한다. (상점)
+	UItemShopSubsystem* ItemShopSubsystem = nullptr;
+
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		ItemShopSubsystem =
+			GameInstance->GetSubsystem<UItemShopSubsystem>();
+	}
+
+	if (ItemShopSubsystem)
+	{
+		ItemShopSubsystem->ReconcileRuntimeShopItems();
+	}
+
 	// 이번 턴 납품액 확정
 	const int32 RoundDeliveredValue = SaveGame->CurrentRoundDeliveredValue;
 	const int32 EffectiveDelivered = bForfeited ? 0 : RoundDeliveredValue;
@@ -178,6 +194,12 @@ FSettlementResult UGoHomeSaveSubsystem::FinalizeRound(bool bForfeited, const TAr
 	
 	// 트래블 전에 디스크에 남긴다
 	SaveToDisk();
+
+	// 이번 라운드 장부는 정산이 끝났으므로 비운다. (상점 관련)
+	if (ItemShopSubsystem)
+	{
+		ItemShopSubsystem->ClearRuntimeShopItems();
+	}
 
 	// 다음 라운드 출발 때 다시 세팅되므로 필수는 아니지만, 0으로 초기화
 	CurrentMapQuota = 0;
@@ -279,5 +301,99 @@ void UGoHomeSaveSubsystem::OnPostLoadMap(UWorld* LoadedWorld)
 	if (GameState->GetCurrentState() == EExpeditionState::Lobby)
 	{
 		SaveToDisk();
+	}
+}
+
+// 상점 - 지금까지 몇 개 샀는지 확인
+int32 UGoHomeSaveSubsystem::GetShopPurchasedQuantity(const FString& OwnerPlayerKey,FName ProductId) const
+{
+	if (!SaveGame)
+	{
+		return 0;
+	}
+
+	for (const FItemShopLoadoutEntry& State :
+		SaveGame->ItemShopPurchaseStates)
+	{
+		if (State.OwnerPlayerKey == OwnerPlayerKey &&
+			State.ProductId == ProductId)
+		{
+			return State.PurchasedQuantity;
+		}
+	}
+
+	return 0;
+}
+
+// 상점 - 현재 몇 개 가지고 있는지 확인
+int32 UGoHomeSaveSubsystem::GetShopOwnedQuantity(const FString& OwnerPlayerKey,FName ProductId) const
+{
+	if (!SaveGame)
+	{
+		return 0;
+	}
+
+	for (const FItemShopLoadoutEntry& State :
+		SaveGame->ItemShopPurchaseStates)
+	{
+		if (State.OwnerPlayerKey == OwnerPlayerKey &&
+			State.ProductId == ProductId)
+		{
+			return State.OwnedQuantity;
+		}
+	}
+
+	return 0;
+}
+
+// 구매 성공 시 Purchased + Owned 증가
+void UGoHomeSaveSubsystem::AddShopPurchase(const FString& OwnerPlayerKey,FName ProductId,int32 Quantity)
+{
+	if (!SaveGame ||
+		ProductId.IsNone() ||
+		Quantity <= 0)
+	{
+		return;
+	}
+
+	for (FItemShopLoadoutEntry& State :
+		SaveGame->ItemShopPurchaseStates)
+	{
+		if (State.OwnerPlayerKey == OwnerPlayerKey &&
+			State.ProductId == ProductId)
+		{
+			State.PurchasedQuantity += Quantity;
+			State.OwnedQuantity += Quantity;
+			return;
+		}
+	}
+
+	FItemShopLoadoutEntry NewState;
+	NewState.OwnerPlayerKey = OwnerPlayerKey;
+	NewState.ProductId = ProductId;
+	NewState.PurchasedQuantity = Quantity;
+	NewState.OwnedQuantity = Quantity;
+
+	SaveGame->ItemShopPurchaseStates.Add(NewState);
+}
+
+// 라운드 종료 시 실제 보유량으로 갱신
+void UGoHomeSaveSubsystem::SetShopOwnedQuantity(const FString& OwnerPlayerKey,FName ProductId,int32 OwnedQuantity)
+{
+	if (!SaveGame || ProductId.IsNone())
+	{
+		return;
+	}
+
+	for (FItemShopLoadoutEntry& State :
+		SaveGame->ItemShopPurchaseStates)
+	{
+		if (State.OwnerPlayerKey == OwnerPlayerKey &&
+			State.ProductId == ProductId)
+		{
+			State.OwnedQuantity =
+				FMath::Max(0, OwnedQuantity);
+			return;
+		}
 	}
 }
