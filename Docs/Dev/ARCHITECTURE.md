@@ -201,6 +201,11 @@ decisions:
     detail: |
       `UVoiceSpeakerListWidget`(UI/HUD)은 진행도 HUD(WBP_ExpeditionProgressHUD)의 LeftColumn에 패널 아래로 내장 — 패널 높이가 로비/탐사마다 달라 별도 뷰포트 위젯의 고정 오프셋 대신 세로 흐름으로 붙인다. `UVoiceChatSubsystem::OnTalkingStateChanged`만 구독(이 머신 OSS voice 상태 그대로, 복제 없음 — 근접 뮤트로 안 들리는 사람은 안 뜬다). 이탈은 PlayerArray 대조로 즉시 제거.
       아바타는 `UPlayerAvatarSubsystem`(Core)이 Steamworks `ISteamFriends::GetMediumFriendAvatar`를 직접 호출해 텍스처 캐시(OSS v1에 아바타 API 없음 → Build.cs에 Steamworks 서드파티 의존). Steam 아닌 환경은 이니셜 원으로 대체. 마이크 없이 확인: 비Shipping 콘솔 `GoHome.Voice.FakeTalk <인덱스> <0|1>`.
+  - name: 인게임 HUD 배치 (하단 중앙 콘솔)
+    detail: |
+      좌상단=정보(진행도 패널 + 그 아래 보이스 목록, 간격 16), 상단 중앙=나침반만, 하단 중앙=내 상태(HP 링 · 인벤토리 핫바(아래 LOAD) · O₂ 링). 보이스 목록이 아래로 길어져도 바이탈과 안 겹치게 하려는 배치.
+      핫바는 `UInventoryHotbarWidget`/`UInventorySlotWidget`(UI/HUD, BP 로직 제거) — 캐릭터 BP의 기존 `InitInventory(InInventory)` 호출을 그대로 받는다. 슬롯 크기는 핫바가 런타임 SizeBox로 강제(슬롯 UserWidget desired가 100에 고정되던 원인 미상 문제 회피).
+      O₂는 `UOxygenRingWidget`(HP 링 아트 MI_HP_Ring 재사용, 소유 폰 UOxygenComponent에 자가 바인딩)으로 바꿔 WB_HP_OxygenUI에 넣었다 — 기존 막대 WBP_OxygenStatus_V3 에셋은 남겨 둠(강화 보너스는 링 안 "+N" 라벨).
   - name: 정산 진행도 레일 데이터
     detail: |
       정산표/엔딩의 자금 관문 레일은 전 노드 위치·목표가 필요하나 FExpeditionProgress는 다음 관문 하나만 싣는다.
