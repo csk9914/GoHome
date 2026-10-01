@@ -197,6 +197,10 @@ decisions:
       상시 HUD 위젯은 BP PlayerController(또는 그 AHUD) 소유 — Pawn/Character 소유 금지. 폰 스코프 데이터(HP·산소·인벤토리)도 위젯은 뷰라 GetOwningPlayerPawn으로 읽고 OnPossessedPawnChanged에 재바인딩. 폰 소유 불가 이유: 사망 시 부활 없이 관전이 수 분 지속되며 그동안도 목표/타이머 HUD가 필요(폰 소유면 관전 내내 검은 화면), 폰은 로비마다 재생성되는 소모품. per-pawn 패널은 "폰 없음/사망" 상태를 명시.
       로비·탐사 공통 상시 진행도 HUD는 AGoHomePlayerController::RefreshProgressHUD가 GameStateSet/SetPawn마다 "현재 GameState가 Lobby/Exploration이고 아직 그 GameState용 위젯이 없으면" 생성한다(클래스는 BP의 ProgressHUDClass). bUseSeamlessTravel이라 컨트롤러가 트래블을 넘어 살아남아 BeginPlay 1회 생성은 다음 맵에서 사라지므로 금지 — 떠나는 월드(bIsTearingDown)에선 만들지 않는다.
       현재 캐릭터 BP·컨트롤러 BP에 흩어짐 → 시스템 PR마다 하나씩 이주(빅뱅 금지). 상세 UI_GUIDE.md.
+  - name: 음성 발화자 목록 + 프로필 아바타
+    detail: |
+      `UVoiceSpeakerListWidget`(UI/HUD)은 진행도 HUD(WBP_ExpeditionProgressHUD)의 LeftColumn에 패널 아래로 내장 — 패널 높이가 로비/탐사마다 달라 별도 뷰포트 위젯의 고정 오프셋 대신 세로 흐름으로 붙인다. `UVoiceChatSubsystem::OnTalkingStateChanged`만 구독(이 머신 OSS voice 상태 그대로, 복제 없음 — 근접 뮤트로 안 들리는 사람은 안 뜬다). 이탈은 PlayerArray 대조로 즉시 제거.
+      아바타는 `UPlayerAvatarSubsystem`(Core)이 Steamworks `ISteamFriends::GetMediumFriendAvatar`를 직접 호출해 텍스처 캐시(OSS v1에 아바타 API 없음 → Build.cs에 Steamworks 서드파티 의존). Steam 아닌 환경은 이니셜 원으로 대체. 마이크 없이 확인: 비Shipping 콘솔 `GoHome.Voice.FakeTalk <인덱스> <0|1>`.
   - name: 정산 진행도 레일 데이터
     detail: |
       정산표/엔딩의 자금 관문 레일은 전 노드 위치·목표가 필요하나 FExpeditionProgress는 다음 관문 하나만 싣는다.
