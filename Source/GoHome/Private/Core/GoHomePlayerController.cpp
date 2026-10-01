@@ -7,6 +7,8 @@
 #include "Core/ExplorationGameState.h"
 
 #include "Core/SessionSubsystem.h"
+#include "Core/GoHomeGameUserSettings.h"
+#include "Camera/CameraComponent.h"
 
 #include "Blueprint/UserWidget.h"
 #include "Components/InputComponent.h"
@@ -36,6 +38,14 @@ static TAutoConsoleVariable<int32> CVarPauseSimulateLeaveFailure(
 void AGoHomePlayerController::BeginPlay()
 {
 	Super::BeginPlay();
+	if (IsLocalController())
+	{
+		if (UGoHomeGameUserSettings* Settings = UGoHomeGameUserSettings::Get())
+		{
+			SettingsAppliedHandle = Settings->OnGameplaySettingsApplied.AddUObject(this, &AGoHomePlayerController::ApplyLocalPlayerSettings);
+		}
+	}
+	ApplyLocalPlayerSettings();
 	BindGameStateSetEvent();
 	RefreshExplorationHUD();
 	RefreshProgressHUD();
@@ -54,6 +64,11 @@ void AGoHomePlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		ProgressHUD->RemoveFromParent();
 		ProgressHUD = nullptr;
 	}
+	if (UGoHomeGameUserSettings* Settings = UGoHomeGameUserSettings::Get())
+	{
+		Settings->OnGameplaySettingsApplied.Remove(SettingsAppliedHandle);
+	}
+	SettingsAppliedHandle.Reset();
 	StopWaitingForSession();
 	if (PauseMenu)
 	{
@@ -66,6 +81,7 @@ void AGoHomePlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void AGoHomePlayerController::OnRep_Pawn()
 {
 	Super::OnRep_Pawn();
+	ApplyLocalPlayerSettings();
 	BindGameStateSetEvent();
 	RefreshExplorationHUD();
 	RefreshProgressHUD();
@@ -74,6 +90,7 @@ void AGoHomePlayerController::OnRep_Pawn()
 void AGoHomePlayerController::SetPawn(APawn* InPawn)
 {
 	Super::SetPawn(InPawn);
+	ApplyLocalPlayerSettings();
 	BindGameStateSetEvent();
 	RefreshExplorationHUD();
 	RefreshProgressHUD();
@@ -88,6 +105,28 @@ void AGoHomePlayerController::SetPawn(APawn* InPawn)
 			{
 				ShopSubsystem->TryGrantSavedLoadout(this);
 			}
+		}
+	}
+}
+
+void AGoHomePlayerController::ApplyLocalPlayerSettings()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	const UGoHomeGameUserSettings* Settings = UGoHomeGameUserSettings::Get();
+	if (!Settings)
+	{
+		return;
+	}
+
+	if (APawn* ControlledPawn = GetPawn())
+	{
+		if (UCameraComponent* Camera = ControlledPawn->FindComponentByClass<UCameraComponent>())
+		{
+			Camera->SetFieldOfView(Settings->GetFieldOfView());
 		}
 	}
 }

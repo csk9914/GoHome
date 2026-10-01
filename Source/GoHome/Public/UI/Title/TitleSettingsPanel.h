@@ -49,6 +49,25 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> MasterVolumeText;
 
+	// 시야와 조작 그룹(Reference Pack settings-extension). 채움 바는 볼륨 행과 같은 구조라 선택 사항.
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<USlider> FieldOfViewSlider;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> FieldOfViewText;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UProgressBar> FieldOfViewFill;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<USlider> MouseSensitivitySlider;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> MouseSensitivityText;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UProgressBar> MouseSensitivityFill;
+
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> ApplyButton;
 
@@ -88,6 +107,12 @@ private:
 	void HandleVolumeChanged(float Value);
 
 	UFUNCTION()
+	void HandleFieldOfViewChanged(float Value);
+
+	UFUNCTION()
+	void HandleMouseSensitivityChanged(float Value);
+
+	UFUNCTION()
 	void HandleApplyClicked();
 
 	void StepResolution(int32 Delta);
@@ -97,4 +122,6 @@ private:
 	int32 ResolutionIndex = INDEX_NONE;
 	EWindowMode::Type PendingWindowMode = EWindowMode::WindowedFullscreen;
 	float PendingVolume = 1.f;
+	float PendingFieldOfView = 90.f;
+	float PendingMouseSensitivity = 1.f;
 };

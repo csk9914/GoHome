@@ -16,6 +16,14 @@ void UTitleSettingsPanel::NativeOnInitialized()
 	ResolutionPrevButton->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleResolutionPrevClicked);
 	ResolutionNextButton->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleResolutionNextClicked);
 	MasterVolumeSlider->OnValueChanged.AddUniqueDynamic(this, &ThisClass::HandleVolumeChanged);
+	if (FieldOfViewSlider)
+	{
+		FieldOfViewSlider->OnValueChanged.AddUniqueDynamic(this, &ThisClass::HandleFieldOfViewChanged);
+	}
+	if (MouseSensitivitySlider)
+	{
+		MouseSensitivitySlider->OnValueChanged.AddUniqueDynamic(this, &ThisClass::HandleMouseSensitivityChanged);
+	}
 	ApplyButton->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleApplyClicked);
 }
 
@@ -29,6 +37,8 @@ void UTitleSettingsPanel::OnPanelOpening()
 
 	PendingWindowMode = Settings->GetFullscreenMode() == EWindowMode::Windowed ? EWindowMode::Windowed : EWindowMode::WindowedFullscreen;
 	PendingVolume = Settings->GetMasterVolume();
+	PendingFieldOfView = Settings->GetFieldOfView();
+	PendingMouseSensitivity = Settings->GetMouseSensitivity();
 
 	Resolutions.Reset();
 	UKismetSystemLibrary::GetSupportedFullscreenResolutions(Resolutions);
@@ -39,6 +49,14 @@ void UTitleSettingsPanel::OnPanelOpening()
 	ResolutionIndex = Resolutions.IndexOfByKey(Current);
 
 	MasterVolumeSlider->SetValue(PendingVolume);
+	if (FieldOfViewSlider)
+	{
+		FieldOfViewSlider->SetValue((PendingFieldOfView - 70.f) / 40.f);
+	}
+	if (MouseSensitivitySlider)
+	{
+		MouseSensitivitySlider->SetValue((PendingMouseSensitivity - 0.2f) / 1.8f);
+	}
 	RefreshView();
 }
 
@@ -75,6 +93,20 @@ void UTitleSettingsPanel::HandleVolumeChanged(float Value)
 	RefreshView();
 }
 
+void UTitleSettingsPanel::HandleFieldOfViewChanged(float Value)
+{
+	// 시안 단계: 1° 단위
+	PendingFieldOfView = FMath::RoundToFloat(FMath::Lerp(70.f, 110.f, Value));
+	RefreshView();
+}
+
+void UTitleSettingsPanel::HandleMouseSensitivityChanged(float Value)
+{
+	// 시안 단계: 0.05× 단위
+	PendingMouseSensitivity = FMath::GridSnap(FMath::Lerp(0.2f, 2.f, Value), 0.05f);
+	RefreshView();
+}
+
 void UTitleSettingsPanel::HandleApplyClicked()
 {
 	UGoHomeGameUserSettings* Settings = UGoHomeGameUserSettings::Get();
@@ -89,6 +121,8 @@ void UTitleSettingsPanel::HandleApplyClicked()
 		Settings->SetScreenResolution(Resolutions[ResolutionIndex]);
 	}
 	Settings->SetMasterVolume(PendingVolume);
+	Settings->SetFieldOfView(PendingFieldOfView);
+	Settings->SetMouseSensitivity(PendingMouseSensitivity);
 	Settings->ApplySettings(false);
 	Settings->SaveSettings();
 
@@ -132,5 +166,24 @@ void UTitleSettingsPanel::RefreshView()
 	if (MasterVolumeFill)
 	{
 		MasterVolumeFill->SetPercent(PendingVolume);
+	}
+	const float FieldOfViewAlpha = (PendingFieldOfView - 70.f) / 40.f;
+	if (FieldOfViewText)
+	{
+		FieldOfViewText->SetText(FText::FromString(FString::Printf(TEXT("%d°"), FMath::RoundToInt(PendingFieldOfView))));
+	}
+	if (FieldOfViewFill)
+	{
+		FieldOfViewFill->SetPercent(FieldOfViewAlpha);
+	}
+
+	const float SensitivityAlpha = (PendingMouseSensitivity - 0.2f) / 1.8f;
+	if (MouseSensitivityText)
+	{
+		MouseSensitivityText->SetText(FText::FromString(FString::Printf(TEXT("%.2f×"), PendingMouseSensitivity)));
+	}
+	if (MouseSensitivityFill)
+	{
+		MouseSensitivityFill->SetPercent(SensitivityAlpha);
 	}
 }

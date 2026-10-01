@@ -116,6 +116,11 @@ private:
 	// seamless travel 은 컨트롤러를 살려 둔 채 월드만 바꾸므로 BeginPlay 1회 생성으로는 탐사맵에서 사라진다.
 	void RefreshProgressHUD();
 
+	// 로컬 사용자 FOV를 폰 획득/재획득·설정 적용 때 카메라에 적용한다.
+	void ApplyLocalPlayerSettings();
+
+	FDelegateHandle SettingsAppliedHandle;
+
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> ProgressHUD;
 

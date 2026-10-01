@@ -8,6 +8,7 @@
 #include "Player/DeathNotifier.h"
 #include "Interaction/CoopCarryObjectBase.h"
 #include "Camera/CameraComponent.h"
+#include "Core/GoHomeGameUserSettings.h"
 #include "InputAction.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
@@ -447,7 +448,9 @@ void AGoHomeCharacter::Look(const FInputActionValue& Value)
 	if (FocusedSwitchboard) { return; }
 	if (bCarryViewActive) { return; } // 운반 중 공용 화면 - 두 사람이 항상 같은 화면을 보도록 둘러보기 없음.
 
-	const FVector2D LookVector = Value.Get<FVector2D>();
+	const UGoHomeGameUserSettings* Settings = UGoHomeGameUserSettings::Get();
+	const float Sensitivity = Settings ? Settings->GetMouseSensitivity() : 1.f;
+	const FVector2D LookVector = Value.Get<FVector2D>() * Sensitivity;
 	AddControllerYawInput(LookVector.X);
 	AddControllerPitchInput(LookVector.Y);
 }
