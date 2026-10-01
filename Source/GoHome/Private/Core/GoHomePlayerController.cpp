@@ -52,6 +52,19 @@ void AGoHomePlayerController::SetPawn(APawn* InPawn)
 	BindGameStateSetEvent();
 	RefreshExplorationHUD();
 	RefreshProgressHUD();
+
+	// 서버에서만 저장된 상점 아이템을 지급한다.
+	if (HasAuthority())
+	{
+		if (UGameInstance* GameInstance = GetGameInstance())
+		{
+			if (UItemShopSubsystem* ShopSubsystem =
+				GameInstance->GetSubsystem<UItemShopSubsystem>())
+			{
+				ShopSubsystem->TryGrantSavedLoadout(this);
+			}
+		}
+	}
 }
 
 void AGoHomePlayerController::BindGameStateSetEvent()
@@ -228,24 +241,19 @@ void AGoHomePlayerController::Server_RequestShopPurchase_Implementation(
 		return;
 	}
 
-	int32 TotalPrice = 0;
-	int32 CurrentFunds = 0;
-	EItemShopResult Result = EItemShopResult::ShopUnavailable;
+	FItemShopPurchaseResult PurchaseResult;
 
-	// 상품과 보유 코인을 함께 확인한다.
-	const bool bValid =
-		ShopSubsystem->TryValidatePurchase(
+	const bool bSuccess =
+		ShopSubsystem->TryProcessPurchase(
+			this,
 			Request,
-			TotalPrice,
-			CurrentFunds,
-			Result);
+			PurchaseResult);
 
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("[ItemShop] Server request. Valid: %s, Total: %d, Funds: %d, Result: %d"),
-		bValid ? TEXT("true") : TEXT("false"),
-		TotalPrice,
-		CurrentFunds,
-		static_cast<uint8>(Result));
+		TEXT("[ItemShop] Purchase. Success: %s, RemainingFunds: %d, Result: %d"),
+		bSuccess ? TEXT("true") : TEXT("false"),
+		PurchaseResult.RemainingFunds,
+		static_cast<uint8>(PurchaseResult.Result));
 }
