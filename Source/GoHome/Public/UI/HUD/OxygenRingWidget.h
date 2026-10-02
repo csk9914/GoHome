@@ -7,6 +7,7 @@
 class UEquipmentUpgradeDataAsset;
 class UImage;
 class UMaterialInstanceDynamic;
+class UMaterialInterface;
 class UOxygenComponent;
 class UTextBlock;
 
@@ -78,13 +79,21 @@ protected:
 		FLinearColor::FromSRGBColor(FColor(0x4F, 0x7D, 0xFF)),
 		FLinearColor::FromSRGBColor(FColor(0xC0, 0x64, 0xFF)) };
 
-	// 비어 있는 강화 구간 = 트랙색과 등급색 사이(이 비율만큼 등급색)
+	// 강화 구간 레이어용 머티리얼(M_O2_RingSegment — M_HP_Ring에 StartPercent를 더해 [시작,끝] 구간만 그림).
+	// 원본 링은 반투명이라 0→N% 레이어를 겹치면 아래 등급색이 비쳐 탁해지므로 구간 단위로 그린다.
+	UPROPERTY(EditAnywhere, Category = "Oxygen Ring|Tiers")
+	TObjectPtr<UMaterialInterface> SegmentMaterial;
+
+	UPROPERTY(EditAnywhere, Category = "Oxygen Ring|Tiers")
+	FName StartParameter = TEXT("StartPercent");
+
+	// 강화 구간 채움색 밝기 배율
+	UPROPERTY(EditAnywhere, Category = "Oxygen Ring|Tiers", meta = (ClampMin = "0"))
+	float TierBrightness = 1.6f;
+
+	// 비어 있는 강화 구간 = 등급색 × TierBrightness × 이 값
 	UPROPERTY(EditAnywhere, Category = "Oxygen Ring|Tiers", meta = (ClampMin = "0", ClampMax = "1"))
 	float EmptyTierStrength = 0.3f;
-
-	// 링 트랙 텍스처(T_HP_Ring_Track) 평균색 — 강화 구간이 있을 때 기본 구간의 빈 자리를 덮는 데 쓴다
-	UPROPERTY(EditAnywhere, Category = "Oxygen Ring|Tiers")
-	FLinearColor TrackColor = FLinearColor::FromSRGBColor(FColor(93, 100, 108, 209));
 
 private:
 	UFUNCTION()
@@ -103,16 +112,13 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UMaterialInstanceDynamic> RingMID;
 
-	// RingFill의 원본 머티리얼(MID 만들기 전) — 레이어마다 자기 MID를 갖도록 이걸로 브러시를 만든다
+	// 레이어 브러시에 쓸 머티리얼(SegmentMaterial, 없으면 RingFill 원본) — 레이어마다 자기 MID를 갖는다
 	UPROPERTY(Transient)
 	TObjectPtr<UObject> RingMaterialTemplate;
 
-	// 아래→위: FaintLayers(위 등급부터) · BaseCover · FillLayers(위 등급부터) · RingFill(기본)
+	// 아래→위: FaintLayers · FillLayers · RingFill(기본) — 구간이 안 겹쳐 순서는 무관하지만 RingFill이 맨 위
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UImage>> FaintLayers;
-
-	UPROPERTY(Transient)
-	TObjectPtr<UImage> BaseCover;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UImage>> FillLayers;

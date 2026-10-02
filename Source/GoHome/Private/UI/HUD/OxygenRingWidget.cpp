@@ -11,7 +11,7 @@
 
 namespace
 {
-	void SetRing(UImage* Layer, FName PercentParameter, FName ColorParameter, float Percent, const FLinearColor& Color)
+	void SetRing(UImage* Layer, FName PercentParameter, FName ColorParameter, float Percent, const FLinearColor& Color, FName StartParameter = NAME_None, float Start = 0.f)
 	{
 		if (!Layer)
 		{
@@ -21,6 +21,10 @@ namespace
 		{
 			MID->SetScalarParameterValue(PercentParameter, Percent);
 			MID->SetVectorParameterValue(ColorParameter, Color);
+			if (!StartParameter.IsNone())
+			{
+				MID->SetScalarParameterValue(StartParameter, Start);
+			}
 		}
 	}
 }
@@ -33,7 +37,8 @@ void UOxygenRingWidget::NativeConstruct()
 	{
 		UObject* Resource = RingFill->GetBrush().GetResourceObject();
 		const UMaterialInstanceDynamic* ExistingMID = Cast<UMaterialInstanceDynamic>(Resource);
-		RingMaterialTemplate = ExistingMID ? ExistingMID->Parent.Get() : Resource;
+		UObject* Original = ExistingMID ? ExistingMID->Parent.Get() : Resource;
+		RingMaterialTemplate = SegmentMaterial ? static_cast<UObject*>(SegmentMaterial.Get()) : Original;
 	}
 	RingMID = RingFill->GetDynamicMaterial();
 	Bounds = { 0.f, 1.f };
@@ -207,27 +212,19 @@ void UOxygenRingWidget::RebuildLayers(int32 UpgradeTierCount)
 			Layer->RemoveFromParent();
 		}
 	}
-	if (BaseCover)
-	{
-		BaseCover->RemoveFromParent();
-	}
 	FaintLayers.Reset();
 	FillLayers.Reset();
-	BaseCover = nullptr;
 
 	if (UpgradeTierCount <= 0)
 	{
 		return;
 	}
 
-	// 아래→위 순서로 RingFill 바로 아래에 끼워 넣는다
-	// 빈 강화 구간: 위 등급부터 깔고, 아래 등급이 앞부분을 덮는다
+	// RingFill 바로 아래에 끼워 넣는다(구간 머티리얼이라 서로 안 겹침)
 	for (int32 Tier = UpgradeTierCount - 1; Tier >= 0; --Tier)
 	{
 		FaintLayers.Insert(AddLayerBelowFill(), 0);
 	}
-	// 기본 구간의 빈 자리는 트랙색으로 덮어 빈 강화색이 비치지 않게
-	BaseCover = AddLayerBelowFill();
 	for (int32 Tier = UpgradeTierCount - 1; Tier >= 0; --Tier)
 	{
 		FillLayers.Insert(AddLayerBelowFill(), 0);
@@ -280,14 +277,18 @@ void UOxygenRingWidget::ApplyLayers()
 
 	for (int32 Tier = 0; Tier < FillLayers.Num(); ++Tier)
 	{
+		const float TierStart = Bounds.IsValidIndex(Tier + 1) ? Bounds[Tier + 1] : 1.f;
 		const float TierEnd = Bounds.IsValidIndex(Tier + 2) ? Bounds[Tier + 2] : 1.f;
-		const FLinearColor TierColor = GetTierColor(Tier);
-		SetRing(FillLayers[Tier], PercentParameter, ColorParameter, bWarning ? 0.f : FMath::Min(Ratio, TierEnd), TierColor);
-		SetRing(FaintLayers[Tier], PercentParameter, ColorParameter, TierEnd, FMath::Lerp(TrackColor, TierColor, EmptyTierStrength));
-	}
-	if (BaseCover)
-	{
-		SetRing(BaseCover, PercentParameter, ColorParameter, BaseEnd, TrackColor);
+		FLinearColor TierColor = GetTierColor(Tier) * TierBrightness;
+		TierColor.A = 1.f;
+		FLinearColor EmptyColor = TierColor * EmptyTierStrength;
+		EmptyColor.A = 1.f;
+		// 채움: [시작, min(남은 양, 끝)] — 남은 양이 시작 전이면 폭 0
+		const float FillEnd = bWarning ? TierStart : FMath::Clamp(Ratio, TierStart, TierEnd);
+		SetRing(FillLayers[Tier], PercentParameter, ColorParameter, FillEnd, TierColor, StartParameter, TierStart);
+		// 폭 0이어도 경계 페더(smoothstep)로 실선이 남으니 숨긴다
+		FillLayers[Tier]->SetRenderOpacity(FillEnd > TierStart + 0.001f ? 1.f : 0.f);
+		SetRing(FaintLayers[Tier], PercentParameter, ColorParameter, TierEnd, EmptyColor, StartParameter, TierStart);
 	}
 }
 
