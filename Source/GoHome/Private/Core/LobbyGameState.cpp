@@ -4,7 +4,6 @@
 #include "Core/LobbyGameState.h"
 #include "Core/ExpeditionZoneDataAsset.h"
 #include "Net/UnrealNetwork.h"
-#include "Save/GoHomeSaveSubsystem.h"
 
 ALobbyGameState::ALobbyGameState()
 {
@@ -19,49 +18,6 @@ void ALobbyGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutL
 
 	// SelectedZoneId 변수를 클라이언트들에게 동기화(Replicate)하도록 등록
 	DOREPLIFETIME(ALobbyGameState, SelectedZoneId);
-	DOREPLIFETIME(ALobbyGameState, CurrentFunds);
-}
-
-void ALobbyGameState::BeginPlay()
-{
-	Super::BeginPlay();
-
-	if (!HasAuthority())
-	{
-		return;
-	}
-
-	const UGameInstance* GameInstance = GetGameInstance();
-	if (!GameInstance)
-	{
-		return;
-	}
-
-	const UGoHomeSaveSubsystem* SaveSubsystem = GameInstance->GetSubsystem<UGoHomeSaveSubsystem>();
-	if (!SaveSubsystem)
-	{
-		return;
-	}
-
-	SetCurrentFunds(SaveSubsystem->GetCurrentFunds());
-}
-
-void ALobbyGameState::SetCurrentFunds(int32 InCurrentFunds)
-{
-	if (!HasAuthority())
-	{
-		return;
-	}
-
-	CurrentFunds = InCurrentFunds;
-
-	// 리슨 서버 호스트는 OnRep이 불리지 않으므로 서버에서 직접 브로드캐스트
-	OnCurrentFundsChanged.Broadcast(CurrentFunds);
-}
-
-void ALobbyGameState::OnRep_CurrentFunds()
-{
-	OnCurrentFundsChanged.Broadcast(CurrentFunds);
 }
 
 void ALobbyGameState::SetSelectedZone(FName ZoneId)

@@ -53,6 +53,14 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
 	FVector2D MarkerIconSize = FVector2D(10.f, 10.f);
 
+	// .menu-marker 13px(×0.75). 시안의 ▶/×는 Consolas에 없거나 모양이 달라 Chrome 폴백 글리프(Segoe UI Symbol ▶, Consolas ×)로
+	// 그려지므로, 행마다 Noto 글리프 크기/굵기를 그 박스에 맞춘다(▶ 8.5pt, × Bold 6pt)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
+	float MarkerFontSize = 9.75f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Style")
+	FName MarkerTypeface = TEXT("Regular");
+
 	// HOST 같은 주 행동 — 강조색을 호박색으로
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Title|Menu")
 	bool bPrimary = false;

@@ -7,6 +7,27 @@
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/PlayerState.h"
 #include "AI/NoiseType.h"
+#include "Engine/GameInstance.h"
+#include "HAL/IConsoleManager.h"
+
+#if !UE_BUILD_SHIPPING
+// 마이크 없이 음성 HUD 확인용: GoHome.Voice.FakeTalk <PlayerArray 인덱스> <0|1>
+static FAutoConsoleCommandWithWorldAndArgs GFakeTalkCommand(
+	TEXT("GoHome.Voice.FakeTalk"),
+	TEXT("음성 말하기 상태를 흉내 낸다(로컬 브로드캐스트만). 인자: <PlayerArray 인덱스> <0|1>"),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
+	{
+		AGameStateBase* GameState = World ? World->GetGameState() : nullptr;
+		UGameInstance* GameInstance = World ? World->GetGameInstance() : nullptr;
+		UVoiceChatSubsystem* Voice = GameInstance ? GameInstance->GetSubsystem<UVoiceChatSubsystem>() : nullptr;
+		const int32 Index = Args.Num() > 0 ? FCString::Atoi(*Args[0]) : 0;
+		const bool bTalking = Args.Num() > 1 ? FCString::Atoi(*Args[1]) != 0 : true;
+		if (Voice && GameState && GameState->PlayerArray.IsValidIndex(Index))
+		{
+			Voice->OnTalkingStateChanged.Broadcast(GameState->PlayerArray[Index], bTalking);
+		}
+	}));
+#endif
 
 void UVoiceChatSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {

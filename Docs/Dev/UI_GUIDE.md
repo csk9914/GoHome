@@ -31,7 +31,7 @@
 | 레이어 | 예 | 성격 |
 |---|---|---|
 | HUD | 산소·나침반(`WBP_Compass`)·HP·무게·상호작용 프롬프트(`WBP_InteractionPrompt`)·위험 비네트(`WBP_DangerVignette`)·인벤토리(`WBP_InventorySlots`)·제한시간·할당량 | 상시, 게임플레이 위. 표시 전용 |
-| Modal | 존 선택(`WBP_ZoneSelect`), 강화 상점(미구현) | 게임 위, 입력 잡음. 확정은 Server RPC |
+| Modal | 존 선택(`WBP_ZoneSelect`), 강화 상점, 인게임 시스템 메뉴(`WBP_PauseMenu`) | 게임 위, 입력 잡음. 확정은 Server RPC. **열 때 `bShowMouseCursor`를 켜고 닫을 때 끈다** — 인게임 메뉴는 커서가 켜져 있으면 다른 Modal이 Escape를 소유한 것으로 보고 열리지 않는다(`AGoHomePlayerController::CanOpenPauseMenu`) |
 | Fullscreen / Sequence | 정산·게임오버·엔딩(`WBP_Settlement` 계열), 타이틀(`WBP_Title`), 로딩(`WBP_Loading`) | 게임 가림. 자체 enter/exit 연출. 동시에 하나만 |
 | System | 세션 진입(`WBP_SessionEntry`), 연결 끊김/에러 | 최상단 |
 
@@ -45,13 +45,16 @@
 | HUD 묶음 | HUD | BP PlayerController | 탐사 레벨 Possess 후 / 레벨 전환 | GameState 복제 필드 / 컴포넌트 델리게이트 |
 | 존 선택 | Modal | 존 셀렉트 모니터 또는 PlayerController | 상호작용 트리거 / 확정·취소 | Zone DataAsset |
 | 타이틀 (`UTitleScreenWidget` 부모 WBP) | Fullscreen | `ATitlePlayerController`(C++, `TitleScreenClass`) | 로컬 BeginPlay 생성 / 로비·세션 트래블 시 파괴 | `ITitleBackend`(컨트롤러가 구현 — 검색 스냅샷·세이브 요약·Host/Join 결과) |
+| 인게임 시스템 메뉴 (`UPauseMenuWidget` 부모 `WBP_PauseMenu`) | Modal | `AGoHomePlayerController`(C++, `PauseMenuClass`) | 로비·탐사에서 Escape/게임패드 Start로 생성(UIOnly, 로컬 입력만 — 세션은 멈추지 않음) / 닫힘 연출 끝·나가기 성공·월드 교체 시 파괴 | `IPauseMenuBackend`(컨트롤러가 구현 — 역할(호스트/참가자)·복귀·나가기 요청·실패 이벤트). 설정 화면은 타이틀과 같은 `UTitleSettingsPanel` 클래스(레이아웃만 `WBP_PauseSettingsPanel`) |
+
+PIE 주의: 에디터의 Stop 단축키가 Esc라 PIE 창에서 Esc를 누르면 메뉴보다 먼저 PIE가 종료된다(엔진에 끄는 옵션 없음, `DebuggerCommands.cpp`). 메뉴 키 흐름은 Standalone(`-game`)으로 확인하거나 에디터 단축키 Stop을 바꿔서 본다.
 
 ## HUD 묶음 소유 규칙
 
 - **상시 HUD 위젯은 BP PlayerController(또는 그 `AHUD`)가 소유. Pawn/Character 소유 금지.** 근거: (1) 데이터가 폰 스코프여도 위젯은 뷰 — `GetOwningPlayerPawn()`으로 읽고 `OnPossessedPawnChanged`에 재바인딩. (2) 사망 시 부활 없이 관전이 수 분 지속되고 그동안도 목표·타이머 HUD가 필요 → 지속 HUD는 필수이고, 폰 소유면 관전 내내 검은 화면 + 별도 관전 HUD를 또 만듦. (3) 폰은 로비 도착마다 재생성되는 소모품이라 폰 소유 위젯은 매 사이클 재생성.
 - **per-pawn 패널(HP·산소·무게·인벤토리)은 "폰 없음/사망" 상태를 명시적으로 가짐** — 재바인딩 함수 안 `if` 하나로 패널이 자기 visibility 관리. 토글이 커지면 대안: 캐릭터의 `UHUDPanelComponent`가 `BeginPlay`에 PC HUD NamedSlot로 위젯 주입 / `EndPlay`에 제거 (라이프타임은 폰, 트리는 PC HUD).
 - **현황**: HUD 요소가 캐릭터 BP·컨트롤러 BP에 흩어짐. 신규(제한시간·할당량)는 처음부터 PC HUD에 넣어 이주 레퍼런스로 삼고, 기존 요소는 해당 시스템 PR마다 하나씩 이주. 빅뱅 리팩터 금지.
-- **데이터**: 제한시간 = `AExplorationGameState::GetRemainingSeconds()` / `HasTimeLimit()` (복제됨). 할당량·자금 = `AExplorationGameState::GetMapQuota()` / `GetRoundDeliveredValue()` / `GetCurrentFunds()` (셋 다 복제됨), 갱신은 `OnQuotaProgressChanged(Delivered, Quota)` 하나에 바인딩(세 값이 같이 갱신 — 델리게이트는 자금을 안 싣으니 콜백 안에서 `GetCurrentFunds()`로 꺼낸다) + 바인딩 직후 Get*()로 초기값 1회.
+- **데이터**: 제한시간·라운드·다음 관문·자금·할당량 = 로비·탐사 공통 상시 진행도 HUD(`UExpeditionProgressHUDWidget`, 화면 좌상단 한 블록 — 상단 중앙은 나침반·산소)가 `AGoHomeGameState`의 Get*()와 가상 `GetTimeLimitProgress()`/`GetMapQuotaProgress()`(탐사맵만 true)로 읽는다. 시간은 매 틱, 나머지는 `OnExpeditionProgressChanged` 하나에 바인딩 + 바인딩 직후 1회 당김. 생성은 BP가 아니라 `AGoHomePlayerController::RefreshProgressHUD`(seamless travel 대응) — 상세는 ARCHITECTURE.md Save 절.
 - **배치**: 팀 공유 상태(제한시간·할당량) 상단, per-player(HP·산소·무게) 하단. 상세는 담당자 개인 문서.
 
 ## 화면 위젯 규칙

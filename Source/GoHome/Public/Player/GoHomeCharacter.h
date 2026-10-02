@@ -20,6 +20,7 @@ class AElectricSwitchboardActor;
 class UInventoryComponent;
 class UPrimitiveComponent;
 class USpotLightComponent;
+class UWidgetComponent;
 
 // 운반 중 공용 카메라 시점에 들어가거나 나올 때(로컬 폰에서만 발생). HUD가 크로스헤어 숨김/역할 표시에 사용.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCarryViewChanged, bool, bActive, bool, bIsMover);
@@ -97,6 +98,10 @@ private:
 	
 	UPROPERTY(VisibleAnywhere, Category = "Camera")
 	TObjectPtr<UCameraComponent> Camera;
+
+	// 플레이어 이름은 PlayerState에서 읽어 월드 이름표로 표시한다.
+	UPROPERTY(VisibleAnywhere, Category = "UI")
+	TObjectPtr<UWidgetComponent> NameplateWidgetComponent;
 
 	// 손전등(기본 장비) - 전원 동일 스펙 지급, 슬롯 불필요. Spine_03에 항상 부착.
 	UPROPERTY(VisibleAnywhere, Category = "Flashlight")
@@ -239,6 +244,7 @@ protected:
 	void OnRep_IsFlashlightOn();
 
 	void UpdateFlashlightVisual(bool bNewIsOn);
+	void RefreshNameplate();
 	
 	UFUNCTION()
 	void OnRep_ReplicatedPitch();
@@ -389,6 +395,8 @@ private:
 	TArray<TPair<TWeakObjectPtr<UPrimitiveComponent>, ECollisionResponse>> CarryCameraIgnoredComponents;
 
 	float LastKnownHP = -1.f; // -1 = 아직 초기화 안됨(최초 값으로는 감소 판정 안 하기 위함).
+	FString LastDisplayedPlayerName;
+	bool bHasAppliedPlayerName = false;
 
 };
 

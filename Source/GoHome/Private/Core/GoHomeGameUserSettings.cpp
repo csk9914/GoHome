@@ -16,11 +16,22 @@ void UGoHomeGameUserSettings::SetMasterVolume(float InVolume)
 	MasterVolume = FMath::Clamp(InVolume, 0.f, 1.f);
 }
 
+void UGoHomeGameUserSettings::SetFieldOfView(float InFieldOfView)
+{
+	FieldOfView = FMath::Clamp(InFieldOfView, 70.f, 110.f);
+}
+
+void UGoHomeGameUserSettings::SetMouseSensitivity(float InMouseSensitivity)
+{
+	MouseSensitivity = FMath::Clamp(InMouseSensitivity, 0.2f, 2.f);
+}
+
 void UGoHomeGameUserSettings::ApplyNonResolutionSettings()
 {
 	Super::ApplyNonResolutionSettings();
 
 	ApplyAudioSettings();
+	OnGameplaySettingsApplied.Broadcast();
 }
 
 void UGoHomeGameUserSettings::SetToDefaults()
@@ -28,6 +39,8 @@ void UGoHomeGameUserSettings::SetToDefaults()
 	Super::SetToDefaults();
 
 	MasterVolume = 1.f;
+	FieldOfView = 90.f;
+	MouseSensitivity = 1.f;
 }
 
 void UGoHomeGameUserSettings::ApplyAudioSettings()

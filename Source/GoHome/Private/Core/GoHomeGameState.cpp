@@ -34,27 +34,45 @@ void AGoHomeGameState::BeginPlay()
 		return;
 	}
 
-	const FExpeditionProgress Progress = SaveSubsystem->BuildProgress();
-	SetRoundProgress(Progress.CurrentRound, Progress.FinalRound);
+	SetExpeditionProgress(SaveSubsystem->BuildProgress());
 }
 
-void AGoHomeGameState::SetRoundProgress(int32 InCurrentRound, int32 InFinalRound)
+void AGoHomeGameState::SetExpeditionProgress(const FExpeditionProgress& Progress)
 {
 	if (!HasAuthority())
 	{
 		return;
 	}
 
-	CurrentRound = InCurrentRound;
-	FinalRound = InFinalRound;
+	CurrentRound = Progress.CurrentRound;
+	FinalRound = Progress.FinalRound;
+	CurrentFunds = Progress.CurrentFunds;
+	NextCheckPointRound = Progress.NextCheckPointRound;
+	NextCheckPointQuota = Progress.NextCheckPointQuota;
 
 	// 리슨 서버 호스트는 OnRep이 불리지 않으므로 서버에서 직접 브로드캐스트
-	OnRoundProgressChanged.Broadcast(CurrentRound, FinalRound);
+	NotifyExpeditionProgressChanged();
 }
 
-void AGoHomeGameState::OnRep_RoundProgress()
+void AGoHomeGameState::SetCurrentFunds(int32 InCurrentFunds)
 {
-	OnRoundProgressChanged.Broadcast(CurrentRound, FinalRound);
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	CurrentFunds = InCurrentFunds;
+	NotifyExpeditionProgressChanged();
+}
+
+void AGoHomeGameState::OnRep_ExpeditionProgress()
+{
+	NotifyExpeditionProgressChanged();
+}
+
+void AGoHomeGameState::NotifyExpeditionProgressChanged()
+{
+	OnExpeditionProgressChanged.Broadcast();
 }
 
 void AGoHomeGameState::SetState(EExpeditionState NewState)
@@ -87,11 +105,11 @@ void AGoHomeGameState::AddDeliveredValue(int32 Value)
 	
 	const int32 RoundDeliveredTotal = SaveSubsystem->AccumulateDeliveredValue(Value);
 
-	// 호스트 전용 세이브 값을 탐사 GameState의 복제 미러로 밀어 라이브 HUD(할당량·자금)가 받게 한다
+	// 호스트 전용 세이브 값을 복제 미러로 밀어 라이브 HUD(자금·할당량)가 받게 한다.
+	// 자금을 먼저 실어야 SetRoundDeliveredValue의 호스트 브로드캐스트 시점에 최신 자금이 보인다.
+	SetCurrentFunds(SaveSubsystem->GetCurrentFunds());
 	if (AExplorationGameState* ExplorationGameState = Cast<AExplorationGameState>(this))
 	{
-		// 자금을 먼저 실어야 SetRoundDeliveredValue의 호스트 브로드캐스트 시점에 최신 자금이 보인다
-		ExplorationGameState->SetCurrentFunds(SaveSubsystem->GetCurrentFunds());
 		ExplorationGameState->SetRoundDeliveredValue(RoundDeliveredTotal);
 	}
 }
@@ -125,6 +143,9 @@ void AGoHomeGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AGoHomeGameState, CurrentState);
 	DOREPLIFETIME(AGoHomeGameState, CurrentRound);
 	DOREPLIFETIME(AGoHomeGameState, FinalRound);
+	DOREPLIFETIME(AGoHomeGameState, CurrentFunds);
+	DOREPLIFETIME(AGoHomeGameState, NextCheckPointRound);
+	DOREPLIFETIME(AGoHomeGameState, NextCheckPointQuota);
 }
 
 void AGoHomeGameState::OnRep_State()

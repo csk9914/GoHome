@@ -51,6 +51,12 @@ public:
 	void DestroySession();
 	void StartSession();
 
+	// 세션 없이 맵을 직접 연 경우(PIE 등)엔 false — 정리할 세션이 없으면 DestroySession을 부르지 않는다
+	bool HasActiveSession() const;
+
+	// DestroySession 요청 후 완료 콜백 전. 이 동안 DestroySession을 다시 불러도 OSS에 중복 요청하지 않는다(OnDestroyComplete를 기다릴 것).
+	bool IsDestroyInProgress() const { return bDestroyInFlight; }
+
 public:
 	// ---외부 노출용 델리게이트 인스턴스---
 	// 외부(UI Widget, GameInstance 등)에서 이벤트 결과를 구독(AddDynamic/Add)할 때 사용
@@ -104,5 +110,6 @@ private:
 
 	// 예외 처리 및 재시도 상태 변수 (흐름을 제어하기 위한 플래그/변수)
 	bool bCreateSessionOnDestroy = false;
+	bool bDestroyInFlight = false;
 	int32 LastNumPublicConnections = 4;
 };

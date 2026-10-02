@@ -103,6 +103,8 @@ decisions:
     detail: UOxygenComponent가 산소 0시 매 틱 IDamageable::ApplyDamage(질식 데미지, Owner, "Suffocation") 동기 호출.
   - name: 중복 사망 방지
     detail: OnDeath는 캐릭터당 탐사 1회만 브로드캐스트 — `AExplorationGameMode`가 생존자 수를 추적하므로 이 보장이 깨지면 카운트가 틀어진다.
+  - name: 플레이어 이름(이름표) 출처
+    detail: "서버 `AGoHomeGameMode::PostLogin`이 PlayerState UniqueNetId로 OSS `GetPlayerNickname`을 조회해 `SetPlayerName` → 기본 PlayerName 복제. 접속 URL의 `Name=`은 덮어쓴다(클라 자기신고 이름 불신). 클라 RPC로 이름을 보내는 안은 기각(서버 권한 원칙). 표시는 `AGoHomeCharacter`의 `UWidgetComponent`(Screen) + `UPlayerNameplateWidget`이 PlayerState 이름을 매 Tick 비교 반영. Steam OSS는 엔진 설계상 에디터 PIE에서 항상 꺼지므로(`IsRunningGame()`일 때만 활성) 실제 Steam 이름 검증은 `-game` Standalone으로."
 
 decisions:
   - name: HP 0 처리
@@ -184,10 +186,26 @@ decisions:
       이전 결정 "UI/는 C++ 베이스 없음(BP 전용)"을 신규 화면부터 뒤집음 — 상태 전이·포커스·세션 요청 흐름이 BP 그래프에 쌓이면 리뷰·diff·병합(바이너리)이 불가능해서. 타이틀(UI/Title/)이 첫 적용.
       UI는 Core 구체 클래스를 include하지 않고 백엔드 인터페이스만 본다(타이틀: ITitleBackend, ATitlePlayerController가 구현) — 폴더 간 의존은 인터페이스로만이라는 컨벤션 + 디자이너 프리뷰용 목 백엔드 여지.
       CommonUI는 계속 반려 — 타이틀에 필요한 건 패널 1단 스택·포커스 복귀·Escape뿐이라 UTitleScreenWidget 하나로 충분. 화면 간 스택이 깊어지면 재검토.
+  - name: 인게임 시스템 메뉴 (UI/Pause)
+    detail: |
+      타이틀과 같은 백엔드 패턴 — UI는 IPauseMenuBackend만 보고, 위젯 생성·입력 모드·세션 정리는 AGoHomePlayerController가 소유한다.
+      나가기는 "USessionSubsystem::DestroySession → OnDestroyComplete(성공)" 뒤에만 OpenLevel(TitleMapPath)/QuitGame. 정리할 세션이 없으면(IP 직접 접속·세션 없이 연 PIE) 바로 이동, 실패·타임아웃은 OnLeaveFailed로 팝업 안 재시도.
+      호스트/참가자 구분은 NetMode(Client=참가자)로만 — 정리 API는 같고 문구만 다르다(리슨 호스트가 레벨을 떠나면 참가자는 연결 끊김으로 기본 맵 복귀).
+      반려: SetGamePaused(협동 세션 전체가 멈춤). 반려: WBP_TitleSettingsPanel 인스턴스를 그대로 임베드(타이틀 드로어 배경·슬라이드 연출이 딸려 옴) — 대신 UTitleSettingsPanel 클래스를 부모로 한 별도 WBP. 클래스는 백엔드 없이도 동작(GetBackend 미사용)함을 확인.
   - name: HUD 위젯 소유
     detail: |
       상시 HUD 위젯은 BP PlayerController(또는 그 AHUD) 소유 — Pawn/Character 소유 금지. 폰 스코프 데이터(HP·산소·인벤토리)도 위젯은 뷰라 GetOwningPlayerPawn으로 읽고 OnPossessedPawnChanged에 재바인딩. 폰 소유 불가 이유: 사망 시 부활 없이 관전이 수 분 지속되며 그동안도 목표/타이머 HUD가 필요(폰 소유면 관전 내내 검은 화면), 폰은 로비마다 재생성되는 소모품. per-pawn 패널은 "폰 없음/사망" 상태를 명시.
+      로비·탐사 공통 상시 진행도 HUD는 AGoHomePlayerController::RefreshProgressHUD가 GameStateSet/SetPawn마다 "현재 GameState가 Lobby/Exploration이고 아직 그 GameState용 위젯이 없으면" 생성한다(클래스는 BP의 ProgressHUDClass). bUseSeamlessTravel이라 컨트롤러가 트래블을 넘어 살아남아 BeginPlay 1회 생성은 다음 맵에서 사라지므로 금지 — 떠나는 월드(bIsTearingDown)에선 만들지 않는다.
       현재 캐릭터 BP·컨트롤러 BP에 흩어짐 → 시스템 PR마다 하나씩 이주(빅뱅 금지). 상세 UI_GUIDE.md.
+  - name: 음성 발화자 목록 + 프로필 아바타
+    detail: |
+      `UVoiceSpeakerListWidget`(UI/HUD)은 진행도 HUD(WBP_ExpeditionProgressHUD)의 LeftColumn에 패널 아래로 내장 — 패널 높이가 로비/탐사마다 달라 별도 뷰포트 위젯의 고정 오프셋 대신 세로 흐름으로 붙인다. `UVoiceChatSubsystem::OnTalkingStateChanged`만 구독(이 머신 OSS voice 상태 그대로, 복제 없음 — 근접 뮤트로 안 들리는 사람은 안 뜬다). 이탈은 PlayerArray 대조로 즉시 제거.
+      아바타는 `UPlayerAvatarSubsystem`(Core)이 Steamworks `ISteamFriends::GetMediumFriendAvatar`를 직접 호출해 텍스처 캐시(OSS v1에 아바타 API 없음 → Build.cs에 Steamworks 서드파티 의존). Steam 아닌 환경은 이니셜 원으로 대체. 마이크 없이 확인: 비Shipping 콘솔 `GoHome.Voice.FakeTalk <인덱스> <0|1>`.
+  - name: 인게임 HUD 배치 (하단 중앙 콘솔)
+    detail: |
+      좌상단=정보(진행도 패널 + 그 아래 보이스 목록, 간격 16), 상단 중앙=나침반만, 하단 중앙=내 상태(O₂ 링 · 인벤토리 핫바(아래 LOAD) · HP 링). 보이스 목록이 아래로 길어져도 바이탈과 안 겹치게 하려는 배치.
+      핫바는 `UInventoryHotbarWidget`/`UInventorySlotWidget`(UI/HUD, BP 로직 제거) — 캐릭터 BP의 기존 `InitInventory(InInventory)` 호출을 그대로 받는다. 슬롯 크기는 핫바가 런타임 SizeBox로 강제(슬롯 UserWidget desired가 100에 고정되던 원인 미상 문제 회피).
+      O₂는 `UOxygenRingWidget`(HP 링 아트 MI_HP_Ring 재사용, 소유 폰 UOxygenComponent에 자가 바인딩)으로 바꿔 WB_HP_OxygenUI에 넣었다 — 기존 막대 WBP_OxygenStatus_V3 에셋은 남겨 둠. 산소 강화 레벨에 따라 링 전체 색이 바뀐다(청록→초록→파랑→보라, 경고색 우선) — 레벨은 복제 안 하고 복제된 MaxOxygenBonus를 DA_OxygenUpgrade 레벨별 누적 보너스와 대조해 역산. 기각: 등급별 구간 분할(예리도식) — 사용자 결정.
   - name: 정산 진행도 레일 데이터
     detail: |
       정산표/엔딩의 자금 관문 레일은 전 노드 위치·목표가 필요하나 FExpeditionProgress는 다음 관문 하나만 싣는다.
@@ -220,8 +238,8 @@ decisions:
       - Submarine 외부인원 즉사(SetOpen(false) 구독)가 FinalizeRound보다 먼저 동기 실행되므로 사망자 수가 정산에 반영됨 — HandleReturn이 SetOpen(false) 직후 DoorCloseDelay를 기다린 뒤에야 EnterSettlement를 부르므로 이 순서는 자연히 유지된다.
       - bRoundResolved 단일 락이 FinalizeRound 1회·자동복귀 타이머 1회를 보장(EnterSettlement/HandleFail 공유). HandleFail·EnterSettlement은 진입 시 TimeLimitTimer를 ClearTimer하고, HandleFail은 DoorCloseTimer도 끊는다 → 귀환 연출 중 전원사망하거나 시간이 만료되면 실패가 정산을 선점.
       - EExpeditionState의 Failed·Settlement 값은 탐사맵 인맵 페이즈로 실제 사용(HandleFail·EnterSettlement이 SetState). Return 값은 아직 미사용.
-      - UI 카운트다운은 AExplorationGameState의 복제 필드 ExpeditionDeadline(절대 서버 시각)을 GetRemainingSeconds()/HasTimeLimit()로 읽는다(표시 전용, 실제 실패 트리거는 서버 TimeLimitTimer).
-      - 라이브 할당량/자금 HUD는 AExplorationGameState의 복제 필드 MapQuota·RoundDeliveredValue·CurrentFunds(셋 다 ReplicatedUsing=OnRep_QuotaProgress, BlueprintPure Get*)를 읽고 OnQuotaProgressChanged(Delivered, Quota) 하나에 바인딩 — 세 값이 항상 같이 갱신되므로 델리게이트 시그니처는 (Delivered, Quota) 그대로 두고 자금은 콜백 안에서 GetCurrentFunds()로 꺼낸다. MapQuota·CurrentFunds 초기값은 AExplorationGameMode::BeginPlay가 SetMapQuota/SetCurrentFunds로 1회, 이후 RoundDeliveredValue·CurrentFunds는 AGoHomeGameState::AddDeliveredValue가 AccumulateDeliveredValue 반환값(세이브 CurrentRoundDeliveredValue 합계)과 GetCurrentFunds()를 SetRoundDeliveredValue/SetCurrentFunds로 미러(자금을 먼저 실어 호스트 브로드캐스트 시점에 최신값이 보이도록). 세이브는 여전히 호스트 전용 SoT, GameState 필드는 표시용 미러. 바인딩 직후 Get*()로 초기값 1회 당길 것. 자금 페널티/강화 차감은 정산·로비에서만 일어나므로 탐사 중 CurrentFunds 변동은 납품뿐.
+      - UI 카운트다운은 AExplorationGameState의 복제 필드 ExpeditionDeadline(절대 서버 시각)을 GetRemainingSeconds()/HasTimeLimit()로 읽는다(표시 전용, 실제 실패 트리거는 서버 TimeLimitTimer). 상시 진행도 HUD는 이를 베이스 가상 GetTimeLimitProgress(Remaining, Total)(AExplorationGameState만 true)로 매 틱 읽어 맨 위 시간 줄(mm:ss + 바, 남은 비율 25%↓ 주황 / 10%↓ 빨강+깜빡임, 제한시간 없으면 접음)을 그린다 — 별도 타이머 위젯(WBP_HUD_TimeLimit)은 폐기.
+      - 상시 진행도 HUD(로비·탐사 공통, UExpeditionProgressHUDWidget)는 AGoHomeGameState(공유 헤더)의 복제 read-model만 읽는다: CurrentRound·FinalRound·CurrentFunds·NextCheckPointRound·NextCheckPointQuota(전부 ReplicatedUsing=OnRep_ExpeditionProgress) + 탐사맵이면 가상 GetMapQuotaProgress(Delivered, Quota)(AExplorationGameState가 MapQuota·RoundDeliveredValue로 오버라이드, 베이스는 false). 바인딩은 OnExpeditionProgressChanged(파라미터 없음) 하나 — 값은 콜백 안에서 Get*()로 꺼내고, 바인딩 직후 1회 당긴다. 초기값은 AGoHomeGameState::BeginPlay(서버)가 SaveSubsystem::BuildProgress()로 SetExpeditionProgress 1회(로비·탐사 둘 다, GameState가 트래블마다 새로 스폰되므로 맵마다 최신), MapQuota는 AExplorationGameMode::BeginPlay가 SetMapQuota. 이후 CurrentFunds는 AddDeliveredValue(납품)·Server_RequestEquipmentUpgrade(강화, 로비 포함)가 베이스 SetCurrentFunds로, RoundDeliveredValue는 SetRoundDeliveredValue로 미러(자금을 먼저 실어 호스트 브로드캐스트 시점에 최신값이 보이도록). 세이브는 여전히 호스트 전용 SoT, GameState 필드는 표시용 미러. OnQuotaProgressChanged(Delivered, Quota)는 기존 구독자(강화 UI)용으로 유지 — AExplorationGameState::NotifyExpeditionProgressChanged가 자금 변화에도 함께 쏜다.
       - 정산 결과 복제: AExplorationGameState::SettlementResult(DOREPLIFETIME, ReplicatedUsing=OnRep_SettlementResult) 한 필드. 서버 SetSettlementResult가 값 대입 + 호스트 로컬 OnSettlementReady 수동 브로드캐스트, 클라는 OnRep이 같은 델리게이트 브로드캐스트. FSettlementResult(중첩 FExpeditionProgress·TArray<FString>·TArray<FCheckPoint> CheckPointSchedule 포함)는 기본 struct 복제로 충분(커스텀 NetSerialize 불필요). 정산/실패 UI는 state 델리게이트가 아니라 OnSettlementReady에 바인딩 — 두 복제 필드(CurrentState/SettlementResult)의 OnRep 순서가 보장되지 않으므로.
   - name: EconomyConfig 로딩
     detail: "UGoHomeSaveSubsystem::Initialize()에서 하드코딩 경로로 LoadObject<UEconomyConfigDataAsset>(/Game/GoHome/Data/DA_EconomyConfig) + ensureMsgf. DeveloperSettings 방식은 클래스 하나 더 필요해 보류. CheckPoints 배열은 Round 오름차순+중복 없음을 UEconomyConfigDataAsset::IsDataValid(#if WITH_EDITOR)가 강제 — FindNextCheckPoint 등은 이 불변식을 가정한다."
@@ -270,7 +288,6 @@ known_gaps:
   - (`AddDeliveredValue`는 `SaveSubsystem::AccumulateDeliveredValue`로 포워드 완료)
 - **도킹 문 위협 판정** — AI가 `OnDoorStateChanged` 구독해 `Fail(EFailReason::DockThreatened)` 호출하는 코드 없음
 - **정산 배선 나머지** — 복귀 버튼 RPC, DA_EconomyConfig 애셋 생성, 정산/게임오버/엔딩 UI 위젯. (사망자 추적, 실패 경로, 타임오버 경로, 정상복귀 Settlement 경로 `HandleReturn→EnterSettlement`, 자동복귀 타이머, `FSettlementResult` GameState 복제(`AExplorationGameState::SettlementResult`/`OnSettlementReady`)는 구현됨)
-- `UI/`는 C++ 베이스 클래스 없음(Blueprint 전용).
 - `Save/` 장비 강화 구매 로직 미구현 — 스키마 필드(`PurchasedUpgrades`)만 있음.
 - 레벨/그레이박스는 `Source/GoHome/` 코드가 아니라 레벨 애셋 작업.
 

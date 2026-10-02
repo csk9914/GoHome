@@ -111,6 +111,12 @@ void UTitleMenuItemWidget::ApplyStaticStyle()
 	if (MarkerText)
 	{
 		MarkerText->SetText(Marker);
+
+		FSlateFontInfo MarkerFont = MarkerText->GetFont();
+		MarkerFont.Size = MarkerFontSize;
+		MarkerFont.TypefaceFontName = MarkerTypeface;
+		MarkerText->SetFont(MarkerFont);
+
 		MarkerText->SetColorAndOpacity(FSlateColor(MarkerColor));
 		MarkerText->SetVisibility(bUseIcon ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
 	}
