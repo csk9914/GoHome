@@ -352,7 +352,7 @@ protected:
 private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "Movement", meta = (ClampMin = "1.0", UIMin = "1.0"))
-	float SprintSpeedMultiplier = 1.5f;
+	float SprintSpeedMultiplier = 2.0f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Movement", meta = (ClampMin = "1.0", UIMin = "1.0"))
 	float SprintOxygenDrainMultiplier = 1.5f;
