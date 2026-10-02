@@ -37,17 +37,23 @@ public:
 	void Server_RequestDeliverCarry(ADeliveryPoint* DeliveryPoint);
 
 	UPROPERTY(EditAnywhere, Category = "Interaction")
-	float TraceDistance = 200.f;
+	float TraceDistance = 300.f;
+
+
+	// 선 트레이스가 빗나갔을 때 한 번 더 쓰는 구체 스윕 반지름(조준 보정). 0이면 보정 끔.
+	UPROPERTY(EditAnywhere, Category = "Interaction")
+	float AimAssistRadius = 20.f;
+
 
 	// 서버 측 거리 재검증용 최대 상호작용 거리.
 	// TraceDistance보다 살짝 여유를 둠.
 	// (카메라-폰 위치 오프셋 + 핑으로 인한 위치 오차 보정).
 	UPROPERTY(EditAnywhere, Category = "Interaction")
-	float MaxInteractDistance = 300.f;
+	float MaxInteractDistance = 500.f;
 
 	// 운반 중 납품 지점 근접 판정 반경(바운딩 박스까지 거리). 서버 재검증 MaxInteractDistance보다 작게 둬서 핑 여유 확보.
 	UPROPERTY(EditAnywhere, Category = "Interaction")
-	float CarryDeliverRadius = 200.f;
+	float CarryDeliverRadius = 300.f;
 
 	UPROPERTY(EditAnywhere, Category = "Interaction")
 	float TraceInterval = 0.1f;
@@ -62,7 +68,7 @@ public:
 
 	// 근처 아이템 힌트가 켜지는 반경(cm). 기본 1000 = 10m.
 	UPROPERTY(EditAnywhere, Category = "Interaction")
-	float NearbyHintRadius = 1000.f;
+	float NearbyHintRadius = 1500.f;
 
 	// 지금 조준 중인 대상 (없으면 nullptr). HUD/디버깅에서 조회용.
 	UFUNCTION(BlueprintPure, Category = "Interaction")

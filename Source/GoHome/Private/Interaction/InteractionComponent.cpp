@@ -78,12 +78,20 @@ void UInteractionComponent::PerformTrace()
 		FCollisionQueryParams Params;
 		Params.AddIgnoredActor(GetOwner()); // 자기 자신은 무시.
 
-		if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+		// 1) 선 트레이스 - 정확히 조준했으면 그대로 선택(기존 조작감 유지).
+		if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params)
+			&& Hit.GetActor() && Hit.GetActor()->Implements<UInteractable>())
 		{
-			if (Hit.GetActor() && Hit.GetActor()->Implements<UInteractable>())
-			{
-				NewTarget = Hit.GetActor();
-			}
+			NewTarget = Hit.GetActor();
+		}
+		// 2) 빗나갔으면 구체 스윕으로 한 번 더 - 살짝 빗나간 조준 보정.
+		// 스윕도 처음 막히는 것에서 멈추므로 벽 너머 대상은 잡히지 않음.
+		else if (AimAssistRadius > 0.f
+			&& GetWorld()->SweepSingleByChannel(Hit, Start, End, FQuat::Identity, ECC_Visibility,
+				FCollisionShape::MakeSphere(AimAssistRadius), Params)
+			&& Hit.GetActor() && Hit.GetActor()->Implements<UInteractable>())
+		{
+			NewTarget = Hit.GetActor();
 		}
 	}
 
