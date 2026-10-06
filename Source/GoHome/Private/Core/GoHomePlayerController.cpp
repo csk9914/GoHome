@@ -328,6 +328,13 @@ void AGoHomePlayerController::Server_RequestShopPurchase_Implementation(
 		static_cast<uint8>(PurchaseResult.Result));
 }
 
+// 상점 열기
+void AGoHomePlayerController::Client_OpenShop_Implementation()
+{
+	OnOpenShop();
+}
+
+
 // --- 인게임 시스템 메뉴 ---
 
 void AGoHomePlayerController::SetupInputComponent()
