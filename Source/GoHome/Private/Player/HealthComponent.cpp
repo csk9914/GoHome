@@ -55,6 +55,26 @@ void UHealthComponent::ApplyDamage_Implementation(float Amount, AActor* Instigat
 	}
 }
 
+float UHealthComponent::RestoreHealth(float Amount)
+{
+	if (!GetOwner() || !GetOwner()->HasAuthority() || bIsDead || Amount <= 0.f)
+	{
+		return 0.f;
+	}
+
+	const float OldHP = HP;
+	const float SafeMaxHP = FMath::Max(0.f, MaxHP);
+	HP = FMath::Clamp(HP + Amount, 0.f, SafeMaxHP);
+
+	if (FMath::IsNearlyEqual(HP, OldHP))
+	{
+		return 0.f;
+	}
+
+	BroadcastHPChanged();
+	return HP - OldHP;
+}
+
 void UHealthComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
