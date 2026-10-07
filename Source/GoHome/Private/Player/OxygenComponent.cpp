@@ -39,6 +39,18 @@ float UOxygenComponent::GetMaxOxygenBonus() const
 	return MaxOxygenBonus;
 }
 
+float UOxygenComponent::RestoreOxygen(float Amount)
+{
+	if (!HasOwnerAuthority() || Amount <= 0.f)
+	{
+		return 0.f;
+	}
+
+	const float OldOxygen = Oxygen;
+	SetOxygen(Oxygen + Amount);
+	return Oxygen - OldOxygen;
+}
+
 int32 UOxygenComponent::GetDisplayedOxygenPips() const
 {
 	/*

@@ -40,6 +40,10 @@ public:
 
 	virtual void ApplyDamage_Implementation(float Amount, AActor* Instigator, FName DamageType) override;
 
+	// 서버 권한 회복. 사망한 플레이어는 회복하지 않으며 실제 회복량을 반환한다.
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Health")
+	float RestoreHealth(float Amount);
+
 	virtual FSimpleMulticastDelegate& GetOnDeathDelegate() override { return OnDeath; }
 
 	UFUNCTION(BlueprintPure, Category = "Health")

@@ -46,6 +46,10 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Oxygen")
 	void SetMaxOxygenBonus(float NewBonus);
 
+	// 서버 권한 회복. 최대 산소를 넘지 않으며 실제 회복량을 반환한다.
+	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category = "Oxygen")
+	float RestoreOxygen(float Amount);
+
 	// UI에서 15칸 산소 표시할 때 사용할 값.
 	UFUNCTION(BlueprintPure, Category = "Oxygen")
 	int32 GetDisplayedOxygenPips() const;
