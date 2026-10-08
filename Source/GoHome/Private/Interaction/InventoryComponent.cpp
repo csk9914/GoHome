@@ -138,7 +138,8 @@ void UInventoryComponent::ServerDeliverAllItems()
 	for (FInventorySlot& Slot : Slots)
 	{
 		AItemActorBase* Item = Slot.Item;
-		if (!Item || !Item->IsDeliverable()) continue;
+		// 보관함 상품은 팀 장비라 납품되면 안 된다(IsDeliverable을 재정의하지 않은 장비가 있어도 안전하게).
+		if (!Item || !Item->IsDeliverable() || Item->IsSharedLockerItem()) continue;
 
 		GameState->AddDeliveredValue(FMath::RoundToInt(Item->GetCurrentValue()));
 		// 슬롯 비우기 + NotifyDropped() (소음 타이머 정지).

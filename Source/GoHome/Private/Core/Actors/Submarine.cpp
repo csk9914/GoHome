@@ -38,6 +38,21 @@ void ASubmarine::BeginPlay()
 	}
 }
 
+bool ASubmarine::IsLocationInsideInterior(const FVector& WorldLocation) const
+{
+	if (!InteriorVolume)
+	{
+		return false;
+	}
+
+	const FVector LocalLocation = InteriorVolume->GetComponentTransform().InverseTransformPosition(WorldLocation);
+	const FVector Extent = InteriorVolume->GetUnscaledBoxExtent();
+
+	return FMath::Abs(LocalLocation.X) <= Extent.X
+		&& FMath::Abs(LocalLocation.Y) <= Extent.Y
+		&& FMath::Abs(LocalLocation.Z) <= Extent.Z;
+}
+
 void ASubmarine::HandleDoorStateChanged(bool bOpen)
 {
 	//  킬 판정은 닫힘 상태일 때, 서버 권위에서 이뤄져야 함

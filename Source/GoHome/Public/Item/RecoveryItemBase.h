@@ -34,10 +34,6 @@ public:
 	virtual bool IsDeliverable() const override { return false; }
 	virtual FText GetInteractionPromptText_Implementation() const override;
 
-	// 상점 연결 시 이 함수를 호출하면 회복 효과 없이 인벤토리에 지급할 수 있다.
-	// 현재 상점은 일반 OnInteract를 지급 경로로 쓰므로, 추후 작은 연결 변경이 필요하다.
-	bool GiveToInventory(APawn* TargetPawn);
-
 protected:
 	virtual void BeginPlay() override;
 

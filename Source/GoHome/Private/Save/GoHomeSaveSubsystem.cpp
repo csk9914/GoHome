@@ -9,6 +9,7 @@
 #include "Upgrade/EquipmentUpgradeSubsystem.h"
 #include "Shop/ItemShopTypes.h"
 #include "Shop/ItemShopSubsystem.h"
+#include "Shop/ItemShopCatalogDataAsset.h"
 
 namespace
 {
@@ -20,6 +21,9 @@ void UGoHomeSaveSubsystem::Initialize(FSubsystemCollectionBase& CollectionBase)
 {
 	Super::Initialize(CollectionBase);
 
+	// 마이그레이션이 카탈로그(상품 수명)를 읽으므로 상점 서브시스템을 먼저 초기화한다.
+	CollectionBase.InitializeDependency<UItemShopSubsystem>();
+
 	// 디스크에 그 이름의 세이브 파일이 실제로 있는지 확인
 	if (UGameplayStatics::DoesSaveGameExist(GoHomeSaveSlotName, GoHomeSaveUserIndex))
 	{
@@ -30,7 +34,11 @@ void UGoHomeSaveSubsystem::Initialize(FSubsystemCollectionBase& CollectionBase)
 	if (!SaveGame)
 	{
 		// 새로운 빈 SaveGame 인스턴스를 만듬
-		SaveGame = Cast<UGoHomeSaveGame>(UGameplayStatics::CreateSaveGameObject(UGoHomeSaveGame::StaticClass()));
+		CreateFreshSaveGame();
+	}
+	else
+	{
+		MigrateSaveGame();
 	}
 
 	EconomyConfig = LoadObject<UEconomyConfigDataAsset>(nullptr, TEXT("/Game/GoHome/Data/DA_EconomyConfig"));
@@ -120,7 +128,7 @@ FSettlementResult UGoHomeSaveSubsystem::FinalizeRound(bool bForfeited, const TAr
 
 	FSettlementResult Result;
 
-	// 라운드 정산 전에 상점 아이템의 현재 보유 상태를 반영한다. (상점)
+	// 정산 전에 보관함에서 꺼내 간 상품을 회수/분실 처리한다 — 게임오버로 ResetSave되더라도 순서는 같다.
 	UItemShopSubsystem* ItemShopSubsystem = nullptr;
 
 	if (UGameInstance* GameInstance = GetGameInstance())
@@ -131,8 +139,11 @@ FSettlementResult UGoHomeSaveSubsystem::FinalizeRound(bool bForfeited, const TAr
 
 	if (ItemShopSubsystem)
 	{
-		ItemShopSubsystem->ReconcileRuntimeShopItems();
+		ItemShopSubsystem->ResolveCheckoutsForRoundEnd();
 	}
+
+	// 라운드 구매 한도는 정산마다 새로 시작한다.
+	SaveGame->RoundShopPurchases.Reset();
 
 	// 이번 턴 납품액 확정
 	const int32 RoundDeliveredValue = SaveGame->CurrentRoundDeliveredValue;
@@ -195,10 +206,10 @@ FSettlementResult UGoHomeSaveSubsystem::FinalizeRound(bool bForfeited, const TAr
 	// 트래블 전에 디스크에 남긴다
 	SaveToDisk();
 
-	// 이번 라운드 장부는 정산이 끝났으므로 비운다. (상점 관련)
+	// 회수/분실·초기화 결과를 클라 보관함 미러에 반영한다.
 	if (ItemShopSubsystem)
 	{
-		ItemShopSubsystem->ClearRuntimeShopItems();
+		ItemShopSubsystem->RefreshLockerView();
 	}
 
 	// 다음 라운드 출발 때 다시 세팅되므로 필수는 아니지만, 0으로 초기화
@@ -258,8 +269,84 @@ void UGoHomeSaveSubsystem::ResetSave()
 		}
 	}
 
-	// 깔끔하게 새로 만들어서 기본값으로 초기화 
+	// 깔끔하게 새로 만들어서 기본값으로 초기화 (공유 보관함·라운드 구매 기록 포함)
+	CreateFreshSaveGame();
+
+	// 보관함에서 꺼내 간 런타임 장부도 함께 버린다 — 새 세이브에 없는 수량을 나중에 되돌리지 않도록.
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (UItemShopSubsystem* ItemShopSubsystem =
+			GameInstance->GetSubsystem<UItemShopSubsystem>())
+		{
+			ItemShopSubsystem->ClearCheckouts();
+		}
+	}
+}
+
+void UGoHomeSaveSubsystem::CreateFreshSaveGame()
+{
 	SaveGame = Cast<UGoHomeSaveGame>(UGameplayStatics::CreateSaveGameObject(UGoHomeSaveGame::StaticClass()));
+
+	if (SaveGame)
+	{
+		SaveGame->SaveVersion = UGoHomeSaveGame::CurrentSaveVersion;
+	}
+}
+
+void UGoHomeSaveSubsystem::MigrateSaveGame()
+{
+	if (!SaveGame || SaveGame->SaveVersion >= UGoHomeSaveGame::CurrentSaveVersion)
+	{
+		return;
+	}
+
+	// 0 → 1: 플레이어별 상점 보유 기록을 팀 공유 보관함으로 합친다.
+	// 옛 키(Player_<PlayerId>)는 세션마다 바뀌어 원래 주인을 찾을 수 없으므로, 소유자 구분 없이 상품별로 합산한다.
+	if (SaveGame->SaveVersion < 1)
+	{
+		const UItemShopSubsystem* ItemShopSubsystem = GetGameInstance()
+			? GetGameInstance()->GetSubsystem<UItemShopSubsystem>()
+			: nullptr;
+
+		TMap<FName, int32> OwnedByProduct;
+		for (const FItemShopLoadoutEntry& Legacy : SaveGame->ItemShopPurchaseStates)
+		{
+			if (!Legacy.ProductId.IsNone() && Legacy.OwnedQuantity > 0)
+			{
+				OwnedByProduct.FindOrAdd(Legacy.ProductId) += Legacy.OwnedQuantity;
+			}
+		}
+
+		for (const TPair<FName, int32>& Pair : OwnedByProduct)
+		{
+			const FItemShopProduct* Product = ItemShopSubsystem
+				? ItemShopSubsystem->FindProduct(Pair.Key)
+				: nullptr;
+
+			// 카탈로그에서 사라진 상품은 수명을 알 수 없어 옮기지 않는다.
+			if (!Product)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[Save] Migration dropped unknown shop product: %s x%d"),
+					*Pair.Key.ToString(), Pair.Value);
+				continue;
+			}
+
+			int32 Quantity = GetLockerOwnedQuantity(Pair.Key) + Pair.Value;
+			if (Product->MaxOwnedQuantity > 0)
+			{
+				Quantity = FMath::Min(Quantity, Product->MaxOwnedQuantity);
+			}
+
+			SetLockerOwnedQuantity(Pair.Key, Product->Lifetime, Quantity);
+		}
+
+		SaveGame->ItemShopPurchaseStates.Reset();
+
+		UE_LOG(LogTemp, Log, TEXT("[Save] Migrated shop loadout to shared locker. Products: %d"),
+			OwnedByProduct.Num());
+	}
+
+	SaveGame->SaveVersion = UGoHomeSaveGame::CurrentSaveVersion;
 }
 
 ESettlementOutcome UGoHomeSaveSubsystem::DetermineOutcome(const FCheckPoint* CheckPoint, int32 CompletedRound) const
@@ -304,96 +391,100 @@ void UGoHomeSaveSubsystem::OnPostLoadMap(UWorld* LoadedWorld)
 	}
 }
 
-// 상점 - 지금까지 몇 개 샀는지 확인
-int32 UGoHomeSaveSubsystem::GetShopPurchasedQuantity(const FString& OwnerPlayerKey,FName ProductId) const
+void UGoHomeSaveSubsystem::RefundFunds(int32 Amount)
 {
-	if (!SaveGame)
-	{
-		return 0;
-	}
-
-	for (const FItemShopLoadoutEntry& State :
-		SaveGame->ItemShopPurchaseStates)
-	{
-		if (State.OwnerPlayerKey == OwnerPlayerKey &&
-			State.ProductId == ProductId)
-		{
-			return State.PurchasedQuantity;
-		}
-	}
-
-	return 0;
-}
-
-// 상점 - 현재 몇 개 가지고 있는지 확인
-int32 UGoHomeSaveSubsystem::GetShopOwnedQuantity(const FString& OwnerPlayerKey,FName ProductId) const
-{
-	if (!SaveGame)
-	{
-		return 0;
-	}
-
-	for (const FItemShopLoadoutEntry& State :
-		SaveGame->ItemShopPurchaseStates)
-	{
-		if (State.OwnerPlayerKey == OwnerPlayerKey &&
-			State.ProductId == ProductId)
-		{
-			return State.OwnedQuantity;
-		}
-	}
-
-	return 0;
-}
-
-// 구매 성공 시 Purchased + Owned 증가
-void UGoHomeSaveSubsystem::AddShopPurchase(const FString& OwnerPlayerKey,FName ProductId,int32 Quantity)
-{
-	if (!SaveGame ||
-		ProductId.IsNone() ||
-		Quantity <= 0)
+	if (!SaveGame || Amount <= 0)
 	{
 		return;
 	}
 
-	for (FItemShopLoadoutEntry& State :
-		SaveGame->ItemShopPurchaseStates)
-	{
-		if (State.OwnerPlayerKey == OwnerPlayerKey &&
-			State.ProductId == ProductId)
-		{
-			State.PurchasedQuantity += Quantity;
-			State.OwnedQuantity += Quantity;
-			return;
-		}
-	}
-
-	FItemShopLoadoutEntry NewState;
-	NewState.OwnerPlayerKey = OwnerPlayerKey;
-	NewState.ProductId = ProductId;
-	NewState.PurchasedQuantity = Quantity;
-	NewState.OwnedQuantity = Quantity;
-
-	SaveGame->ItemShopPurchaseStates.Add(NewState);
+	SaveGame->CurrentFunds += Amount;
 }
 
-// 라운드 종료 시 실제 보유량으로 갱신
-void UGoHomeSaveSubsystem::SetShopOwnedQuantity(const FString& OwnerPlayerKey,FName ProductId,int32 OwnedQuantity)
+const TArray<FSharedLockerEntry>& UGoHomeSaveSubsystem::GetSharedLockerEntries() const
+{
+	static const TArray<FSharedLockerEntry> Empty;
+	return SaveGame ? SaveGame->SharedLockerItems : Empty;
+}
+
+int32 UGoHomeSaveSubsystem::GetLockerOwnedQuantity(FName ProductId) const
+{
+	if (!SaveGame)
+	{
+		return 0;
+	}
+
+	const FSharedLockerEntry* Entry = SaveGame->SharedLockerItems.FindByPredicate(
+		[ProductId](const FSharedLockerEntry& It) { return It.ProductId == ProductId; });
+
+	return Entry ? Entry->OwnedQuantity : 0;
+}
+
+bool UGoHomeSaveSubsystem::SetLockerOwnedQuantity(FName ProductId, EItemShopItemLifetime Lifetime, int32 OwnedQuantity)
+{
+	if (!SaveGame || ProductId.IsNone())
+	{
+		return false;
+	}
+
+	const int32 Index = SaveGame->SharedLockerItems.IndexOfByPredicate(
+		[ProductId](const FSharedLockerEntry& It) { return It.ProductId == ProductId; });
+
+	if (OwnedQuantity <= 0)
+	{
+		if (Index != INDEX_NONE)
+		{
+			SaveGame->SharedLockerItems.RemoveAt(Index);
+		}
+		return true;
+	}
+
+	FSharedLockerEntry& Entry = Index != INDEX_NONE
+		? SaveGame->SharedLockerItems[Index]
+		: SaveGame->SharedLockerItems.AddDefaulted_GetRef();
+
+	Entry.ProductId = ProductId;
+	Entry.Lifetime = Lifetime;
+	Entry.OwnedQuantity = OwnedQuantity;
+	return true;
+}
+
+int32 UGoHomeSaveSubsystem::GetRoundPurchaseQuantity(FName ProductId) const
+{
+	if (!SaveGame)
+	{
+		return 0;
+	}
+
+	const FItemShopRoundPurchase* Entry = SaveGame->RoundShopPurchases.FindByPredicate(
+		[ProductId](const FItemShopRoundPurchase& It) { return It.ProductId == ProductId; });
+
+	return Entry ? Entry->Quantity : 0;
+}
+
+void UGoHomeSaveSubsystem::SetRoundPurchaseQuantity(FName ProductId, int32 Quantity)
 {
 	if (!SaveGame || ProductId.IsNone())
 	{
 		return;
 	}
 
-	for (FItemShopLoadoutEntry& State :
-		SaveGame->ItemShopPurchaseStates)
+	const int32 Index = SaveGame->RoundShopPurchases.IndexOfByPredicate(
+		[ProductId](const FItemShopRoundPurchase& It) { return It.ProductId == ProductId; });
+
+	if (Quantity <= 0)
 	{
-		if (State.OwnerPlayerKey == OwnerPlayerKey &&
-			State.ProductId == ProductId)
+		if (Index != INDEX_NONE)
 		{
-			State.OwnedQuantity =
-				FMath::Max(0, OwnedQuantity);
-			return;
+			SaveGame->RoundShopPurchases.RemoveAt(Index);
 		}
+		return;
 	}
+
+	FItemShopRoundPurchase& Entry = Index != INDEX_NONE
+		? SaveGame->RoundShopPurchases[Index]
+		: SaveGame->RoundShopPurchases.AddDefaulted_GetRef();
+
+	Entry.ProductId = ProductId;
+	Entry.Quantity = Quantity;
 }

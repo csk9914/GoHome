@@ -39,6 +39,15 @@ public:
 	virtual void OnInteract(APawn* InstigatorPawn) override;
 	virtual float GetTotalWeight() const override;
 
+	// 서버 전용: 서브클래스 OnInteract 재정의(예: 회복 아이템의 즉시 사용)를 거치지 않고 기본 픽업으로 Pawn 핫바에 넣는다.
+	// 공유 보관함 꺼내기가 사용한다. 들어갔으면 true.
+	bool ServerGrantToPawn(APawn* TargetPawn);
+
+	// 잠수정 공유 보관함에서 꺼낸 상품인지(서버 전용 표시). 납품 정산 대상에서 빠진다.
+	void SetSharedLockerItem(bool bInSharedLockerItem) { bSharedLockerItem = bInSharedLockerItem; }
+
+	bool IsSharedLockerItem() const { return bSharedLockerItem; }
+
 	// 파손 반영된 현재 가치. 납품 정산 시 ItemData->Value대신 이 값을 사용해야 함.
 	UFUNCTION(BlueprintCallable, Category = "Item")
 	float GetCurrentValue() const;
@@ -231,5 +240,7 @@ private:
 	// 파손 시각효과용 스텐실 값. 조준(1)/근접힌트(2)와 겹치지 않는 값.
 	UPROPERTY(EditAnywhere, Category = "Item")
 	int32 DamageStencilValue = 3;
+
+	bool bSharedLockerItem = false;
 
 };

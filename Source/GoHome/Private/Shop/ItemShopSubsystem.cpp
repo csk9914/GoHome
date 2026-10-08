@@ -3,13 +3,16 @@
 #include "Shop/ItemShopTypes.h"
 #include "Core/GoHomeGameState.h"
 #include "Core/ExpeditionState.h"
-#include "Core/ExplorationGameState.h"
+#include "Core/Actors/Submarine.h"
 #include "Save/GoHomeSaveSubsystem.h"
 #include "Interaction/InventoryComponent.h"
+#include "Interaction/SharedLockerActor.h"
+#include "Item/ItemActorBase.h"
+#include "Item/UsableItemBase.h"
+#include "EngineUtils.h"
 #include "UObject/UObjectGlobals.h"
 #include "GameFramework/PlayerController.h"
-#include "GameFramework/PlayerState.h"
-#include "Item/ItemActorBase.h"
+#include "GameFramework/Pawn.h"
 #include "Engine/World.h"
 #include "Engine/GameInstance.h"
 
@@ -18,26 +21,9 @@ namespace
 	const TCHAR* ItemShopCatalogPath =
 		TEXT("/Game/GoHome/Developers/LSA/Data/DA_ItemShopCatalog.DA_ItemShopCatalog");
 
-	FString MakeShopOwnerPlayerKey(
-		const APlayerController* Requester)
+	FText MakeShopMessage(const TCHAR* Message)
 	{
-		if (!Requester)
-		{
-			return FString();
-		}
-
-		const APlayerState* PlayerState =
-			Requester->GetPlayerState<APlayerState>();
-
-		if (!PlayerState)
-		{
-			return FString();
-		}
-
-		// PIE에서 온라인 ID가 없을 때 사용할 임시 키
-		return FString::Printf(
-			TEXT("Player_%d"),
-			PlayerState->GetPlayerId());
+		return FText::FromString(Message);
 	}
 }
 
@@ -58,7 +44,7 @@ void UItemShopSubsystem::Initialize(
 		UE_LOG(
 			LogTemp,
 			Warning,
-			TEXT("[ItemShop] Catalog faild. shop is envailable.")
+			TEXT("[ItemShop] Catalog load failed. Shop is unavailable.")
 		);
 
 		bShopAvailable = false;
@@ -70,13 +56,15 @@ void UItemShopSubsystem::Initialize(
 	UE_LOG(
 		LogTemp,
 		Log,
-		TEXT("[ItemShop] Catalog Loard Success. product count: %d"),
+		TEXT("[ItemShop] Catalog load success. Product count: %d"),
 		Catalog->Products.Num()
 	);
 }
 
 void UItemShopSubsystem::Deinitialize()
 {
+	ClearCheckouts();
+
 	Catalog = nullptr;
 	bShopAvailable = false;
 
@@ -95,8 +83,39 @@ const FItemShopProduct* UItemShopSubsystem::FindProduct(
 	return Catalog->FindProduct(ProductId);
 }
 
+UGoHomeSaveSubsystem* UItemShopSubsystem::GetSaveSubsystem() const
+{
+	UGameInstance* GameInstance = GetGameInstance();
+	return GameInstance ? GameInstance->GetSubsystem<UGoHomeSaveSubsystem>() : nullptr;
+}
+
+bool UItemShopSubsystem::TryResolveShopContext(EItemShopContext& OutContext) const
+{
+	const UWorld* World = GetWorld();
+	const AGoHomeGameState* GameState =
+		World ? World->GetGameState<AGoHomeGameState>() : nullptr;
+
+	if (!GameState)
+	{
+		return false;
+	}
+
+	switch (GameState->GetCurrentState())
+	{
+	case EExpeditionState::Lobby:
+		OutContext = EItemShopContext::LobbyLoadout;
+		return true;
+	case EExpeditionState::Exploration:
+		OutContext = EItemShopContext::InGameImmediate;
+		return true;
+	default:
+		return false;
+	}
+}
+
 bool UItemShopSubsystem::TryCalculateOrderTotal(
 	const FItemShopPurchaseRequest& Request,
+	EItemShopContext Context,
 	int32& OutTotalPrice,
 	EItemShopResult& OutResult
 ) const
@@ -107,25 +126,6 @@ bool UItemShopSubsystem::TryCalculateOrderTotal(
 	// 카탈로그가 없으면 상점만 사용할 수 없게 한다.
 	if (!bShopAvailable || !Catalog)
 	{
-		return false;
-	}
-
-	// 현재는 탐사 중에만 상점 구매를 허용한다.
-	UWorld* World = GetWorld();
-
-	const AGoHomeGameState* GameState =
-		World ? World->GetGameState<AGoHomeGameState>() : nullptr;
-
-	const bool bIsExploration =
-		GameState &&
-		GameState->GetCurrentState() == EExpeditionState::Exploration;
-
-	// 클라이언트가 보낸 Context만 믿지 않고,
-	// 서버의 실제 GameState도 함께 확인한다.
-	if (!bIsExploration ||
-		Request.Context != EItemShopContext::InGameImmediate)
-	{
-		OutResult = EItemShopResult::NotAllowedInContext;
 		return false;
 	}
 
@@ -150,22 +150,17 @@ bool UItemShopSubsystem::TryCalculateOrderTotal(
 			return false;
 		}
 
+		// 보관함은 팀 공유라 받는 사람을 고를 수 없다.
+		if (!Line.TargetPlayerKey.IsEmpty())
+		{
+			OutResult = EItemShopResult::InvalidTarget;
+			return false;
+		}
+
 		const FItemShopProduct* Product =
 			FindProduct(Line.ProductId);
 
-		if (!Product)
-		{
-			OutResult = EItemShopResult::InvalidProduct;
-			return false;
-		}
-
-		if (!Product->ItemData || !Product->ActorClass)
-		{
-			OutResult = EItemShopResult::InvalidProduct;
-			return false;
-		}
-
-		if (Product->PurchasePrice < 0)
+		if (!Product || !Product->ItemData || !Product->ActorClass || Product->PurchasePrice < 0)
 		{
 			OutResult = EItemShopResult::InvalidProduct;
 			return false;
@@ -178,7 +173,7 @@ bool UItemShopSubsystem::TryCalculateOrderTotal(
 		}
 
 		const bool bAllowedInContext =
-			Request.Context == EItemShopContext::LobbyLoadout
+			Context == EItemShopContext::LobbyLoadout
 			? Product->bCanBuyInLobby
 			: Product->bCanBuyInGame;
 
@@ -188,13 +183,9 @@ bool UItemShopSubsystem::TryCalculateOrderTotal(
 			return false;
 		}
 
-		const int64 LinePrice =
-			static_cast<int64>(Product->PurchasePrice)
-			* static_cast<int64>(Line.Quantity);
-
 		const int64 NewTotal =
 			static_cast<int64>(OutTotalPrice)
-			+ LinePrice;
+			+ static_cast<int64>(Product->PurchasePrice) * static_cast<int64>(Line.Quantity);
 
 		// 가격 계산이 int32 범위를 넘지 않는지 확인한다.
 		if (NewTotal > MAX_int32)
@@ -210,391 +201,6 @@ bool UItemShopSubsystem::TryCalculateOrderTotal(
 	return true;
 }
 
-bool UItemShopSubsystem::TryValidatePurchase(
-	const FItemShopPurchaseRequest& Request,
-	int32& OutTotalPrice,
-	int32& OutCurrentFunds,
-	EItemShopResult& OutResult
-) const
-{
-	OutTotalPrice = 0;
-	OutCurrentFunds = 0;
-	OutResult = EItemShopResult::ShopUnavailable;
-
-	// 먼저 상품, 수량, 가격, 구매 장소를 확인한다.
-	if (!TryCalculateOrderTotal(
-		Request,
-		OutTotalPrice,
-		OutResult))
-	{
-		return false;
-	}
-
-	UGameInstance* GameInstance = GetGameInstance();
-	if (!GameInstance)
-	{
-		OutResult = EItemShopResult::InvalidRequester;
-		return false;
-	}
-
-	UGoHomeSaveSubsystem* SaveSubsystem =
-		GameInstance->GetSubsystem<UGoHomeSaveSubsystem>();
-
-	if (!SaveSubsystem)
-	{
-		OutResult = EItemShopResult::ShopUnavailable;
-		return false;
-	}
-
-	// 현재 보유 코인을 가져온다.
-	OutCurrentFunds = SaveSubsystem->GetCurrentFunds();
-
-	// 코인이 부족하면 구매 실패.
-	if (OutCurrentFunds < OutTotalPrice)
-	{
-		OutResult = EItemShopResult::NotEnoughFunds;
-		return false;
-	}
-
-	// 여기까지 통과하면 구매 조건은 만족한 상태.
-	OutResult = EItemShopResult::Success;
-	return true;
-}
-
-void UItemShopSubsystem::RegisterRuntimeShopItem(
-	AItemActorBase* Item,
-	UInventoryComponent* OwnerInventory,
-	FName ProductId,
-	const FString& OwnerPlayerKey)
-{
-	if (!Item || !OwnerInventory || ProductId.IsNone())
-	{
-		return;
-	}
-
-	FItemShopRuntimeItem RuntimeItem;
-
-	RuntimeItem.Item = Item;
-	RuntimeItem.OwnerInventory = OwnerInventory;
-	RuntimeItem.ProductId = ProductId;
-	RuntimeItem.OwnerPlayerKey = OwnerPlayerKey;
-
-	RuntimeShopItems.Add(RuntimeItem);
-}
-
-void UItemShopSubsystem::UnregisterRuntimeShopItem(
-	AItemActorBase* Item)
-{
-	if (!Item)
-	{
-		return;
-	}
-
-	RuntimeShopItems.RemoveAll(
-		[Item](const FItemShopRuntimeItem& RuntimeItem)
-		{
-			return RuntimeItem.Item.Get() == Item;
-		});
-}
-
-void UItemShopSubsystem::ClearRuntimeShopItems()
-{
-	RuntimeShopItems.Reset();
-	LoadoutGrantedPlayers.Reset();
-}
-
-bool UItemShopSubsystem::TryGrantSavedLoadout(
-	APlayerController* Requester)
-{
-	if (!Requester ||
-		!Requester->HasAuthority() ||
-		!Requester->GetPawn())
-	{
-		return false;
-	}
-
-	if (!bShopAvailable || !Catalog)
-	{
-		return false;
-	}
-
-	UWorld* World = GetWorld();
-
-	if (!World)
-	{
-		return false;
-	}
-
-	// 탐사 맵에서만 지급한다.
-	const AGoHomeGameState* GameState =
-		World->GetGameState<AGoHomeGameState>();
-
-	if (!GameState ||
-		GameState->GetCurrentState() != EExpeditionState::Exploration)
-	{
-		return false;
-	}
-
-	const FString OwnerPlayerKey =
-		MakeShopOwnerPlayerKey(Requester);
-
-	if (OwnerPlayerKey.IsEmpty())
-	{
-		return false;
-	}
-
-	// SetPawn이 여러 번 호출되어도 중복 지급하지 않는다.
-	if (LoadoutGrantedPlayers.Contains(OwnerPlayerKey))
-	{
-		return true;
-	}
-
-	UGameInstance* GameInstance = GetGameInstance();
-
-	if (!GameInstance)
-	{
-		return false;
-	}
-
-	UGoHomeSaveSubsystem* SaveSubsystem =
-		GameInstance->GetSubsystem<UGoHomeSaveSubsystem>();
-
-	if (!SaveSubsystem)
-	{
-		return false;
-	}
-
-	APawn* Pawn = Requester->GetPawn();
-
-	UInventoryComponent* Inventory =
-		Pawn->FindComponentByClass<UInventoryComponent>();
-
-	if (!Inventory)
-	{
-		return false;
-	}
-
-	// 먼저 지급해야 할 전체 수량을 계산한다.
-	int32 RequiredSlotCount = 0;
-
-	for (const FItemShopProduct& Product : Catalog->Products)
-	{
-		if (Product.ProductId.IsNone())
-		{
-			continue;
-		}
-
-		const int32 OwnedQuantity =
-			SaveSubsystem->GetShopOwnedQuantity(
-				OwnerPlayerKey,
-				Product.ProductId);
-
-		if (OwnedQuantity <= 0)
-		{
-			continue;
-		}
-
-		if (!Product.ItemData ||
-			!Product.ActorClass)
-		{
-			UE_LOG(
-				LogTemp,
-				Warning,
-				TEXT("[ItemShop] Loadout product data is invalid: %s"),
-				*Product.ProductId.ToString());
-
-			return false;
-		}
-
-		RequiredSlotCount += OwnedQuantity;
-	}
-
-	// 현재 인벤토리의 빈칸 수를 계산한다.
-	int32 EmptySlotCount = 0;
-
-	for (int32 SlotIndex = 0;
-		SlotIndex < Inventory->GetInventorySlotCount();
-		++SlotIndex)
-	{
-		if (!Inventory->GetItemInSlot(SlotIndex))
-		{
-			++EmptySlotCount;
-		}
-	}
-
-	if (RequiredSlotCount > EmptySlotCount)
-	{
-		UE_LOG(
-			LogTemp,
-			Warning,
-			TEXT("[ItemShop] Loadout failed. Required: %d, Empty: %d"),
-			RequiredSlotCount,
-			EmptySlotCount);
-
-		return false;
-	}
-
-	TArray<AItemActorBase*> GrantedItems;
-
-	// 중간에 실패하면 지금 라운드에 만든 아이템을 전부 되돌린다.
-	auto RollbackItems = [&]()
-		{
-			for (AItemActorBase* Item : GrantedItems)
-			{
-				if (!Item)
-				{
-					continue;
-				}
-
-				UnregisterRuntimeShopItem(Item);
-				Item->ServerDrop();
-				Item->Destroy();
-			}
-
-			GrantedItems.Reset();
-		};
-
-	// 상품별 저장 보유량만큼 아이템을 생성한다.
-	for (const FItemShopProduct& Product : Catalog->Products)
-	{
-		const int32 OwnedQuantity =
-			SaveSubsystem->GetShopOwnedQuantity(
-				OwnerPlayerKey,
-				Product.ProductId);
-
-		for (int32 Index = 0;
-			Index < OwnedQuantity;
-			++Index)
-		{
-			FTransform SpawnTransform;
-			SpawnTransform.SetLocation(
-				Pawn->GetActorLocation());
-			SpawnTransform.SetRotation(
-				Pawn->GetActorQuat());
-
-			AItemActorBase* SpawnedItem =
-				World->SpawnActorDeferred<AItemActorBase>(
-					Product.ActorClass,
-					SpawnTransform,
-					Requester,
-					Pawn,
-					ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-
-			if (!SpawnedItem)
-			{
-				RollbackItems();
-				return false;
-			}
-
-			// 아이템 데이터 설정
-			SpawnedItem->ItemData =
-				Product.ItemData;
-
-			SpawnedItem->FinishSpawning(
-				SpawnTransform);
-
-			// 기존 픽업 로직을 이용해 인벤토리에 넣는다.
-			SpawnedItem->OnInteract(Pawn);
-
-			if (Inventory->FindSlotIndexOf(SpawnedItem) == INDEX_NONE)
-			{
-				SpawnedItem->Destroy();
-				RollbackItems();
-				return false;
-			}
-
-			// 다음 라운드 종료 때 보유 여부를 다시 확인할 수 있게 등록한다.
-			RegisterRuntimeShopItem(
-				SpawnedItem,
-				Inventory,
-				Product.ProductId,
-				OwnerPlayerKey);
-
-			GrantedItems.Add(SpawnedItem);
-		}
-	}
-
-	// 이번 라운드에 이미 지급했다는 기록
-	LoadoutGrantedPlayers.Add(OwnerPlayerKey);
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[ItemShop] Loadout granted. Player: %s, Items: %d"),
-		*OwnerPlayerKey,
-		RequiredSlotCount);
-
-	return true;
-}
-
-void UItemShopSubsystem::ReconcileRuntimeShopItems()
-{
-	UGameInstance* GameInstance = GetGameInstance();
-
-	if (!GameInstance)
-	{
-		return;
-	}
-
-	UGoHomeSaveSubsystem* SaveSubsystem =
-		GameInstance->GetSubsystem<UGoHomeSaveSubsystem>();
-
-	if (!SaveSubsystem)
-	{
-		return;
-	}
-
-	// 플레이어별, 상품별로 현재 인벤토리에 남아 있는 수량을 센다.
-	TMap<FString, TMap<FName, int32>> OwnedCounts;
-
-	for (const FItemShopRuntimeItem& RuntimeItem : RuntimeShopItems)
-	{
-		if (RuntimeItem.OwnerPlayerKey.IsEmpty() ||
-			RuntimeItem.ProductId.IsNone())
-		{
-			continue;
-		}
-
-		// 이 아이템이 장부에 있었다는 사실은 먼저 기록한다.
-		// 나중에 아이템을 잃었으면 0으로 저장하기 위해서다.
-		int32& OwnedCount =
-			OwnedCounts
-			.FindOrAdd(RuntimeItem.OwnerPlayerKey)
-			.FindOrAdd(RuntimeItem.ProductId);
-
-		UInventoryComponent* Inventory =
-			RuntimeItem.OwnerInventory.Get();
-
-		AItemActorBase* Item =
-			RuntimeItem.Item.Get();
-
-		// 실제로 현재 인벤토리에 있으면 보유 수량을 증가시킨다.
-		if (Inventory &&
-			Item &&
-			Inventory->FindSlotIndexOf(Item) != INDEX_NONE)
-		{
-			++OwnedCount;
-		}
-	}
-
-	// 계산한 현재 보유 수량을 세이브에 반영한다.
-	for (const TPair<FString, TMap<FName, int32>>& OwnerPair : OwnedCounts)
-	{
-		for (const TPair<FName, int32>& ProductPair : OwnerPair.Value)
-		{
-			SaveSubsystem->SetShopOwnedQuantity(
-				OwnerPair.Key,
-				ProductPair.Key,
-				ProductPair.Value);
-		}
-	}
-
-	UE_LOG(
-		LogTemp,
-		Log,
-		TEXT("[ItemShop] Runtime item ownership reconciled."));
-}
-
 bool UItemShopSubsystem::TryProcessPurchase(
 	APlayerController* Requester,
 	const FItemShopPurchaseRequest& Request,
@@ -602,312 +208,573 @@ bool UItemShopSubsystem::TryProcessPurchase(
 {
 	OutResult = FItemShopPurchaseResult();
 
-	if (!Requester || !Requester->GetPawn())
+	// 보관함으로 들어가므로 폰은 필요 없다(관전 중 구매 차단은 상점 단말 상호작용이 담당).
+	if (!Requester || !Requester->HasAuthority())
 	{
 		OutResult.Result = EItemShopResult::InvalidRequester;
-		OutResult.Message =
-			FText::FromString(TEXT("구매자를 찾을 수 없습니다."));
+		OutResult.Message = MakeShopMessage(TEXT("구매자를 찾을 수 없습니다."));
 		return false;
 	}
 
-	APawn* Pawn = Requester->GetPawn();
-
-	UInventoryComponent* Inventory =
-		Pawn->FindComponentByClass<UInventoryComponent>();
-
-	if (!Inventory)
-	{
-		OutResult.Result = EItemShopResult::InvalidRequester;
-		OutResult.Message =
-			FText::FromString(TEXT("인벤토리를 찾을 수 없습니다."));
-		return false;
-	}
-
-	UGameInstance* GameInstance = GetGameInstance();
-
-	if (!GameInstance)
+	UGoHomeSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
+	if (!SaveSubsystem || !SaveSubsystem->GetSaveGame())
 	{
 		OutResult.Result = EItemShopResult::ShopUnavailable;
 		return false;
 	}
 
-	UGoHomeSaveSubsystem* SaveSubsystem =
-		GameInstance->GetSubsystem<UGoHomeSaveSubsystem>();
+	const int32 CurrentFunds = SaveSubsystem->GetCurrentFunds();
+	OutResult.RemainingFunds = CurrentFunds;
 
-	if (!SaveSubsystem)
+	// 클라가 보낸 Context가 아니라 서버의 실제 게임 단계로 판정한다.
+	EItemShopContext Context = EItemShopContext::InGameImmediate;
+	if (!TryResolveShopContext(Context))
 	{
-		OutResult.Result = EItemShopResult::ShopUnavailable;
+		OutResult.Result = EItemShopResult::NotAllowedInContext;
+		OutResult.Message = MakeShopMessage(TEXT("지금은 구매할 수 없습니다."));
 		return false;
 	}
 
-	// 상품, 장소, 가격, 코인을 먼저 확인한다.
 	int32 TotalPrice = 0;
-	int32 CurrentFunds = 0;
-
-	// 검증 함수 전용 결과 변수
-	EItemShopResult ValidationResult =
-		EItemShopResult::ShopUnavailable;
-
-	if (!TryValidatePurchase(
-		Request,
-		TotalPrice,
-		CurrentFunds,
-		ValidationResult))
+	EItemShopResult ValidationResult = EItemShopResult::ShopUnavailable;
+	if (!TryCalculateOrderTotal(Request, Context, TotalPrice, ValidationResult))
 	{
-		// 검증 결과를 구매 결과 구조체에 옮긴다.
 		OutResult.Result = ValidationResult;
-		OutResult.RemainingFunds = CurrentFunds;
-		return false;
-	}
-
-	const FString OwnerPlayerKey =
-		MakeShopOwnerPlayerKey(Requester);
-
-	if (OwnerPlayerKey.IsEmpty())
-	{
-		OutResult.Result = EItemShopResult::InvalidRequester;
-		OutResult.Message =
-			FText::FromString(TEXT("플레이어 ID를 찾을 수 없습니다."));
 		return false;
 	}
 
 	// 상품별 이번 구매 수량을 합친다.
 	TMap<FName, int32> RequestedByProduct;
-
-	int32 RequestedItemCount = 0;
-
 	for (const FItemShopCartLine& Line : Request.Lines)
 	{
-		// 현재는 다른 플레이어에게 선물하기를 허용하지 않는다.
-		if (!Line.TargetPlayerKey.IsEmpty())
-		{
-			OutResult.Result = EItemShopResult::InvalidTarget;
-			OutResult.Message =
-				FText::FromString(TEXT("현재는 자기 자신에게만 지급할 수 있습니다."));
-			return false;
-		}
-
-		RequestedByProduct.FindOrAdd(Line.ProductId)
-			+= Line.Quantity;
-
-		RequestedItemCount += Line.Quantity;
+		RequestedByProduct.FindOrAdd(Line.ProductId) += Line.Quantity;
 	}
 
-	// 상품별 구매 횟수 확인.
-	for (const TPair<FName, int32>& Pair :
-		RequestedByProduct)
+	// 라운드 한도·보유 상한 확인(팀 공유 기준).
+	for (const TPair<FName, int32>& Pair : RequestedByProduct)
 	{
-		const FItemShopProduct* Product =
-			FindProduct(Pair.Key);
+		const FItemShopProduct* Product = FindProduct(Pair.Key);
+		check(Product); // TryCalculateOrderTotal에서 이미 검증됨
 
-		if (!Product)
+		const int32 RoundPurchased = SaveSubsystem->GetRoundPurchaseQuantity(Pair.Key);
+		if (Product->MaxPurchasesPerRun > 0 &&
+			RoundPurchased > Product->MaxPurchasesPerRun - Pair.Value)
 		{
-			OutResult.Result = EItemShopResult::InvalidProduct;
+			OutResult.Result = EItemShopResult::PurchaseLimitReached;
+			OutResult.Message = MakeShopMessage(TEXT("이번 라운드의 구매 한도를 초과했습니다."));
 			return false;
 		}
 
-		const int32 AlreadyPurchased =
-			SaveSubsystem->GetShopPurchasedQuantity(
-				OwnerPlayerKey,
-				Product->ProductId);
-
-		const int32 RequestedQuantity = Pair.Value;
-
-		if (Product->MaxPurchasesPerRun < 0 ||
-			AlreadyPurchased >
-			Product->MaxPurchasesPerRun - RequestedQuantity)
+		const int32 Owned = SaveSubsystem->GetLockerOwnedQuantity(Pair.Key);
+		if (Product->MaxOwnedQuantity > 0 &&
+			Owned > Product->MaxOwnedQuantity - Pair.Value)
 		{
-			OutResult.Result =
-				EItemShopResult::PurchaseLimitReached;
-
-			OutResult.RemainingFunds = CurrentFunds;
-			OutResult.Message =
-				FText::FromString(
-					TEXT("이번 런의 구매 한도를 초과했습니다."));
-
-			return false;
-		}
-
-		// 하나만 가질 수 있는 상품인지 확인.
-		if (Product->bUniquePerPlayer &&
-			SaveSubsystem->GetShopOwnedQuantity(
-				OwnerPlayerKey,
-				Product->ProductId) > 0)
-		{
-			OutResult.Result =
-				EItemShopResult::PurchaseLimitReached;
-
-			OutResult.RemainingFunds = CurrentFunds;
-			OutResult.Message =
-				FText::FromString(
-					TEXT("이미 보유한 상품입니다."));
-
+			OutResult.Result = EItemShopResult::OwnedLimitReached;
+			OutResult.Message = MakeShopMessage(TEXT("보유 한도를 초과했습니다."));
 			return false;
 		}
 	}
 
-	// 인벤토리 빈칸 확인.
-	int32 EmptySlotCount = 0;
-
-	for (int32 SlotIndex = 0;
-		SlotIndex < Inventory->GetInventorySlotCount();
-		++SlotIndex)
+	if (CurrentFunds < TotalPrice)
 	{
-		if (!Inventory->GetItemInSlot(SlotIndex))
-		{
-			++EmptySlotCount;
-		}
+		OutResult.Result = EItemShopResult::NotEnoughFunds;
+		OutResult.Message = MakeShopMessage(TEXT("자금이 부족합니다."));
+		return false;
 	}
 
-	if (RequestedItemCount > EmptySlotCount)
+	// --- 커밋: 자금 차감 + 보관함 수량 증가. 실패하면 둘 다 원래 값으로 되돌린다. ---
+	struct FLockerUndo
+	{
+		FName ProductId;
+		EItemShopItemLifetime Lifetime;
+		int32 OwnedQuantity;
+		int32 RoundQuantity;
+	};
+	TArray<FLockerUndo> Undo;
+
+	if (!SaveSubsystem->TrySpendFunds(TotalPrice))
+	{
+		OutResult.Result = EItemShopResult::NotEnoughFunds;
+		return false;
+	}
+
+	bool bCommitted = true;
+	for (const TPair<FName, int32>& Pair : RequestedByProduct)
+	{
+		const FItemShopProduct* Product = FindProduct(Pair.Key);
+		const int32 Owned = SaveSubsystem->GetLockerOwnedQuantity(Pair.Key);
+		const int32 RoundPurchased = SaveSubsystem->GetRoundPurchaseQuantity(Pair.Key);
+
+		Undo.Add({ Pair.Key, Product->Lifetime, Owned, RoundPurchased });
+
+		if (!SaveSubsystem->SetLockerOwnedQuantity(Pair.Key, Product->Lifetime, Owned + Pair.Value))
+		{
+			bCommitted = false;
+			break;
+		}
+
+		SaveSubsystem->SetRoundPurchaseQuantity(Pair.Key, RoundPurchased + Pair.Value);
+	}
+
+	if (!bCommitted)
+	{
+		for (const FLockerUndo& Entry : Undo)
+		{
+			SaveSubsystem->SetLockerOwnedQuantity(Entry.ProductId, Entry.Lifetime, Entry.OwnedQuantity);
+			SaveSubsystem->SetRoundPurchaseQuantity(Entry.ProductId, Entry.RoundQuantity);
+		}
+		SaveSubsystem->RefundFunds(TotalPrice);
+
+		OutResult.Result = EItemShopResult::ShopUnavailable;
+		OutResult.RemainingFunds = SaveSubsystem->GetCurrentFunds();
+		OutResult.Message = MakeShopMessage(TEXT("구매를 처리하지 못했습니다."));
+		return false;
+	}
+
+	// 로비·탐사 공통 진행도 HUD 자금 + 보관함 미러 갱신
+	if (UWorld* World = GetWorld())
+	{
+		if (AGoHomeGameState* GameState = World->GetGameState<AGoHomeGameState>())
+		{
+			GameState->SetCurrentFunds(SaveSubsystem->GetCurrentFunds());
+		}
+	}
+	RefreshLockerView();
+
+	OutResult.Result = EItemShopResult::Success;
+	OutResult.RemainingFunds = SaveSubsystem->GetCurrentFunds();
+	OutResult.Message = MakeShopMessage(TEXT("구매 완료 — 잠수정 보관함에 넣었습니다."));
+	return true;
+}
+
+// --- 공유 보관함 ---
+
+int32 UItemShopSubsystem::GetCheckedOutQuantity(FName ProductId) const
+{
+	int32 Count = 0;
+	for (const FSharedLockerCheckout& Checkout : Checkouts)
+	{
+		if (Checkout.ProductId == ProductId)
+		{
+			++Count;
+		}
+	}
+	return Count;
+}
+
+TArray<FSharedLockerViewEntry> UItemShopSubsystem::BuildLockerView() const
+{
+	TArray<FSharedLockerViewEntry> View;
+
+	const UGoHomeSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
+	if (!SaveSubsystem)
+	{
+		return View;
+	}
+
+	for (const FSharedLockerEntry& Entry : SaveSubsystem->GetSharedLockerEntries())
+	{
+		FSharedLockerViewEntry& ViewEntry = View.AddDefaulted_GetRef();
+		ViewEntry.ProductId = Entry.ProductId;
+		ViewEntry.Lifetime = Entry.Lifetime;
+		ViewEntry.OwnedQuantity = Entry.OwnedQuantity;
+		ViewEntry.StoredQuantity = FMath::Max(0, Entry.OwnedQuantity - GetCheckedOutQuantity(Entry.ProductId));
+	}
+
+	return View;
+}
+
+void UItemShopSubsystem::RefreshLockerView()
+{
+	UWorld* World = GetWorld();
+	if (!World || World->GetNetMode() == NM_Client || World->bIsTearingDown)
+	{
+		return;
+	}
+
+	if (AGoHomeGameState* GameState = World->GetGameState<AGoHomeGameState>())
+	{
+		GameState->SetSharedLockerItems(BuildLockerView());
+	}
+}
+
+void UItemShopSubsystem::RemoveOwnedOne(FName ProductId)
+{
+	UGoHomeSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
+	if (!SaveSubsystem)
+	{
+		return;
+	}
+
+	const FSharedLockerEntry* Entry = SaveSubsystem->GetSharedLockerEntries().FindByPredicate(
+		[ProductId](const FSharedLockerEntry& It) { return It.ProductId == ProductId; });
+
+	if (Entry)
+	{
+		SaveSubsystem->SetLockerOwnedQuantity(ProductId, Entry->Lifetime, Entry->OwnedQuantity - 1);
+	}
+}
+
+void UItemShopSubsystem::ReleaseCheckout(int32 CheckoutIndex)
+{
+	if (!Checkouts.IsValidIndex(CheckoutIndex))
+	{
+		return;
+	}
+
+	if (AItemActorBase* Item = Checkouts[CheckoutIndex].Item.Get())
+	{
+		Item->OnEndPlay.RemoveDynamic(this, &UItemShopSubsystem::HandleCheckedOutItemEndPlay);
+	}
+
+	Checkouts.RemoveAtSwap(CheckoutIndex);
+}
+
+void UItemShopSubsystem::ClearCheckouts()
+{
+	while (Checkouts.Num() > 0)
+	{
+		ReleaseCheckout(Checkouts.Num() - 1);
+	}
+}
+
+bool UItemShopSubsystem::IsLockerUsableInCurrentState() const
+{
+	EItemShopContext UnusedContext;
+	return TryResolveShopContext(UnusedContext);
+}
+
+bool UItemShopSubsystem::IsNearSharedLocker(const APawn* Pawn) const
+{
+	UWorld* World = GetWorld();
+	if (!World || !Pawn)
+	{
+		return false;
+	}
+
+	for (TActorIterator<ASharedLockerActor> It(World); It; ++It)
+	{
+		if (It->IsPawnInUseRange(Pawn))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+bool UItemShopSubsystem::IsSpentConsumable(const AItemActorBase* Item, EItemShopItemLifetime Lifetime)
+{
+	if (Lifetime != EItemShopItemLifetime::Consumable)
+	{
+		return false;
+	}
+
+	const AUsableItemBase* Usable = Cast<AUsableItemBase>(Item);
+	return Usable && Usable->IsDepleted();
+}
+
+bool UItemShopSubsystem::TryWithdrawFromLocker(
+	APlayerController* Requester,
+	FName ProductId,
+	FSharedLockerResult& OutResult)
+{
+	OutResult = FSharedLockerResult();
+	OutResult.Action = ESharedLockerAction::Withdraw;
+	OutResult.ProductId = ProductId;
+
+	APawn* Pawn = Requester ? Requester->GetPawn() : nullptr;
+	if (!Requester || !Requester->HasAuthority() || !Pawn)
+	{
+		OutResult.Result = EItemShopResult::InvalidRequester;
+		OutResult.Message = MakeShopMessage(TEXT("꺼낼 수 있는 상태가 아닙니다."));
+		return false;
+	}
+
+	if (!IsLockerUsableInCurrentState())
+	{
+		OutResult.Result = EItemShopResult::NotAllowedInContext;
+		OutResult.Message = MakeShopMessage(TEXT("지금은 보관함을 쓸 수 없습니다."));
+		return false;
+	}
+
+	if (!IsNearSharedLocker(Pawn))
+	{
+		OutResult.Result = EItemShopResult::TooFarFromLocker;
+		OutResult.Message = MakeShopMessage(TEXT("보관함에서 너무 멉니다."));
+		return false;
+	}
+
+	const FItemShopProduct* Product = FindProduct(ProductId);
+	UGoHomeSaveSubsystem* SaveSubsystem = GetSaveSubsystem();
+	if (!Product || !Product->ActorClass || !Product->ItemData || !SaveSubsystem)
+	{
+		OutResult.Result = EItemShopResult::InvalidProduct;
+		return false;
+	}
+
+	if (SaveSubsystem->GetLockerOwnedQuantity(ProductId) - GetCheckedOutQuantity(ProductId) <= 0)
+	{
+		OutResult.Result = EItemShopResult::LockerEmpty;
+		OutResult.Message = MakeShopMessage(TEXT("보관함에 남은 수량이 없습니다."));
+		return false;
+	}
+
+	UInventoryComponent* Inventory = Pawn->FindComponentByClass<UInventoryComponent>();
+	bool bHasEmptySlot = false;
+	for (int32 SlotIndex = 0; Inventory && SlotIndex < Inventory->GetInventorySlotCount(); ++SlotIndex)
+	{
+		bHasEmptySlot |= Inventory->GetItemInSlot(SlotIndex) == nullptr;
+	}
+
+	if (!bHasEmptySlot)
 	{
 		OutResult.Result = EItemShopResult::InventoryFull;
-		OutResult.RemainingFunds = CurrentFunds;
-		OutResult.Message =
-			FText::FromString(TEXT("인벤토리 공간이 부족합니다."));
+		OutResult.Message = MakeShopMessage(TEXT("손이 가득 찼습니다."));
 		return false;
 	}
 
 	UWorld* World = GetWorld();
+	const FTransform SpawnTransform(Pawn->GetActorQuat(), Pawn->GetActorLocation());
 
-	if (!World)
+	AItemActorBase* SpawnedItem = World
+		? World->SpawnActorDeferred<AItemActorBase>(
+			Product->ActorClass,
+			SpawnTransform,
+			nullptr,
+			Pawn,
+			ESpawnActorCollisionHandlingMethod::AlwaysSpawn)
+		: nullptr;
+
+	if (!SpawnedItem)
 	{
 		OutResult.Result = EItemShopResult::SpawnFailed;
 		return false;
 	}
 
-	TArray<AItemActorBase*> GrantedItems;
+	SpawnedItem->ItemData = Product->ItemData;
+	SpawnedItem->SetSharedLockerItem(true);
+	SpawnedItem->FinishSpawning(SpawnTransform);
 
-	// 중간 실패 시 이미 만든 아이템을 되돌린다.
-	auto RollbackItems = [&]()
-		{
-			for (AItemActorBase* Item : GrantedItems)
-			{
-				if (!Item)
-				{
-					continue;
-				}
-
-				UnregisterRuntimeShopItem(Item);
-				Item->ServerDrop();
-				Item->Destroy();
-			}
-
-			GrantedItems.Reset();
-		};
-
-	// 상품별로 실제 아이템을 생성한다.
-	for (const FItemShopCartLine& Line : Request.Lines)
+	// 회복 아이템의 OnInteract(즉시 회복)를 타지 않도록 기본 픽업 경로로 직접 지급한다.
+	if (!SpawnedItem->ServerGrantToPawn(Pawn))
 	{
-		const FItemShopProduct* Product =
-			FindProduct(Line.ProductId);
-
-		if (!Product)
-		{
-			RollbackItems();
-
-			OutResult.Result =
-				EItemShopResult::InvalidProduct;
-
-			return false;
-		}
-
-		for (int32 Index = 0;
-			Index < Line.Quantity;
-			++Index)
-		{
-			FTransform SpawnTransform;
-			SpawnTransform.SetLocation(
-				Pawn->GetActorLocation());
-			SpawnTransform.SetRotation(
-				Pawn->GetActorQuat());
-
-			AItemActorBase* SpawnedItem =
-				World->SpawnActorDeferred<AItemActorBase>(
-					Product->ActorClass,
-					SpawnTransform,
-					Requester,
-					Pawn,
-					ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
-
-			if (!SpawnedItem)
-			{
-				RollbackItems();
-
-				OutResult.Result =
-					EItemShopResult::SpawnFailed;
-
-				return false;
-			}
-
-			// 생성 전에 상품 데이터를 넣는다.
-			SpawnedItem->ItemData =
-				Product->ItemData;
-
-			SpawnedItem->FinishSpawning(
-				SpawnTransform);
-
-			// 기존 인벤토리 지급 방식을 그대로 사용한다.
-			SpawnedItem->OnInteract(Pawn);
-
-			if (Inventory->FindSlotIndexOf(
-				SpawnedItem) == INDEX_NONE)
-			{
-				SpawnedItem->Destroy();
-				RollbackItems();
-
-				OutResult.Result =
-					EItemShopResult::InventoryFull;
-
-				return false;
-			}
-
-			// 아이템 코어를 수정하지 않고 상점 장부에만 등록한다.
-			RegisterRuntimeShopItem(
-				SpawnedItem,
-				Inventory,
-				Product->ProductId,
-				OwnerPlayerKey);
-
-			GrantedItems.Add(SpawnedItem);
-		}
-	}
-
-	// 모든 아이템 지급이 성공한 후 코인을 차감한다.
-	if (!SaveSubsystem->TrySpendFunds(TotalPrice))
-	{
-		RollbackItems();
-
-		OutResult.Result =
-			EItemShopResult::NotEnoughFunds;
-
+		// 아직 장부에 없으므로 이 파괴는 분실로 세지 않는다.
+		SpawnedItem->Destroy();
+		OutResult.Result = EItemShopResult::InventoryFull;
+		OutResult.Message = MakeShopMessage(TEXT("손이 가득 찼습니다."));
 		return false;
 	}
 
-	// 구매 기록을 저장한다.
-	for (const TPair<FName, int32>& Pair :
-		RequestedByProduct)
-	{
-		SaveSubsystem->AddShopPurchase(
-			OwnerPlayerKey,
-			Pair.Key,
-			Pair.Value);
-	}
+	FSharedLockerCheckout& Checkout = Checkouts.AddDefaulted_GetRef();
+	Checkout.Item = SpawnedItem;
+	Checkout.ProductId = ProductId;
+	SpawnedItem->OnEndPlay.AddDynamic(this, &UItemShopSubsystem::HandleCheckedOutItemEndPlay);
 
-	// 인게임 HUD에 최신 코인을 전달한다.
-	if (AExplorationGameState* GameState =
-		World->GetGameState<AExplorationGameState>())
-	{
-		GameState->SetCurrentFunds(
-			SaveSubsystem->GetCurrentFunds());
-	}
+	RefreshLockerView();
 
 	OutResult.Result = EItemShopResult::Success;
-	OutResult.RemainingFunds =
-		SaveSubsystem->GetCurrentFunds();
-
-	OutResult.Message =
-		FText::FromString(TEXT("구매가 완료되었습니다."));
-
 	return true;
+}
+
+bool UItemShopSubsystem::TryDepositToLocker(
+	APlayerController* Requester,
+	FName ProductId,
+	FSharedLockerResult& OutResult)
+{
+	OutResult = FSharedLockerResult();
+	OutResult.Action = ESharedLockerAction::Deposit;
+	OutResult.ProductId = ProductId;
+
+	APawn* Pawn = Requester ? Requester->GetPawn() : nullptr;
+	if (!Requester || !Requester->HasAuthority() || !Pawn)
+	{
+		OutResult.Result = EItemShopResult::InvalidRequester;
+		OutResult.Message = MakeShopMessage(TEXT("넣을 수 있는 상태가 아닙니다."));
+		return false;
+	}
+
+	if (!IsLockerUsableInCurrentState())
+	{
+		OutResult.Result = EItemShopResult::NotAllowedInContext;
+		OutResult.Message = MakeShopMessage(TEXT("지금은 보관함을 쓸 수 없습니다."));
+		return false;
+	}
+
+	if (!IsNearSharedLocker(Pawn))
+	{
+		OutResult.Result = EItemShopResult::TooFarFromLocker;
+		OutResult.Message = MakeShopMessage(TEXT("보관함에서 너무 멉니다."));
+		return false;
+	}
+
+	UInventoryComponent* Inventory = Pawn->FindComponentByClass<UInventoryComponent>();
+	if (!Inventory)
+	{
+		OutResult.Result = EItemShopResult::InvalidRequester;
+		return false;
+	}
+
+	// 요청자 핫바에 있는 같은 상품 중 손에 든 것을 먼저 고른다.
+	int32 FoundIndex = INDEX_NONE;
+	for (int32 Index = 0; Index < Checkouts.Num(); ++Index)
+	{
+		AItemActorBase* Item = Checkouts[Index].Item.Get();
+		if (!Item || Checkouts[Index].ProductId != ProductId || Inventory->FindSlotIndexOf(Item) == INDEX_NONE)
+		{
+			continue;
+		}
+
+		FoundIndex = Index;
+		if (Item == Inventory->GetActiveItem())
+		{
+			break;
+		}
+	}
+
+	if (FoundIndex == INDEX_NONE)
+	{
+		OutResult.Result = EItemShopResult::NotLockerItem;
+		OutResult.Message = MakeShopMessage(TEXT("넣을 수 있는 아이템을 들고 있지 않습니다."));
+		return false;
+	}
+
+	AItemActorBase* Item = Checkouts[FoundIndex].Item.Get();
+	const FItemShopProduct* Product = FindProduct(ProductId);
+	const bool bSpent = Product && IsSpentConsumable(Item, Product->Lifetime);
+
+	ReleaseCheckout(FoundIndex);
+
+	// 다 쓴 소모품은 되돌리지 않고 소모 처리한다(충전량 소진 후 넣었다 빼서 새것으로 바꾸는 우회 방지).
+	if (bSpent)
+	{
+		RemoveOwnedOne(ProductId);
+	}
+
+	Inventory->RemoveItem(Item);
+	Item->Destroy();
+
+	RefreshLockerView();
+
+	OutResult.Result = EItemShopResult::Success;
+	if (bSpent)
+	{
+		OutResult.Message = MakeShopMessage(TEXT("다 쓴 소모품이라 폐기했습니다."));
+	}
+	return true;
+}
+
+void UItemShopSubsystem::HandleCheckedOutItemEndPlay(AActor* Actor, EEndPlayReason::Type EndPlayReason)
+{
+	const int32 Index = Checkouts.IndexOfByPredicate(
+		[Actor](const FSharedLockerCheckout& Checkout) { return Checkout.Item.Get() == Actor; });
+
+	if (Index == INDEX_NONE)
+	{
+		return;
+	}
+
+	const FName ProductId = Checkouts[Index].ProductId;
+	Checkouts.RemoveAtSwap(Index);
+
+	// 맵 정리(트래블·PIE 종료)로 사라진 건 보관함에 그대로 남은 것으로 본다.
+	// 플레이 중 명시적 파괴 = 사용 성공 소모(회복·텔레포트) 또는 분실(납품·소멸)이라 보유 수량을 줄인다.
+	const UWorld* World = Actor ? Actor->GetWorld() : nullptr;
+	const bool bWorldTeardown =
+		EndPlayReason != EEndPlayReason::Destroyed ||
+		!World ||
+		World->bIsTearingDown ||
+		World->IsInSeamlessTravel();
+
+	if (bWorldTeardown)
+	{
+		return;
+	}
+
+	RemoveOwnedOne(ProductId);
+	RefreshLockerView();
+}
+
+void UItemShopSubsystem::ResolveCheckoutsForRoundEnd()
+{
+	UWorld* World = GetWorld();
+
+	auto IsHeldByPlayer = [World](AItemActorBase* Item)
+		{
+			for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+			{
+				const APlayerController* PlayerController = It->Get();
+				const APawn* Pawn = PlayerController ? PlayerController->GetPawn() : nullptr;
+				const UInventoryComponent* Inventory =
+					Pawn ? Pawn->FindComponentByClass<UInventoryComponent>() : nullptr;
+
+				// 사망한 폰은 이미 ServerDropAllItems로 다 떨어뜨렸으므로 핫바에 있다 = 살아서 들고 있다.
+				if (Inventory && Inventory->FindSlotIndexOf(Item) != INDEX_NONE)
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+
+	auto IsInsideSubmarine = [World](const AItemActorBase* Item)
+		{
+			for (TActorIterator<ASubmarine> It(World); It; ++It)
+			{
+				if (It->IsLocationInsideInterior(Item->GetActorLocation()))
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+
+	int32 ReturnedCount = 0;
+	int32 LostCount = 0;
+
+	while (Checkouts.Num() > 0)
+	{
+		const int32 Index = Checkouts.Num() - 1;
+		const FName ProductId = Checkouts[Index].ProductId;
+		AItemActorBase* Item = Checkouts[Index].Item.Get();
+
+		const FItemShopProduct* Product = FindProduct(ProductId);
+		const EItemShopItemLifetime Lifetime = Product ? Product->Lifetime : EItemShopItemLifetime::Permanent;
+
+		const bool bHeld = World && Item && IsHeldByPlayer(Item);
+		const bool bReturned = World && Item &&
+			!IsSpentConsumable(Item, Lifetime) &&
+			(bHeld || IsInsideSubmarine(Item));
+
+		ReleaseCheckout(Index);
+
+		if (bReturned)
+		{
+			++ReturnedCount;
+		}
+		else
+		{
+			RemoveOwnedOne(ProductId);
+			++LostCount;
+		}
+
+		// 정산 중 다시 쓰거나 납품해 수량이 이중으로 움직이지 않도록 꺼내 간 액터는 모두 거둔다.
+		if (Item)
+		{
+			if (bHeld)
+			{
+				for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+				{
+					const APawn* Pawn = It->Get() ? It->Get()->GetPawn() : nullptr;
+					if (UInventoryComponent* Inventory = Pawn ? Pawn->FindComponentByClass<UInventoryComponent>() : nullptr)
+					{
+						Inventory->RemoveItem(Item);
+					}
+				}
+			}
+			Item->Destroy();
+		}
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("[ItemShop] Locker round end. Returned: %d, Lost/Consumed: %d"),
+		ReturnedCount, LostCount);
 }
