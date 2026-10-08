@@ -24,6 +24,7 @@ public:
 	virtual void ServerUseSpecialAction() override;
 
 	virtual bool CanUse() const override;
+	virtual bool IsDepleted() const override { return !CanUse(); }
 
 	virtual bool IsDeliverable() const override { return false; }
 

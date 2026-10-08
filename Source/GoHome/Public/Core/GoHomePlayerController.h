@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "Core/PauseMenuBackend.h"
+#include "Core/SharedLockerBackend.h"
 #include "Data/FSettlementResult.h"
 #include "Shop/ItemShopTypes.h"
 #include "GoHomePlayerController.generated.h"
@@ -17,11 +18,24 @@ class UUserWidget;
  *
  */
 UCLASS()
-class GOHOME_API AGoHomePlayerController : public APlayerController, public IPauseMenuBackend
+class GOHOME_API AGoHomePlayerController : public APlayerController, public IPauseMenuBackend, public ISharedLockerBackend
 {
 	GENERATED_BODY()
 
 public:
+	// ISharedLockerBackend
+	virtual void RequestLockerWithdraw(FName ProductId) override;
+	virtual void RequestLockerDeposit(FName ProductId) override;
+	virtual void RequestCloseSharedLocker() override;
+	virtual FSharedLockerResultEvent& OnSharedLockerResult() override { return SharedLockerResultEvent; }
+
+	UFUNCTION(BlueprintPure, Category = "UI|Shared Locker")
+	bool IsSharedLockerOpen() const { return SharedLockerWidget != nullptr; }
+
+	// 서버(ASharedLockerActor::OnInteract) → 상호작용한 플레이어 화면에 보관함 UI를 연다.
+	UFUNCTION(Client, Reliable)
+	void Client_OpenSharedLocker();
+
 	// IPauseMenuBackend
 	virtual EPauseSessionRole GetSessionRole() const override;
 	virtual void RequestResume() override;
@@ -85,6 +99,23 @@ public:
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Item Shop")
 	void Server_RequestShopPurchase(FItemShopPurchaseRequest Request);
 
+	// 구매 결과(성공 시 상품은 플레이어가 아니라 잠수정 공유 보관함으로 간다). 상점 BP가 문구를 띄울 때 쓴다.
+	UFUNCTION(Client, Reliable)
+	void Client_ShopPurchaseResult(const FItemShopPurchaseResult& Result);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Item Shop")
+	void OnShopPurchaseResult(const FItemShopPurchaseResult& Result);
+
+	// 공유 보관함 — UI는 ISharedLockerBackend로만 부른다. 서버 검증은 UItemShopSubsystem.
+	UFUNCTION(Server, Reliable)
+	void Server_RequestLockerWithdraw(FName ProductId);
+
+	UFUNCTION(Server, Reliable)
+	void Server_RequestLockerDeposit(FName ProductId);
+
+	UFUNCTION(Client, Reliable)
+	void Client_SharedLockerResult(const FSharedLockerResult& Result);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -114,6 +145,13 @@ protected:
 
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	int32 ProgressHUDZOrder = 0;
+
+	// 잠수정 공유 보관함 Modal(USharedLockerWidget 부모 WBP). 비어 있으면 보관함 상호작용 시 아무 것도 안 열린다.
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Shared Locker")
+	TSubclassOf<UUserWidget> SharedLockerWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Shared Locker")
+	int32 SharedLockerZOrder = 50;
 
 private:
 	// 로컬 컨트롤러에서 현재 월드의 GameState 로 탐사 레벨 여부를 판정해 Ready/Teardown 을 엣지에서 1회씩 쏜다.
@@ -163,6 +201,15 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UUserWidget> PauseMenu;
+
+	// --- 공유 보관함 UI ---
+	void OpenSharedLocker();
+	void CloseSharedLocker(bool bRestoreInput);
+
+	UPROPERTY(Transient)
+	TObjectPtr<UUserWidget> SharedLockerWidget;
+
+	FSharedLockerResultEvent SharedLockerResultEvent;
 
 	TOptional<EPauseLeaveTarget> PendingLeaveTarget;
 	FPauseLeaveFailedEvent LeaveFailedEvent;

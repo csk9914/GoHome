@@ -28,6 +28,11 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Item")
 	virtual bool CanUse() const { return true; }
 
+	// 다시 쓸 수 없게 다 써 버린 상태인지(충전량 소진 등). 쿨다운처럼 기다리면 풀리는 상태는 false.
+	// 공유 보관함이 소모품 회수 여부를 판정할 때 쓴다 — CanUse()는 "HP 가득" 같은 일시 조건도 false라 쓰면 안 된다.
+	UFUNCTION(BlueprintPure, Category = "Item")
+	virtual bool IsDepleted() const { return false; }
+
 	// 사용(좌클릭) 중단 요청 -> 홀드형 아이템만 오버라이드.
 	// 기본은 아무것도 안함 -> 즉발형 아이템은 뗌 신호를 무시
 	virtual void ServerCancelSpecialAction() {}

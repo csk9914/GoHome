@@ -184,12 +184,17 @@ bool AItemActorBase::CanInteract(APawn* InstigatorPawn) const
 
 void AItemActorBase::OnInteract(APawn* InstigatorPawn)
 {
-	if (!HasAuthority() || !InstigatorPawn) return;
+	ServerGrantToPawn(InstigatorPawn);
+}
+
+bool AItemActorBase::ServerGrantToPawn(APawn* InstigatorPawn)
+{
+	if (!HasAuthority() || !InstigatorPawn) return false;
 
 	UInventoryComponent* Inventory = InstigatorPawn->FindComponentByClass<UInventoryComponent>();
-	if (!Inventory) return;
+	if (!Inventory) return false;
 
-	if (!Inventory->TryAddItem(this)) return;
+	if (!Inventory->TryAddItem(this)) return false;
 
 	bIsBeingClaimed = true;
 	bHasBeenPickedUp = true;
@@ -201,6 +206,8 @@ void AItemActorBase::OnInteract(APawn* InstigatorPawn)
 	{
 		Inventory->SetActiveSlot(SlotIndex);
 	}
+
+	return true;
 }
 
 void AItemActorBase::OnRep_HoldingPawn(APawn* OldHoldingPawn)

@@ -4,6 +4,7 @@
 #include "GameFramework/GameState.h"
 #include "Core/ExpeditionState.h"
 #include "Core/FailReason.h"
+#include "Shop/SharedLockerTypes.h"
 #include "GoHomeGameState.generated.h"
 
 class UDockingDoorComponent;
@@ -12,6 +13,9 @@ struct FExpeditionProgress;
 
 // 상시 진행도 HUD 값(라운드·다음 관문·보유 자금, 탐사맵이면 할당량)이 바뀔 때 브로드캐스트 — 값은 콜백 안에서 Get*()로 꺼낸다
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnExpeditionProgressChanged);
+
+// 잠수정 공유 보관함 수량 미러가 바뀔 때 — 값은 GetSharedLockerItems()로 꺼낸다
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnSharedLockerChanged);
 
 /**
  * 탐사 진행 단계만 책임진다 (도킹 문 상태는 UDockingDoorComponent가 별도 소유).
@@ -43,6 +47,9 @@ protected:
 	UFUNCTION()
 	void OnRep_ExpeditionProgress();
 
+	UFUNCTION()
+	void OnRep_SharedLockerItems();
+
 	// 진행도 값이 바뀐 뒤 공통 지점 — 서브클래스가 자기 델리게이트(예: 탐사 할당량)도 함께 쏘도록 오버라이드
 	virtual void NotifyExpeditionProgressChanged();
 
@@ -61,6 +68,12 @@ public:
 
 	// 서버 전용. 납품/강화 후 세이브의 새 보유 자금을 복제 필드에 싣는다(로비·탐사 공통).
 	void SetCurrentFunds(int32 InCurrentFunds);
+
+	// 서버 전용. UItemShopSubsystem이 보관함 수량이 바뀔 때마다(구매·꺼내기·넣기·소모·분실·정산) 다시 싣는다.
+	void SetSharedLockerItems(const TArray<FSharedLockerViewEntry>& InItems);
+
+	UFUNCTION(BlueprintPure, Category = "Shared Locker")
+	const TArray<FSharedLockerViewEntry>& GetSharedLockerItems() const { return SharedLockerItems; }
 
 	UFUNCTION(BlueprintPure, Category = "Expedition")
 	int32 GetCurrentRound() const { return CurrentRound; }
@@ -91,6 +104,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Expedition")
 	FOnExpeditionProgressChanged OnExpeditionProgressChanged;
 
+	// 보관함 UI가 바인딩 — 바인딩 직후 GetSharedLockerItems()로 한 번 당겨오도록
+	UPROPERTY(BlueprintAssignable, Category = "Shared Locker")
+	FOnSharedLockerChanged OnSharedLockerChanged;
+
 protected:
 	UPROPERTY(ReplicatedUsing = OnRep_State, BlueprintReadOnly, Category = "Expedition")
 	EExpeditionState CurrentState = EExpeditionState::Lobby;
@@ -115,6 +132,10 @@ protected:
 
 	UPROPERTY(ReplicatedUsing = OnRep_ExpeditionProgress, BlueprintReadOnly, Category = "Expedition", meta = (AllowPrivateAccess = "true"))
 	int32 NextCheckPointQuota = 0;
+
+	// 잠수정 공유 보관함 표시 미러(세이브 + 런타임 꺼냄 장부가 서버 SoT). 팀원 전원이 같은 수량을 본다.
+	UPROPERTY(ReplicatedUsing = OnRep_SharedLockerItems, BlueprintReadOnly, Category = "Shared Locker", meta = (AllowPrivateAccess = "true"))
+	TArray<FSharedLockerViewEntry> SharedLockerItems;
 
 private:
 	UPROPERTY()

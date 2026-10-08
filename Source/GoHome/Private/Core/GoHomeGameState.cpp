@@ -7,6 +7,7 @@
 #include "Data/FExpeditionProgress.h"
 #include "Net/UnrealNetwork.h"
 #include "Save/GoHomeSaveSubsystem.h"
+#include "Shop/ItemShopSubsystem.h"
 
 AGoHomeGameState::AGoHomeGameState()
 {
@@ -35,6 +36,30 @@ void AGoHomeGameState::BeginPlay()
 	}
 
 	SetExpeditionProgress(SaveSubsystem->BuildProgress());
+
+	// GameState는 트래블마다 새로 스폰되므로 보관함 미러도 맵마다 다시 싣는다.
+	if (const UItemShopSubsystem* ShopSubsystem = GameInstance->GetSubsystem<UItemShopSubsystem>())
+	{
+		SetSharedLockerItems(ShopSubsystem->BuildLockerView());
+	}
+}
+
+void AGoHomeGameState::SetSharedLockerItems(const TArray<FSharedLockerViewEntry>& InItems)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	SharedLockerItems = InItems;
+
+	// 리슨 서버 호스트는 OnRep이 불리지 않으므로 서버에서 직접 브로드캐스트
+	OnSharedLockerChanged.Broadcast();
+}
+
+void AGoHomeGameState::OnRep_SharedLockerItems()
+{
+	OnSharedLockerChanged.Broadcast();
 }
 
 void AGoHomeGameState::SetExpeditionProgress(const FExpeditionProgress& Progress)
@@ -146,6 +171,7 @@ void AGoHomeGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AGoHomeGameState, CurrentFunds);
 	DOREPLIFETIME(AGoHomeGameState, NextCheckPointRound);
 	DOREPLIFETIME(AGoHomeGameState, NextCheckPointQuota);
+	DOREPLIFETIME(AGoHomeGameState, SharedLockerItems);
 }
 
 void AGoHomeGameState::OnRep_State()

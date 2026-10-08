@@ -4,6 +4,7 @@
 #include "Data/FSettlementResult.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Upgrade/EquipmentUpgradeTypes.h"
+#include "Shop/SharedLockerTypes.h"
 #include "GoHomeSaveSubsystem.generated.h"
 
 class UEconomyConfigDataAsset;
@@ -64,20 +65,30 @@ public:
 	// 출발 시 호출해서 값을 초기화
 	void SetTargetMapQuota(int32 Quota) { CurrentMapQuota = Quota; };
 
-	// 상점 상품의 총 구매 수량
-	int32 GetShopPurchasedQuantity(const FString& OwnerPlayerKey,FName ProductId) const;
+	// 강화/구매 취소 시 차감했던 자금을 되돌린다(원자적 구매 롤백용).
+	void RefundFunds(int32 Amount);
 
-	// 상점 현재 실제 보유 수량
-	int32 GetShopOwnedQuantity(const FString& OwnerPlayerKey,FName ProductId) const;
+	// --- 잠수정 공유 보관함 저장소 (로직은 UItemShopSubsystem) ---
+	const TArray<FSharedLockerEntry>& GetSharedLockerEntries() const;
 
-	// 상점 구매 성공 시 구매량과 보유량을 함께 증가
-	void AddShopPurchase(const FString& OwnerPlayerKey,FName ProductId,int32 Quantity);
+	int32 GetLockerOwnedQuantity(FName ProductId) const;
 
-	// 상점 라운드 종료 시 현재 보유량을 갱신
-	void SetShopOwnedQuantity(const FString& OwnerPlayerKey,FName ProductId,int32 OwnedQuantity);
+	// 팀 보유 수량을 덮어쓴다. 0 이하면 항목을 지운다. 세이브가 없으면 false.
+	bool SetLockerOwnedQuantity(FName ProductId, EItemShopItemLifetime Lifetime, int32 OwnedQuantity);
+
+	// 이번 라운드 팀 구매 수량
+	int32 GetRoundPurchaseQuantity(FName ProductId) const;
+
+	void SetRoundPurchaseQuantity(FName ProductId, int32 Quantity);
 
 private:
 	void ResetSave();
+
+	// 새로 만든 SaveGame 인스턴스에 현재 스키마 버전을 넣는다.
+	void CreateFreshSaveGame();
+
+	// 옛 스키마 세이브를 현재 버전으로 올린다(디스크 반영은 다음 저장 시점).
+	void MigrateSaveGame();
 	ESettlementOutcome DetermineOutcome(const FCheckPoint* CheckPoint, int32 CompletedRound) const;
 
 protected:

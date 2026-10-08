@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Item/ItemActorBase.h"
+#include "Shop/SharedLockerTypes.h"
 #include "ItemShopTypes.generated.h"
 
 class UItemDataAsset;
@@ -37,7 +38,12 @@ enum class EItemShopResult : uint8
 	Overweight,
 	NotAllowedInContext,
 	SpawnFailed,
-	PurchaseLimitReached
+	PurchaseLimitReached,
+	// 아래는 공유 보관함 전환 후 추가(기존 값 순서 유지)
+	OwnedLimitReached,
+	LockerEmpty,
+	NotLockerItem,
+	TooFarFromLocker
 };
 
 // 상품 하나의 구조
@@ -67,6 +73,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
 	EItemShopCategory Category = EItemShopCategory::Tools;
 
+	// 영구 장비(사용해도 안 줄어듦) / 소모품(사용 성공 시 1 감소). 공유 보관함 수명 규칙의 기준.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
+	EItemShopItemLifetime Lifetime = EItemShopItemLifetime::Permanent;
+
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
 	bool bCanBuyInLobby = false;
 
@@ -77,12 +87,17 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
 	int32 MaxQuantityPerOrder = 1;
 
-	// 한 런 동안 구매할 수 있는 총 수량
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
+	// 한 라운드(로비 구매 + 그 탐사) 동안 팀 전체가 살 수 있는 수량. 정산(FinalizeRound)마다 리셋. 0 이하면 제한 없음.
+	// 이름은 기존 에셋/위젯 바인딩 호환을 위해 유지한다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop", meta = (ToolTip = "라운드마다 리셋되는 팀 전체 구매 한도. 0 이하면 제한 없음."))
 	int32 MaxPurchasesPerRun = 3;
 
-	// 플레이어 한 명당 하나만 가질 수 있는지
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop")
+	// 팀이 동시에 보유할 수 있는 최대 수량(보관함 안 + 꺼내 간 것). 0 이하면 제한 없음.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop", meta = (ToolTip = "팀 전체 보유 상한. 0 이하면 제한 없음."))
+	int32 MaxOwnedQuantity = 0;
+
+	// [미사용] 공유 보관함 전환 후 플레이어별 소유가 없어져 서버가 읽지 않는다. 기존 상점 위젯의 Break 핀 호환용으로만 남김.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Shop", meta = (ToolTip = "사용 안 함 — 팀 보유 상한은 MaxOwnedQuantity"))
 	bool bUniquePerPlayer = false;
 };
 
@@ -114,13 +129,13 @@ public:
 	UPROPERTY(BlueprintReadWrite, Category = "Shop")
 	TArray<FItemShopCartLine> Lines;
 
-	// 현재 상점은 탐사 중 즉시 구매만 사용한다.
+	// 서버는 이 값을 믿지 않고 자기 GameState(로비/탐사)로 구매 장소를 판정한다. 기존 위젯 호환용으로만 남김.
 	UPROPERTY(BlueprintReadWrite, Category = "Shop")
 	EItemShopContext Context = EItemShopContext::InGameImmediate;
 };
 
 
-// 상점 상품의 구매 및 현재 보유 상태
+// [레거시] 공유 보관함 이전의 플레이어별 구매/보유 기록. 세이브 마이그레이션(SaveVersion 0 → 1) 입력으로만 읽는다.
 USTRUCT(BlueprintType)
 struct GOHOME_API FItemShopLoadoutEntry
 {
@@ -140,6 +155,40 @@ public:
 	// 현재 실제로 보유한 수량
 	UPROPERTY(BlueprintReadWrite, Category = "Shop")
 	int32 OwnedQuantity = 0;
+};
+
+// 라운드별 팀 구매 수량(MaxPurchasesPerRun 검증용). 정산마다 비운다.
+USTRUCT(BlueprintType)
+struct GOHOME_API FItemShopRoundPurchase
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(BlueprintReadOnly, Category = "Shop")
+	FName ProductId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Shop")
+	int32 Quantity = 0;
+};
+
+// 보관함 꺼내기/넣기 결과 (서버 → 요청한 클라이언트). 수량 자체는 GameState 복제 미러로 따로 온다.
+USTRUCT(BlueprintType)
+struct GOHOME_API FSharedLockerResult
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(BlueprintReadOnly, Category = "Shared Locker")
+	ESharedLockerAction Action = ESharedLockerAction::Withdraw;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Shared Locker")
+	FName ProductId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Shared Locker")
+	EItemShopResult Result = EItemShopResult::ShopUnavailable;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Shared Locker")
+	FText Message;
 };
 
 // 구매 결과 구조 (서버가 UI에게 보냄)
