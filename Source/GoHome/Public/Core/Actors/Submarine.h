@@ -29,6 +29,10 @@ protected:
 	void HandleDoorStateChanged(bool bOpen); 
 	
 public:
+	// 월드 위치가 InteriorVolume 박스 안인지(오버랩 채널과 무관한 기하 판정 — 물리 아이템은 Pawn 채널에 안 걸린다).
+	// 공유 보관함이 라운드 종료 때 "잠수정 안에 둔 장비"를 회수할 때 쓴다.
+	bool IsLocationInsideInterior(const FVector& WorldLocation) const;
+
 	// 레벨/BP에서 위치·크기를 눈으로 맞추도록 EditAnywhere.
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Docking Door")
 	TObjectPtr<UBoxComponent> InteriorVolume;

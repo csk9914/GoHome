@@ -75,6 +75,11 @@ void AGoHomePlayerController::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		PauseMenu->RemoveFromParent();
 		PauseMenu = nullptr;
 	}
+	if (SharedLockerWidget)
+	{
+		SharedLockerWidget->RemoveFromParent();
+		SharedLockerWidget = nullptr;
+	}
 	Super::EndPlay(EndPlayReason);
 }
 
@@ -95,17 +100,10 @@ void AGoHomePlayerController::SetPawn(APawn* InPawn)
 	RefreshExplorationHUD();
 	RefreshProgressHUD();
 
-	// 서버에서만 저장된 상점 아이템을 지급한다.
-	if (HasAuthority())
+	// 폰이 바뀌면(사망 후 관전 등) 이전 폰 기준으로 연 보관함은 닫는다.
+	if (IsLocalController() && SharedLockerWidget)
 	{
-		if (UGameInstance* GameInstance = GetGameInstance())
-		{
-			if (UItemShopSubsystem* ShopSubsystem =
-				GameInstance->GetSubsystem<UItemShopSubsystem>())
-			{
-				ShopSubsystem->TryGrantSavedLoadout(this);
-			}
-		}
+		CloseSharedLocker(true);
 	}
 }
 
@@ -149,6 +147,10 @@ void AGoHomePlayerController::HandleGameStateSet(AGameStateBase* /*NewGameState*
 	if (PauseMenu && !IsLeaveInFlight())
 	{
 		ClosePauseMenu();
+	}
+	if (SharedLockerWidget)
+	{
+		CloseSharedLocker(true);
 	}
 	RefreshExplorationHUD();
 	RefreshProgressHUD();
@@ -326,6 +328,107 @@ void AGoHomePlayerController::Server_RequestShopPurchase_Implementation(
 		bSuccess ? TEXT("true") : TEXT("false"),
 		PurchaseResult.RemainingFunds,
 		static_cast<uint8>(PurchaseResult.Result));
+
+	Client_ShopPurchaseResult(PurchaseResult);
+}
+
+void AGoHomePlayerController::Client_ShopPurchaseResult_Implementation(const FItemShopPurchaseResult& Result)
+{
+	OnShopPurchaseResult(Result);
+}
+
+// --- 잠수정 공유 보관함 ---
+
+void AGoHomePlayerController::Client_OpenSharedLocker_Implementation()
+{
+	OpenSharedLocker();
+}
+
+void AGoHomePlayerController::OpenSharedLocker()
+{
+	if (!IsLocalController() || !SharedLockerWidgetClass || SharedLockerWidget || PauseMenu)
+	{
+		return;
+	}
+
+	SharedLockerWidget = CreateWidget<UUserWidget>(this, SharedLockerWidgetClass);
+	if (!SharedLockerWidget)
+	{
+		return;
+	}
+	SharedLockerWidget->AddToViewport(SharedLockerZOrder);
+
+	// 열린 동안은 이동하지 않는다(UIOnly). Escape는 위젯이 받아 RequestCloseSharedLocker로 닫는다 — 커서가 켜져 있어
+	// 인게임 시스템 메뉴는 열리지 않는다(CanOpenPauseMenu).
+	FlushPressedKeys();
+	FInputModeUIOnly InputMode;
+	InputMode.SetWidgetToFocus(SharedLockerWidget->TakeWidget());
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+	bShowMouseCursor = true;
+}
+
+void AGoHomePlayerController::CloseSharedLocker(bool bRestoreInput)
+{
+	if (!SharedLockerWidget)
+	{
+		return;
+	}
+
+	SharedLockerWidget->RemoveFromParent();
+	SharedLockerWidget = nullptr;
+
+	if (bRestoreInput)
+	{
+		SetInputMode(FInputModeGameOnly());
+		bShowMouseCursor = false;
+	}
+}
+
+void AGoHomePlayerController::RequestCloseSharedLocker()
+{
+	CloseSharedLocker(true);
+}
+
+void AGoHomePlayerController::RequestLockerWithdraw(FName ProductId)
+{
+	Server_RequestLockerWithdraw(ProductId);
+}
+
+void AGoHomePlayerController::RequestLockerDeposit(FName ProductId)
+{
+	Server_RequestLockerDeposit(ProductId);
+}
+
+void AGoHomePlayerController::Server_RequestLockerWithdraw_Implementation(FName ProductId)
+{
+	UItemShopSubsystem* ShopSubsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UItemShopSubsystem>() : nullptr;
+	if (!ShopSubsystem)
+	{
+		return;
+	}
+
+	FSharedLockerResult Result;
+	ShopSubsystem->TryWithdrawFromLocker(this, ProductId, Result);
+	Client_SharedLockerResult(Result);
+}
+
+void AGoHomePlayerController::Server_RequestLockerDeposit_Implementation(FName ProductId)
+{
+	UItemShopSubsystem* ShopSubsystem = GetGameInstance() ? GetGameInstance()->GetSubsystem<UItemShopSubsystem>() : nullptr;
+	if (!ShopSubsystem)
+	{
+		return;
+	}
+
+	FSharedLockerResult Result;
+	ShopSubsystem->TryDepositToLocker(this, ProductId, Result);
+	Client_SharedLockerResult(Result);
+}
+
+void AGoHomePlayerController::Client_SharedLockerResult_Implementation(const FSharedLockerResult& Result)
+{
+	SharedLockerResultEvent.Broadcast(Result);
 }
 
 // 상점 열기
@@ -490,6 +593,9 @@ void AGoHomePlayerController::HandleSettlementReadyForPause(const FSettlementRes
 	{
 		DismissPauseMenuWithoutInputRestore();
 	}
+
+	// 보관함도 같은 이유로 걷어낸다(입력 모드는 정산 화면 몫).
+	CloseSharedLocker(false);
 }
 
 EPauseSessionRole AGoHomePlayerController::GetSessionRole() const

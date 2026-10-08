@@ -74,17 +74,6 @@ FText ARecoveryItemBase::GetInteractionPromptText_Implementation() const
 	return ActionText;
 }
 
-bool ARecoveryItemBase::GiveToInventory(APawn* TargetPawn)
-{
-	if (!HasAuthority() || !TargetPawn || HoldingPawn || bIsBeingClaimed)
-	{
-		return false;
-	}
-
-	AUsableItemBase::OnInteract(TargetPawn);
-	return HoldingPawn == TargetPawn;
-}
-
 bool ARecoveryItemBase::CanRestorePawn(const APawn* TargetPawn) const
 {
 	if (!IsValid(TargetPawn) || RecoveryAmount <= 0.f)

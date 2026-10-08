@@ -27,6 +27,7 @@ public:
 
 	// 소진됐거나 이미 채널링 중이면 false
 	virtual bool CanUse() const override;
+	virtual bool IsDepleted() const override { return bConsumed; }
 
 	// 장비류 - 납품 정산 대상 아님
 	virtual bool IsDeliverable() const override { return false; }

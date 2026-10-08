@@ -44,7 +44,23 @@ public:
 	UPROPERTY(BlueprintReadWrite, Category = "Save")
 	FName LastProgressPoint;
 	
-	// 상점 상품의 구매 및 현재 보유 상태
-	UPROPERTY(BlueprintReadWrite, Category = "Save")
+	// 세이브 스키마 버전. 이 필드가 없던 옛 세이브는 로드 시 0으로 읽혀 마이그레이션 대상이 된다
+	// (그래서 기본값은 0이고, 새로 만드는 세이브만 UGoHomeSaveSubsystem이 CurrentSaveVersion을 넣는다).
+	UPROPERTY(BlueprintReadOnly, Category = "Save")
+	int32 SaveVersion = 0;
+
+	// 1: 플레이어별 상점 보유 기록 → 잠수정 공유 보관함
+	static constexpr int32 CurrentSaveVersion = 1;
+
+	// 잠수정 공유 보관함 — 팀 전체 상품 보유 수량(영구 장비 + 소모품). 게임 초기화(ResetSave) 시 함께 비워진다.
+	UPROPERTY(BlueprintReadOnly, Category = "Save")
+	TArray<FSharedLockerEntry> SharedLockerItems;
+
+	// 이번 라운드 팀 구매 수량(MaxPurchasesPerRun 검증). FinalizeRound마다 비운다.
+	UPROPERTY(BlueprintReadOnly, Category = "Save")
+	TArray<FItemShopRoundPurchase> RoundShopPurchases;
+
+	// [레거시] 플레이어별 상점 구매/보유 기록. SaveVersion 0 세이브를 읽을 때만 채워져 있고, 마이그레이션 후 비운다.
+	UPROPERTY()
 	TArray<FItemShopLoadoutEntry> ItemShopPurchaseStates;
 };

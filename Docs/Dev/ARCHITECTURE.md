@@ -33,6 +33,7 @@
 | `Item/` | 4. 상호작용/운반/납품 (아이템 정의 + 물리/부력) | - |
 | `UI/` | 6. UI | 신규 화면은 화면군 하위 폴더(`UI/Title/`)에 C++ 베이스. 기존 BP 전용 화면은 해당 화면 작업 시에만 이주 |
 | `Save/` | 9. 세이브 데이터 스키마, 8. 장비 강화(미구현) | - |
+| `Shop/` | 아이템 상점 + 잠수정 공유 보관함 | 보관함 상자 액터(`ASharedLockerActor`)는 상점 단말(`AShopStation`)과 같은 상호작용 스테이션이라 `Interaction/`에 있다 |
 
 `Public/`·`Private/` 최상위 배치 규칙은 [CODING_CONVENTIONS.md 폴더 규칙](CODING_CONVENTIONS.md#폴더-규칙) 참고.
 
@@ -147,6 +148,36 @@ known_gaps:
     detail: "`AI/MonsterBase.h`의 `AMonsterBase`는 경계 3종(IDamageable 호출·IMonsterNoiseListener 구현·도킹 문 상태 구독)을 다 갖췄지만 아무 BP도 상속하지 않는다. 실제 스폰되는 `BP_UnderwaterMonster`는 `AUnderwaterEnemyBase`(빈 APawn), `BP_WormBase`는 `AActor`를 직접 상속한다. 데미지 처리·도킹 문 위협 구독은 `AMonsterBase` 경유 없이 각 BP가 별도 구현해야 한다(소음 감지는 원래 BP가 직접 구현이라 무관)."
   - name: 도킹 문 위협 판정 미구현
     detail: "수신 측(`AGoHomeGameState::Fail(EFailReason)` → `AExplorationGameMode::HandleFail`)은 배선됐으나, `UDockingDoorComponent::OnDoorStateChanged`를 구독해 위협 판정 후 `Fail(EFailReason::DockThreatened)`을 호출하는 코드가 AI 쪽에 없다."
+```
+
+### Shop (상점 + 잠수정 공유 보관함)
+```yaml
+decoupling:
+  - "상점 구매품은 플레이어가 아니라 팀 소유다 — 구매는 자금 차감 + `SaveGame.SharedLockerItems`(상품별 팀 보유 수량) 증가만 하고 액터를 만들지 않는다. 액터는 잠수정 보관함에서 꺼낼 때만 생성돼 핫바(`UInventoryComponent`)에 들어간다. 핫바는 유물 운반·손에 들기용으로 그대로이고 구매품을 저장하지 않는다."
+  - "영구/소모 구분은 `FItemShopProduct::Lifetime`(`EItemShopItemLifetime`)과 세이브 항목 `FSharedLockerEntry::Lifetime`이 출처다 — `IsDeliverable()`(납품 여부)에서 추론하지 않는다. 보관함 상품은 `AItemActorBase::IsSharedLockerItem()`으로 납품 정산에서 따로 빠진다."
+  - "UI는 수량을 `AGoHomeGameState::SharedLockerItems`(복제 미러, `OnSharedLockerChanged`)로만 읽고, 꺼내기/넣기는 `ISharedLockerBackend`(Core, `AGoHomePlayerController` 구현) 요청만 한다."
+
+decisions:
+  - name: 수량 모델 (보유 − 꺼냄 = 보관)
+    detail: |
+      SaveGame에는 팀 보유 수량(OwnedQuantity)만 저장하고, 꺼내 간 액터는 `UItemShopSubsystem::Checkouts` 런타임 장부(약참조 + `OnEndPlay` 구독)만 안다. 보관함 안 수량 = 보유 − 꺼냄.
+      그래서 아무 시점에 세이브가 디스크로 나가도 꺼내 간 것은 "보유"로 남는다(크래시해도 분실로 바뀌지 않음).
+      꺼낸 액터가 플레이 중 명시적으로 파괴되면(`EEndPlayReason::Destroyed`, 월드 정리·seamless travel 아님) 보유 −1 — 회복 캡슐은 효과가 실제 적용됐을 때만 Destroy하므로 "HP/산소 가득이면 안 줄어듦"이 자연히 성립하고, 텔레포트 리모컨 소모·납품·바닥 소멸도 같은 경로다. 맵 정리로 사라지면(로비→탐사 트래블 등) 보관함으로 돌아간 것으로 본다.
+  - name: 라운드 종료 회수/분실
+    detail: |
+      `FinalizeRound` 첫머리에서 `ResolveCheckoutsForRoundEnd`: 꺼낸 액터 중 살아있는 플레이어 핫바에 있거나(사망 폰은 이미 `ServerDropAllItems`로 떨굼) `ASubmarine::IsLocationInsideInterior` 안에 있는 것만 회수, 나머지는 분실(보유 −1). 다 쓴 소모품(`AUsableItemBase::IsDepleted`)은 회수 위치와 무관하게 소모 처리.
+      회수·분실 모두 액터를 바로 Destroy해 정산 화면 중 재사용/납품으로 수량이 이중으로 움직이지 않게 한다. 영구 장비 분실은 사용자 결정(리썰컴퍼니식 분실), 미사용 소모품은 다음 라운드까지 보관함에 남는다.
+  - name: 구매 장소·한도
+    detail: |
+      서버는 클라가 보낸 `FItemShopPurchaseRequest::Context`를 쓰지 않고 GameState 단계로 판정(Lobby=LobbyLoadout→`bCanBuyInLobby`, Exploration=InGameImmediate→`bCanBuyInGame`, 그 외 거절). 탐사 중 구매도 같은 보관함으로 들어간다.
+      `MaxPurchasesPerRun`은 이름만 유지(위젯 바인딩 호환)하고 의미를 "팀 전체·라운드당"으로 바꿨다 — `SaveGame.RoundShopPurchases`에 저장, `FinalizeRound`마다 비움(0 이하 = 무제한). 이전엔 플레이어별 누적이 `ResetSave`에서만 리셋돼 사실상 게임 전체 한도였다. 팀 보유 상한은 `MaxOwnedQuantity`. `bUniquePerPlayer`는 미사용(위젯 핀 호환용으로만 잔존).
+      커밋은 검증 전부 통과 후 `TrySpendFunds` → 상품별 `SetLockerOwnedQuantity`, 실패 시 이전 값 복원 + `RefundFunds`.
+  - name: 기존 플레이어별 로드아웃 폐기
+    detail: |
+      반려: 구매품을 플레이어 핫바에 지급하고 라운드 끝에 남은 수량을 플레이어 키(`Player_<PlayerId>`)별로 저장, 다음 탐사 `SetPawn`에서 재지급하던 구조 — PlayerId가 세션마다 바뀌어 저장 보유가 주인을 잃고, 회복 캡슐은 지급 경로(`OnInteract` = 즉시 회복) 때문에 구매 자체가 실패했다.
+      `SaveVersion` 0 세이브는 로드 시 `MigrateSaveGame`이 옛 `ItemShopPurchaseStates`의 보유 수량을 상품별로 합산해 보관함으로 옮긴다(카탈로그에 없는 상품은 버림).
+  - name: 보관함 꺼내기 서버 검증
+    detail: 꺼내기/넣기 RPC마다 서버가 게임 단계(로비/탐사), 요청 폰이 `ASharedLockerActor::UseRadius` 안인지, 보관 수량·빈 핫바 슬롯을 다시 확인한다. 지급은 `AItemActorBase::ServerGrantToPawn`(서브클래스 `OnInteract` 재정의 우회 — 회복 캡슐이 꺼내자마자 쓰이지 않게).
 ```
 
 ### Item
@@ -270,6 +301,7 @@ known_gaps:
 | 인벤토리 슬롯 | Interaction | UI(슬롯별 바인딩) |
 | `IDeathNotifier::OnDeath` | Player (`DeathNotifier.h`, `UHealthComponent`가 구현) | Interaction(`UInventoryComponent`가 `BeginPlay`에서 `FindComponentByInterface<IDeathNotifier>()`로 구독 → `ServerDropAllItems` 구현됨), Core(`AExplorationGameMode`가 `RestartPlayer`→`TrackPawnDeath`에서 폰별 구독 → 전원 사망 시 `HandleFail`, 구현됨). 구체 타입을 몰라도 사망 시점을 구독하게 하는 게 목적 |
 | `AGoHomeGameState::Fail(EFailReason)` | Core (`GoHomeGameState.h`) | 서버 전용 얇은 포워더 — `HasAuthority` 가드 후 `GetAuthGameMode<AExplorationGameMode>()->HandleFail(Reason)`. 콜러는 AI 도킹문 위협만 남음(미구현) — 타임오버는 `AExplorationGameMode`가 `TimeLimitTimer`로 `HandleFail`을 직접 부른다 |
+| 공유 보관함 | Shop (`UItemShopSubsystem`) → Core 미러 | 저장은 `UGoHomeSaveSubsystem`(`SharedLockerItems`), 표시는 `AGoHomeGameState::SharedLockerItems`/`OnSharedLockerChanged`, 요청은 `ISharedLockerBackend`(Core) → `AGoHomePlayerController` 서버 RPC, 상호작용 진입은 `ASharedLockerActor`(Interaction). 상세 Shop 절 |
 | 정산/납품 값 흐름 | Interaction → Core → Save | Interaction(딜리버리 존 진입 시 `AddDeliveredValue` 호출), Core(`AGoHomeGameState::AddDeliveredValue` → `SaveSubsystem::AccumulateDeliveredValue` 포워드, 구현됨), Save(스키마·로직 O) |
 
 ## 공유 헤더 규칙
