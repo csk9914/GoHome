@@ -442,7 +442,18 @@ void AItemActorBase::SetActiveHeld(bool bNewActive)
 
 FText AItemActorBase::GetInteractionPromptText_Implementation() const
 {
-	return FText::FromString(TEXT("줍기"));
+	const FText PickupText = FText::FromString(TEXT("줍기"));
+
+	// 납품 정산 대상만 가치 표시 - 정산 루프(InventoryComponent::ServerDeliverAllItems)와 같은 기준.
+	// 사용 아이템/장비(IsDeliverable false)와 보관함 상품은 기존처럼 "줍기"만.
+	if (!IsDeliverable() || IsSharedLockerItem())
+	{
+		return PickupText;
+	}
+
+	// 파손이 반영된 현재 가치. 반올림도 정산과 동일하게 맞춰서, 표시 금액 = 실제 납품 금액.
+	return FText::Format(NSLOCTEXT("Item", "PickupWithValue", "줍기(Value {0})"),
+		FText::AsNumber(FMath::RoundToInt(GetCurrentValue())));
 }
 
 void AItemActorBase::OnRep_IsActiveHeld()
